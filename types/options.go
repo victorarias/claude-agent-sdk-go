@@ -1,5 +1,10 @@
 package types
 
+import (
+	"fmt"
+	"sync"
+)
+
 // PermissionMode controls how tool permissions are handled.
 type PermissionMode string
 
@@ -127,6 +132,12 @@ type MCPContent struct {
 	Type string `json:"type"` // "text", "image", etc.
 	Text string `json:"text,omitempty"`
 }
+
+// Version is the SDK version.
+const Version = "0.1.0"
+
+// MinimumCLIVersion is the minimum supported CLI version.
+const MinimumCLIVersion = "2.0.0"
 
 // Options configures the Claude SDK client.
 type Options struct {
