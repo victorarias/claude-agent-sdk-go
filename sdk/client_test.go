@@ -84,8 +84,8 @@ func TestClientWithPostToolUseHook(t *testing.T) {
 		),
 	)
 
-	if len(client.hooks[HookPostToolUse]) != 1 {
-		t.Errorf("expected 1 post tool use hook, got %d", len(client.hooks[HookPostToolUse]))
+	if len(client.hooks[types.HookPostToolUse]) != 1 {
+		t.Errorf("expected 1 post tool use hook, got %d", len(client.hooks[types.HookPostToolUse]))
 	}
 }
 
@@ -99,17 +99,17 @@ func TestClientWithStopHook(t *testing.T) {
 		),
 	)
 
-	if len(client.hooks[HookStop]) != 1 {
-		t.Errorf("expected 1 stop hook, got %d", len(client.hooks[HookStop]))
+	if len(client.hooks[types.HookStop]) != 1 {
+		t.Errorf("expected 1 stop hook, got %d", len(client.hooks[types.HookStop]))
 	}
 }
 
 func TestClientWithCanUseTool(t *testing.T) {
 	called := false
 	client := NewClient(
-		WithCanUseTool(func(toolName string, input map[string]any, ctx *ToolPermissionContext) (PermissionResult, error) {
+		WithCanUseTool(func(toolName string, input map[string]any, ctx *types.ToolPermissionContext) (types.PermissionResult, error) {
 			called = true
-			return &PermissionResultAllow{Behavior: "allow"}, nil
+			return &types.PermissionResultAllow{Behavior: "allow"}, nil
 		}),
 	)
 
@@ -140,18 +140,18 @@ func TestClient_IsConnected(t *testing.T) {
 func TestClientWithHookTimeout(t *testing.T) {
 	timeout := 5.0
 	client := NewClient(
-		WithHookTimeout(HookPreToolUse, map[string]any{"tool_name": "Bash"}, timeout,
+		WithHookTimeout(types.HookPreToolUse, map[string]any{"tool_name": "Bash"}, timeout,
 			func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
 				return &types.HookOutput{}, nil
 			},
 		),
 	)
 
-	if len(client.hooks[HookPreToolUse]) != 1 {
-		t.Errorf("expected 1 hook, got %d", len(client.hooks[HookPreToolUse]))
+	if len(client.hooks[types.HookPreToolUse]) != 1 {
+		t.Errorf("expected 1 hook, got %d", len(client.hooks[types.HookPreToolUse]))
 	}
 
-	if client.hooks[HookPreToolUse][0].Timeout == nil || *client.hooks[HookPreToolUse][0].Timeout != timeout {
+	if client.hooks[types.HookPreToolUse][0].Timeout == nil || *client.hooks[types.HookPreToolUse][0].Timeout != timeout {
 		t.Error("expected hook timeout to be set")
 	}
 }
