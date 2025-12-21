@@ -3,6 +3,8 @@ package mcp
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 func TestMCPToolDefinition_JSON(t *testing.T) {
@@ -55,7 +57,7 @@ func TestMCPRequest_JSON(t *testing.T) {
 					"capabilities":    map[string]any{},
 					"clientInfo": map[string]any{
 						"name":    "claude-agent-sdk-go",
-						"version": Version,
+						"version": types.Version,
 					},
 				},
 			},

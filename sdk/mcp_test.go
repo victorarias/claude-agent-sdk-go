@@ -7,7 +7,7 @@ import (
 )
 
 func TestMCPTool(t *testing.T) {
-	tool := &MCPTool{
+	tool := &types.MCPTool{
 		Name:        "test_tool",
 		Description: "A test tool",
 		Schema: map[string]any{
@@ -16,9 +16,9 @@ func TestMCPTool(t *testing.T) {
 				"input": map[string]any{"type": "string"},
 			},
 		},
-		Handler: func(args map[string]any) (*MCPToolResult, error) {
-			return &MCPToolResult{
-				Content: []MCPContent{{Type: "text", Text: "success"}},
+		Handler: func(args map[string]any) (*types.MCPToolResult, error) {
+			return &types.MCPToolResult{
+				Content: []types.MCPContent{{Type: "text", Text: "success"}},
 			}, nil
 		},
 	}
@@ -38,16 +38,16 @@ func TestMCPTool(t *testing.T) {
 }
 
 func TestMCPServer_GetTool(t *testing.T) {
-	server := &MCPServer{
+	server := &types.MCPServer{
 		Name:    "test-server",
 		Version: "1.0.0",
-		Tools: []*MCPTool{
+		Tools: []*types.MCPTool{
 			{
 				Name:        "greet",
 				Description: "Greets someone",
-				Handler: func(args map[string]any) (*MCPToolResult, error) {
-					return &MCPToolResult{
-						Content: []MCPContent{{Type: "text", Text: "Hello!"}},
+				Handler: func(args map[string]any) (*types.MCPToolResult, error) {
+					return &types.MCPToolResult{
+						Content: []types.MCPContent{{Type: "text", Text: "Hello!"}},
 					}, nil
 				},
 			},
@@ -69,17 +69,17 @@ func TestMCPServer_GetTool(t *testing.T) {
 }
 
 func TestMCPServer_CallTool(t *testing.T) {
-	server := &MCPServer{
+	server := &types.MCPServer{
 		Name:    "test-server",
 		Version: "1.0.0",
-		Tools: []*MCPTool{
+		Tools: []*types.MCPTool{
 			{
 				Name:        "echo",
 				Description: "Echoes input",
-				Handler: func(args map[string]any) (*MCPToolResult, error) {
+				Handler: func(args map[string]any) (*types.MCPToolResult, error) {
 					msg := args["message"].(string)
-					return &MCPToolResult{
-						Content: []MCPContent{{Type: "text", Text: msg}},
+					return &types.MCPToolResult{
+						Content: []types.MCPContent{{Type: "text", Text: msg}},
 					}, nil
 				},
 			},
@@ -97,7 +97,7 @@ func TestMCPServer_CallTool(t *testing.T) {
 }
 
 func TestMCPServer_CallTool_NotFound(t *testing.T) {
-	server := &MCPServer{
+	server := &types.MCPServer{
 		Name:    "test-server",
 		Version: "1.0.0",
 	}
@@ -109,10 +109,10 @@ func TestMCPServer_CallTool_NotFound(t *testing.T) {
 }
 
 func TestMCPServer_ToConfig(t *testing.T) {
-	server := &MCPServer{
+	server := &types.MCPServer{
 		Name:    "test-server",
 		Version: "1.0.0",
-		Tools: []*MCPTool{
+		Tools: []*types.MCPTool{
 			{
 				Name:        "greet",
 				Description: "Greets someone",
@@ -145,17 +145,17 @@ func TestMCPServer_ToConfig(t *testing.T) {
 }
 
 func TestMCPServerBuilder(t *testing.T) {
-	server := NewMCPServerBuilder("test-server").
+	server := types.NewMCPServerBuilder("test-server").
 		WithVersion("2.0.0").
 		WithTool("greet", "Greets a user", map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"name": map[string]any{"type": "string"},
 			},
-		}, func(args map[string]any) (*MCPToolResult, error) {
+		}, func(args map[string]any) (*types.MCPToolResult, error) {
 			name := args["name"].(string)
-			return &MCPToolResult{
-				Content: []MCPContent{{Type: "text", Text: "Hello, " + name + "!"}},
+			return &types.MCPToolResult{
+				Content: []types.MCPContent{{Type: "text", Text: "Hello, " + name + "!"}},
 			}, nil
 		}).
 		Build()
@@ -188,19 +188,19 @@ func TestMCPServerBuilder(t *testing.T) {
 }
 
 func TestMCPServerBuilder_MultipleTool(t *testing.T) {
-	server := NewMCPServerBuilder("multi-tool").
+	server := types.NewMCPServerBuilder("multi-tool").
 		WithTool("add", "Adds numbers", map[string]any{
 			"type": "object",
-		}, func(args map[string]any) (*MCPToolResult, error) {
-			return &MCPToolResult{
-				Content: []MCPContent{{Type: "text", Text: "result"}},
+		}, func(args map[string]any) (*types.MCPToolResult, error) {
+			return &types.MCPToolResult{
+				Content: []types.MCPContent{{Type: "text", Text: "result"}},
 			}, nil
 		}).
 		WithTool("multiply", "Multiplies numbers", map[string]any{
 			"type": "object",
-		}, func(args map[string]any) (*MCPToolResult, error) {
-			return &MCPToolResult{
-				Content: []MCPContent{{Type: "text", Text: "result"}},
+		}, func(args map[string]any) (*types.MCPToolResult, error) {
+			return &types.MCPToolResult{
+				Content: []types.MCPContent{{Type: "text", Text: "result"}},
 			}, nil
 		}).
 		Build()
@@ -223,7 +223,7 @@ func TestMCPServerBuilder_MultipleTool(t *testing.T) {
 }
 
 func TestMCPServerBuilder_DefaultVersion(t *testing.T) {
-	server := NewMCPServerBuilder("test").Build()
+	server := types.NewMCPServerBuilder("test").Build()
 
 	if server.Version != "1.0.0" {
 		t.Errorf("expected default version 1.0.0, got %s", server.Version)
