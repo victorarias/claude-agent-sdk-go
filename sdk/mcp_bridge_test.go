@@ -315,7 +315,7 @@ func TestHandleControlRequest_MCPMessage(t *testing.T) {
 		}).
 		Build()
 
-	transport := newMockTransport()
+	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 	query.RegisterMCPServer(server)
 
@@ -345,57 +345,59 @@ func TestHandleControlRequest_MCPMessage(t *testing.T) {
 	// Send the control request
 	go query.handleControlRequest(controlRequest)
 
-	// Wait for response
-	select {
-	case <-time.After(1 * time.Second):
-		t.Fatal("timeout waiting for control response")
-	case msg := <-transport.writeChan:
-		// Parse response
-		var response map[string]any
-		if err := json.Unmarshal([]byte(msg), &response); err != nil {
-			t.Fatalf("failed to parse response: %v", err)
-		}
+	// Wait for response to be written
+	time.Sleep(100 * time.Millisecond)
 
-		if response["type"] != "control_response" {
-			t.Errorf("expected control_response, got %v", response["type"])
-		}
+	written := transport.Written()
+	if len(written) == 0 {
+		t.Fatal("no response written")
+	}
 
-		responseData, ok := response["response"].(map[string]any)
-		if !ok {
-			t.Fatalf("expected response map, got %T", response["response"])
-		}
+	// Parse response
+	var response map[string]any
+	if err := json.Unmarshal([]byte(written[0]), &response); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
 
-		if responseData["subtype"] != "success" {
-			t.Errorf("expected success subtype, got %v", responseData["subtype"])
-		}
+	if response["type"] != "control_response" {
+		t.Errorf("expected control_response, got %v", response["type"])
+	}
 
-		// Check the mcp_response
-		respPayload, ok := responseData["response"].(map[string]any)
-		if !ok {
-			t.Fatalf("expected response payload map, got %T", responseData["response"])
-		}
+	responseData, ok := response["response"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected response map, got %T", response["response"])
+	}
 
-		mcpResponse, ok := respPayload["mcp_response"].(map[string]any)
-		if !ok {
-			t.Fatalf("expected mcp_response map, got %T", respPayload["mcp_response"])
-		}
+	if responseData["subtype"] != "success" {
+		t.Errorf("expected success subtype, got %v", responseData["subtype"])
+	}
 
-		if mcpResponse["jsonrpc"] != "2.0" {
-			t.Errorf("expected jsonrpc 2.0, got %v", mcpResponse["jsonrpc"])
-		}
+	// Check the mcp_response
+	respPayload, ok := responseData["response"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected response payload map, got %T", responseData["response"])
+	}
 
-		result, ok := mcpResponse["result"].(map[string]any)
-		if !ok {
-			t.Fatalf("expected result map, got %T", mcpResponse["result"])
-		}
+	mcpResponse, ok := respPayload["mcp_response"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected mcp_response map, got %T", respPayload["mcp_response"])
+	}
 
-		tools, ok := result["tools"].([]any)
-		if !ok {
-			t.Fatalf("expected tools array, got %T", result["tools"])
-		}
+	if mcpResponse["jsonrpc"] != "2.0" {
+		t.Errorf("expected jsonrpc 2.0, got %v", mcpResponse["jsonrpc"])
+	}
 
-		if len(tools) != 1 {
-			t.Errorf("expected 1 tool, got %d", len(tools))
-		}
+	result, ok := mcpResponse["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected result map, got %T", mcpResponse["result"])
+	}
+
+	tools, ok := result["tools"].([]any)
+	if !ok {
+		t.Fatalf("expected tools array, got %T", result["tools"])
+	}
+
+	if len(tools) != 1 {
+		t.Errorf("expected 1 tool, got %d", len(tools))
 	}
 }
