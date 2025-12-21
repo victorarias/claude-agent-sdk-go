@@ -114,3 +114,123 @@ func TestQuery_Close(t *testing.T) {
 		t.Errorf("second Close failed: %v", err)
 	}
 }
+
+func TestQuery_SendControlRequest(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	// Simulate response in background
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		written := transport.Written()
+		if len(written) > 0 {
+			var req map[string]any
+			json.Unmarshal([]byte(written[0]), &req)
+			reqID := req["request_id"].(string)
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{"status": "ok"},
+				},
+			})
+		}
+	}()
+
+	response, err := query.sendControlRequest(map[string]any{
+		"subtype": "interrupt",
+	}, 5*time.Second)
+
+	if err != nil {
+		t.Errorf("sendControlRequest failed: %v", err)
+	}
+
+	if response["status"] != "ok" {
+		t.Errorf("unexpected response: %v", response)
+	}
+}
+
+func TestQuery_SendControlRequest_Timeout(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	// Don't send a response - should timeout
+	_, err := query.sendControlRequest(map[string]any{
+		"subtype": "interrupt",
+	}, 100*time.Millisecond)
+
+	if err == nil {
+		t.Error("expected timeout error")
+	}
+}
+
+func TestQuery_SendControlRequest_Error(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		written := transport.Written()
+		if len(written) > 0 {
+			var req map[string]any
+			json.Unmarshal([]byte(written[0]), &req)
+			reqID := req["request_id"].(string)
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "error",
+					"request_id": reqID,
+					"error":      "something went wrong",
+				},
+			})
+		}
+	}()
+
+	_, err := query.sendControlRequest(map[string]any{
+		"subtype": "test",
+	}, 5*time.Second)
+
+	if err == nil {
+		t.Error("expected error response")
+	}
+}
+
+func TestQuery_SendControlRequest_NonStreaming(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, false) // non-streaming
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	_, err := query.sendControlRequest(map[string]any{
+		"subtype": "interrupt",
+	}, 100*time.Millisecond)
+
+	if err == nil {
+		t.Error("expected error for non-streaming mode")
+	}
+}
