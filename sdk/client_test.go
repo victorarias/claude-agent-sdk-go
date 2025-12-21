@@ -158,7 +158,7 @@ func TestClientWithHookTimeout(t *testing.T) {
 
 func TestClient_Connect(t *testing.T) {
 	transport := NewMockTransport()
-	client := NewClient(WithTransport(transport))
+	client := NewClient(types.WithTransport(transport))
 
 	// Respond to control requests
 	go func() {
@@ -212,7 +212,7 @@ func TestClient_Connect(t *testing.T) {
 
 func TestClient_ConnectWithPrompt(t *testing.T) {
 	transport := NewMockTransport()
-	client := NewClient(WithTransport(transport))
+	client := NewClient(types.WithTransport(transport))
 
 	// Non-streaming mode doesn't require Initialize
 	ctx := context.Background()
@@ -231,8 +231,8 @@ func TestClient_ConnectWithPrompt(t *testing.T) {
 func TestClient_Resume(t *testing.T) {
 	transport := NewMockTransport()
 	client := NewClient(
-		WithResume("previous_session_id"),
-		WithTransport(transport),
+		types.WithResume("previous_session_id"),
+		types.WithTransport(transport),
 	)
 
 	// Respond to control requests
@@ -305,7 +305,7 @@ func TestQuery_OneShot(t *testing.T) {
 	}()
 
 	ctx := context.Background()
-	messages, err := RunQuery(ctx, "Hello", WithTransport(transport))
+	messages, err := RunQuery(ctx, "Hello", types.WithTransport(transport))
 
 	if err != nil {
 		t.Fatalf("Query failed: %v", err)
@@ -316,7 +316,7 @@ func TestQuery_OneShot(t *testing.T) {
 	}
 
 	// Verify assistant message
-	if asst, ok := messages[0].(*AssistantMessage); ok {
+	if asst, ok := messages[0].(*types.AssistantMessage); ok {
 		if asst.Text() != "Hello!" {
 			t.Errorf("got text %q, want Hello!", asst.Text())
 		}
@@ -325,7 +325,7 @@ func TestQuery_OneShot(t *testing.T) {
 	}
 
 	// Verify result message
-	if result, ok := messages[1].(*ResultMessage); ok {
+	if result, ok := messages[1].(*types.ResultMessage); ok {
 		if !result.IsSuccess() {
 			t.Error("expected success result")
 		}
@@ -360,9 +360,9 @@ func TestQueryStream(t *testing.T) {
 	}()
 
 	ctx := context.Background()
-	msgChan, errChan := QueryStream(ctx, "Hello", WithTransport(transport))
+	msgChan, errChan := QueryStream(ctx, "Hello", types.WithTransport(transport))
 
-	var messages []Message
+	var messages []types.Message
 	for msg := range msgChan {
 		messages = append(messages, msg)
 	}
@@ -400,7 +400,7 @@ func TestQueryStream_Cancellation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	msgChan, errChan := QueryStream(ctx, "Hello", WithTransport(transport))
+	msgChan, errChan := QueryStream(ctx, "Hello", types.WithTransport(transport))
 
 	// Drain messages (should get at least one before timeout)
 	var count int
@@ -424,7 +424,7 @@ func TestQueryStream_Cancellation(t *testing.T) {
 
 func TestClient_SendQuery(t *testing.T) {
 	transport := NewMockTransport()
-	client := NewClient(WithTransport(transport))
+	client := NewClient(types.WithTransport(transport))
 
 	// Respond to initialize
 	go func() {
@@ -471,7 +471,7 @@ func TestClient_SendQuery(t *testing.T) {
 
 func TestClient_ReceiveMessage(t *testing.T) {
 	transport := NewMockTransport()
-	client := NewClient(WithTransport(transport))
+	client := NewClient(types.WithTransport(transport))
 
 	// Respond to initialize and send assistant message
 	go func() {
@@ -526,14 +526,14 @@ func TestClient_ReceiveMessage(t *testing.T) {
 		t.Errorf("ReceiveMessage failed: %v", err)
 	}
 
-	if _, ok := msg.(*AssistantMessage); !ok {
+	if _, ok := msg.(*types.AssistantMessage); !ok {
 		t.Errorf("expected AssistantMessage, got %T", msg)
 	}
 }
 
 func TestClient_ReceiveAll(t *testing.T) {
 	transport := NewMockTransport()
-	client := NewClient(WithTransport(transport))
+	client := NewClient(types.WithTransport(transport))
 
 	// Respond to initialize and send messages
 	go func() {
@@ -644,9 +644,9 @@ func TestWithClient(t *testing.T) {
 	}()
 
 	ctx := context.Background()
-	var receivedMessages []Message
+	var receivedMessages []types.Message
 
-	err := WithClient(ctx, []Option{WithTransport(transport)}, func(c *Client) error {
+	err := WithClient(ctx, []types.Option{types.WithTransport(transport)}, func(c *Client) error {
 		if err := c.SendQuery("Hello"); err != nil {
 			return err
 		}
@@ -701,7 +701,7 @@ func TestClient_Run(t *testing.T) {
 		}
 	}()
 
-	client := NewClient(WithTransport(transport))
+	client := NewClient(types.WithTransport(transport))
 	ctx := context.Background()
 
 	runCalled := false
@@ -725,7 +725,7 @@ func TestClient_Run(t *testing.T) {
 
 func TestClient_Messages(t *testing.T) {
 	transport := NewMockTransport()
-	client := NewClient(WithTransport(transport))
+	client := NewClient(types.WithTransport(transport))
 
 	go func() {
 		for {
@@ -790,10 +790,10 @@ func TestClient_Messages(t *testing.T) {
 
 	var texts []string
 	for msg := range client.Messages() {
-		if asst, ok := msg.(*AssistantMessage); ok {
+		if asst, ok := msg.(*types.AssistantMessage); ok {
 			texts = append(texts, asst.Text())
 		}
-		if _, ok := msg.(*ResultMessage); ok {
+		if _, ok := msg.(*types.ResultMessage); ok {
 			break
 		}
 	}
