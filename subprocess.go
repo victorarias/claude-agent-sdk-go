@@ -609,9 +609,87 @@ func (t *SubprocessTransport) readStderr() {
 	}
 }
 
+const gracefulShutdownTimeout = 5 * time.Second
+
 // Close terminates the subprocess and cleans up resources.
+// CRITICAL: Uses TOCTOU-safe pattern - state changes inside lock.
 func (t *SubprocessTransport) Close() error {
-	// Implemented in Task 7
+	// CRITICAL: Acquire write lock FIRST to prevent concurrent writes during close
+	t.writeMu.Lock()
+	defer t.writeMu.Unlock()
+
+	t.closeMu.Lock()
+	if t.closed {
+		t.closeMu.Unlock()
+		return nil
+	}
+	// CRITICAL: Set closed and ready inside the lock to prevent TOCTOU
+	t.closed = true
+	t.ready = false
+	cancel := t.cancel
+	cmd := t.cmd
+	stdin := t.stdin
+	stdout := t.stdout
+	stderr := t.stderr
+	t.closeMu.Unlock()
+
+	// Cancel context to stop goroutines
+	if cancel != nil {
+		cancel()
+	}
+
+	// Close stdin first to signal EOF
+	if stdin != nil {
+		stdin.Close()
+	}
+
+	// Terminate process if running
+	if cmd != nil && cmd.Process != nil {
+		done := make(chan error, 1)
+		go func() {
+			done <- cmd.Wait()
+		}()
+
+		select {
+		case <-done:
+			// Process exited gracefully
+		case <-time.After(gracefulShutdownTimeout):
+			// Force kill
+			cmd.Process.Kill()
+			<-done
+		}
+	}
+
+	// Close pipes
+	if stdout != nil {
+		stdout.Close()
+	}
+	if stderr != nil {
+		stderr.Close()
+	}
+
+	// Wait for goroutines
+	t.wg.Wait()
+
+	// Clean up temp files
+	t.tempMu.Lock()
+	for _, path := range t.tempFiles {
+		os.Remove(path)
+	}
+	t.tempFiles = nil
+	t.tempMu.Unlock()
+
+	return nil
+}
+
+// Kill forcefully terminates the subprocess.
+func (t *SubprocessTransport) Kill() error {
+	t.closeMu.Lock()
+	defer t.closeMu.Unlock()
+
+	if t.cmd != nil && t.cmd.Process != nil {
+		return t.cmd.Process.Kill()
+	}
 	return nil
 }
 
