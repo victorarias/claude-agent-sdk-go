@@ -15,7 +15,8 @@ import (
 	"fmt"
 	"time"
 
-	sdk "github.com/victorarias/claude-agent-sdk-go"
+	"github.com/victorarias/claude-agent-sdk-go/sdk"
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 func main() {
@@ -42,7 +43,7 @@ func main() {
 func singleQueryBudget(ctx context.Context) {
 	// Set a budget - query will be limited to this amount
 	messages, err := sdk.RunQuery(ctx, "Say 'hi' briefly",
-		sdk.WithMaxBudget(0.01), // $0.01 budget
+		types.WithMaxBudget(0.01), // $0.01 budget
 	)
 	if err != nil {
 		fmt.Printf("   Error: %v\n", err)
@@ -51,9 +52,9 @@ func singleQueryBudget(ctx context.Context) {
 
 	for _, msg := range messages {
 		switch m := msg.(type) {
-		case *sdk.AssistantMessage:
+		case *types.AssistantMessage:
 			fmt.Printf("   Response: %s\n", m.Text())
-		case *sdk.ResultMessage:
+		case *types.ResultMessage:
 			if m.TotalCostUSD != nil {
 				fmt.Printf("   Cost: $%.6f\n", *m.TotalCostUSD)
 			}
@@ -82,7 +83,7 @@ func costTrackingExample(ctx context.Context) {
 		fmt.Printf("   Query %d: %s (budget remaining: $%.4f)\n", i+1, query, remaining)
 
 		messages, err := sdk.RunQuery(ctx, query,
-			sdk.WithMaxBudget(remaining),
+			types.WithMaxBudget(remaining),
 		)
 		if err != nil {
 			fmt.Printf("   Error: %v\n", err)
@@ -90,7 +91,7 @@ func costTrackingExample(ctx context.Context) {
 		}
 
 		for _, msg := range messages {
-			if result, ok := msg.(*sdk.ResultMessage); ok {
+			if result, ok := msg.(*types.ResultMessage); ok {
 				if result.TotalCostUSD != nil {
 					queryCost := *result.TotalCostUSD
 					totalCost += queryCost
@@ -107,7 +108,7 @@ func streamingBudgetExample(ctx context.Context) {
 	budget := 0.02 // $0.02 budget
 
 	client := sdk.NewClient(
-		sdk.WithMaxBudget(budget),
+		types.WithMaxBudget(budget),
 	)
 
 	if err := client.Connect(ctx); err != nil {
@@ -129,9 +130,9 @@ func streamingBudgetExample(ctx context.Context) {
 		}
 
 		switch m := msg.(type) {
-		case *sdk.AssistantMessage:
+		case *types.AssistantMessage:
 			fmt.Printf("   Response: %s\n", m.Text())
-		case *sdk.ResultMessage:
+		case *types.ResultMessage:
 			if m.TotalCostUSD != nil {
 				fmt.Printf("   Total cost: $%.6f (budget: $%.4f)\n", *m.TotalCostUSD, budget)
 			}
