@@ -74,7 +74,7 @@ func TestFindCLI_NotFound(t *testing.T) {
 		t.Error("expected error when CLI not found")
 	}
 
-	var notFoundErr *CLINotFoundError
+	var notFoundErr *types.CLINotFoundError
 	if !errors.As(err, &notFoundErr) {
 		t.Errorf("expected CLINotFoundError, got %T", err)
 	}
@@ -86,14 +86,14 @@ func TestFindCLI_ExplicitPathNotExists(t *testing.T) {
 		t.Error("expected error for nonexistent path")
 	}
 
-	var notFoundErr *CLINotFoundError
+	var notFoundErr *types.CLINotFoundError
 	if !errors.As(err, &notFoundErr) {
 		t.Errorf("expected CLINotFoundError, got %T", err)
 	}
 }
 
 func TestBuildCommand_Basic(t *testing.T) {
-	opts := DefaultOptions()
+	opts := types.DefaultOptions()
 	cmd := buildCommand("/usr/bin/claude", "Hello", opts, false)
 
 	if cmd[0] != "/usr/bin/claude" {
@@ -113,7 +113,7 @@ func TestBuildCommand_Basic(t *testing.T) {
 }
 
 func TestBuildCommand_Streaming(t *testing.T) {
-	opts := DefaultOptions()
+	opts := types.DefaultOptions()
 	cmd := buildCommand("/usr/bin/claude", "", opts, true)
 
 	hasInputFormat := false
@@ -129,10 +129,10 @@ func TestBuildCommand_Streaming(t *testing.T) {
 }
 
 func TestBuildCommand_WithOptions(t *testing.T) {
-	opts := DefaultOptions()
+	opts := types.DefaultOptions()
 	opts.Model = "claude-opus-4"
 	opts.MaxTurns = 5
-	opts.PermissionMode = PermissionBypass
+	opts.PermissionMode = types.PermissionBypass
 	opts.SystemPrompt = "You are helpful"
 
 	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
@@ -159,8 +159,8 @@ func TestBuildCommand_WithOptions(t *testing.T) {
 }
 
 func TestBuildCommand_MCPServers(t *testing.T) {
-	opts := DefaultOptions()
-	opts.MCPServers = map[string]MCPServerConfig{
+	opts := types.DefaultOptions()
+	opts.MCPServers = map[string]types.MCPServerConfig{
 		"test-server": {
 			Command: "node",
 			Args:    []string{"server.js"},
@@ -182,8 +182,8 @@ func TestBuildCommand_MCPServers(t *testing.T) {
 }
 
 func TestBuildCommand_SandboxConfig(t *testing.T) {
-	opts := DefaultOptions()
-	opts.Sandbox = &SandboxSettings{
+	opts := types.DefaultOptions()
+	opts.Sandbox = &types.SandboxSettings{
 		Enabled: true,
 	}
 
@@ -203,7 +203,7 @@ func TestBuildCommand_SandboxConfig(t *testing.T) {
 
 func TestCommandLength_Windows(t *testing.T) {
 	// Test that very long commands are handled on Windows
-	opts := DefaultOptions()
+	opts := types.DefaultOptions()
 	opts.SystemPrompt = string(make([]byte, 10000)) // Very long prompt
 
 	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
@@ -221,7 +221,7 @@ func TestCommandLength_Windows(t *testing.T) {
 }
 
 func TestNewSubprocessTransport(t *testing.T) {
-	opts := DefaultOptions()
+	opts := types.DefaultOptions()
 	transport := NewSubprocessTransport("Hello", opts)
 
 	if transport == nil {
@@ -234,7 +234,7 @@ func TestNewSubprocessTransport(t *testing.T) {
 }
 
 func TestNewStreamingTransport(t *testing.T) {
-	opts := DefaultOptions()
+	opts := types.DefaultOptions()
 	transport := NewStreamingTransport(opts)
 
 	if transport == nil {
@@ -251,7 +251,7 @@ func TestSubprocessTransportImplementsInterface(t *testing.T) {
 }
 
 func TestSubprocessTransport_Connect_NotFound(t *testing.T) {
-	opts := DefaultOptions()
+	opts := types.DefaultOptions()
 	opts.CLIPath = "/nonexistent/path/to/claude"
 
 	transport := NewSubprocessTransport("Hello", opts)
@@ -261,7 +261,7 @@ func TestSubprocessTransport_Connect_NotFound(t *testing.T) {
 		t.Error("expected error for nonexistent CLI")
 	}
 
-	var notFoundErr *CLINotFoundError
+	var notFoundErr *types.CLINotFoundError
 	if !errors.As(err, &notFoundErr) {
 		t.Errorf("expected CLINotFoundError, got %T: %v", err, err)
 	}
@@ -279,7 +279,7 @@ sleep 0.1
 		t.Fatal(err)
 	}
 
-	opts := DefaultOptions()
+	opts := types.DefaultOptions()
 	opts.CLIPath = mockCLI
 
 	transport := NewSubprocessTransport("Hello", opts)
@@ -375,7 +375,7 @@ func TestSpeculativeJSONParsing(t *testing.T) {
 }
 
 func TestSubprocessTransport_Write_NotReady(t *testing.T) {
-	opts := DefaultOptions()
+	opts := types.DefaultOptions()
 	transport := NewSubprocessTransport("", opts)
 
 	err := transport.Write(`{"type":"user","message":{"content":"hello"}}`)
@@ -383,14 +383,14 @@ func TestSubprocessTransport_Write_NotReady(t *testing.T) {
 		t.Error("expected error when writing to non-ready transport")
 	}
 
-	var connErr *ConnectionError
+	var connErr *types.ConnectionError
 	if !errors.As(err, &connErr) {
 		t.Errorf("expected ConnectionError, got %T", err)
 	}
 }
 
 func TestSubprocessTransport_Close_NotConnected(t *testing.T) {
-	opts := DefaultOptions()
+	opts := types.DefaultOptions()
 	transport := NewSubprocessTransport("", opts)
 
 	err := transport.Close()
@@ -400,7 +400,7 @@ func TestSubprocessTransport_Close_NotConnected(t *testing.T) {
 }
 
 func TestSubprocessTransport_Close_Idempotent(t *testing.T) {
-	opts := DefaultOptions()
+	opts := types.DefaultOptions()
 	transport := NewSubprocessTransport("", opts)
 
 	// Multiple closes should not panic
@@ -416,7 +416,7 @@ func TestSubprocessTransport_Close_CleansUpTempFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	opts := DefaultOptions()
+	opts := types.DefaultOptions()
 	transport := NewSubprocessTransport("", opts)
 	transport.AddTempFile(tmpFile)
 
@@ -442,7 +442,7 @@ while true; do sleep 0.1; done
 		t.Fatal(err)
 	}
 
-	opts := DefaultOptions()
+	opts := types.DefaultOptions()
 	opts.CLIPath = mockCLI
 
 	transport := NewStreamingTransport(opts)
@@ -479,7 +479,7 @@ echo '{"type":"result"}'
 		t.Fatal(err)
 	}
 
-	opts := DefaultOptions()
+	opts := types.DefaultOptions()
 	opts.CLIPath = mockCLI
 
 	transport := NewSubprocessTransport("Hello", opts)
@@ -524,7 +524,7 @@ done
 		t.Fatal(err)
 	}
 
-	opts := DefaultOptions()
+	opts := types.DefaultOptions()
 	opts.CLIPath = mockCLI
 
 	transport := NewStreamingTransport(opts)
@@ -584,7 +584,7 @@ echo '{"type":"result","subtype":"success","duration_ms":100,"is_error":false}'
 		t.Fatal(err)
 	}
 
-	opts := DefaultOptions()
+	opts := types.DefaultOptions()
 	opts.CLIPath = mockCLI
 
 	transport := NewSubprocessTransport("Hello", opts)
@@ -634,7 +634,7 @@ done
 		t.Fatal(err)
 	}
 
-	opts := DefaultOptions()
+	opts := types.DefaultOptions()
 	opts.CLIPath = mockCLI
 
 	transport := NewStreamingTransport(opts)
