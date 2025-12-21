@@ -141,6 +141,74 @@ func TestParseMessage_User(t *testing.T) {
 	}
 }
 
+func TestParseMessage_StreamEvent(t *testing.T) {
+	raw := map[string]any{
+		"type":       "stream_event",
+		"uuid":       "event_123",
+		"session_id": "sess_456",
+		"event": map[string]any{
+			"type":  "content_block_delta",
+			"index": float64(0),
+			"delta": map[string]any{
+				"type": "text_delta",
+				"text": "Hello",
+			},
+		},
+	}
+
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+
+	event, ok := msg.(*StreamEvent)
+	if !ok {
+		t.Fatalf("expected *StreamEvent, got %T", msg)
+	}
+
+	if event.UUID != "event_123" {
+		t.Errorf("got uuid %q, want event_123", event.UUID)
+	}
+	if event.SessionID != "sess_456" {
+		t.Errorf("got session_id %q, want sess_456", event.SessionID)
+	}
+	if event.EventType != "content_block_delta" {
+		t.Errorf("got event_type %q, want content_block_delta", event.EventType)
+	}
+	if event.Index == nil || *event.Index != 0 {
+		t.Error("expected index 0")
+	}
+}
+
+func TestParseMessage_WithParentToolUseID(t *testing.T) {
+	raw := map[string]any{
+		"type":               "user",
+		"uuid":               "msg_123",
+		"parent_tool_use_id": "tool_456",
+		"message": map[string]any{
+			"role":    "user",
+			"content": "Subagent response",
+		},
+	}
+
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+
+	user, ok := msg.(*UserMessage)
+	if !ok {
+		t.Fatalf("expected *UserMessage, got %T", msg)
+	}
+
+	if user.UUID != "msg_123" {
+		t.Errorf("got uuid %q, want msg_123", user.UUID)
+	}
+	if user.ParentToolUseID == nil || *user.ParentToolUseID != "tool_456" {
+		t.Error("expected parent_tool_use_id tool_456")
+	}
+}
+
 func TestParseContentBlock(t *testing.T) {
 	tests := []struct {
 		name string
