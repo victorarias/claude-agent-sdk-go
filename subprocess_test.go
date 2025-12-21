@@ -214,3 +214,33 @@ func TestCommandLength_Windows(t *testing.T) {
 		t.Log("Warning: command exceeds Windows limit, should be handled")
 	}
 }
+
+func TestNewSubprocessTransport(t *testing.T) {
+	opts := DefaultOptions()
+	transport := NewSubprocessTransport("Hello", opts)
+
+	if transport == nil {
+		t.Fatal("NewSubprocessTransport returned nil")
+	}
+
+	if transport.IsReady() {
+		t.Error("should not be ready before Connect")
+	}
+}
+
+func TestNewStreamingTransport(t *testing.T) {
+	opts := DefaultOptions()
+	transport := NewStreamingTransport(opts)
+
+	if transport == nil {
+		t.Fatal("NewStreamingTransport returned nil")
+	}
+
+	if !transport.streaming {
+		t.Error("should be in streaming mode")
+	}
+}
+
+func TestSubprocessTransportImplementsInterface(t *testing.T) {
+	var _ Transport = (*SubprocessTransport)(nil)
+}
