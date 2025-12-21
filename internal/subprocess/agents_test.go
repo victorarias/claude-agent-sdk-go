@@ -128,15 +128,6 @@ func TestBuildCommand_EmptyAgents(t *testing.T) {
 	}
 }
 
-// getCmdLength calculates the total command line length.
-func getCmdLength(cmd []string) int {
-	totalLen := 0
-	for _, arg := range cmd {
-		totalLen += len(arg) + 1 // +1 for space separator
-	}
-	return totalLen
-}
-
 // TestAgentsTempFileFallback tests that agents use temp file when command is too long.
 func TestAgentsTempFileFallback(t *testing.T) {
 	// Create a large agents map to exceed command length limit
