@@ -233,10 +233,54 @@ func WithStopHook(matcher map[string]any, callback HookCallback) Option {
 	}
 }
 
+// WithUserPromptSubmitHook adds a user prompt submit hook.
+func WithUserPromptSubmitHook(callback HookCallback) Option {
+	return &hookOption{
+		event:    HookUserPromptSubmit,
+		matcher:  nil, // No matcher for prompt submit
+		callback: callback,
+	}
+}
+
+// WithSubagentStopHook adds a subagent stop hook.
+func WithSubagentStopHook(callback HookCallback) Option {
+	return &hookOption{
+		event:    HookSubagentStop,
+		matcher:  nil,
+		callback: callback,
+	}
+}
+
+// WithPreCompactHook adds a pre-compact hook.
+func WithPreCompactHook(callback HookCallback) Option {
+	return &hookOption{
+		event:    HookPreCompact,
+		matcher:  nil,
+		callback: callback,
+	}
+}
+
+// WithHookTimeout adds a hook with a timeout.
+func WithHookTimeout(event HookEvent, matcher map[string]any, timeout float64, callback HookCallback) Option {
+	return &hookOptionWithTimeout{
+		event:    event,
+		matcher:  matcher,
+		callback: callback,
+		timeout:  timeout,
+	}
+}
+
 type hookOption struct {
 	event    HookEvent
 	matcher  map[string]any
 	callback HookCallback
+}
+
+type hookOptionWithTimeout struct {
+	event    HookEvent
+	matcher  map[string]any
+	callback HookCallback
+	timeout  float64
 }
 
 func (o *hookOption) Apply(opts *Options) {}
@@ -245,6 +289,16 @@ func (o *hookOption) applyClient(c *Client) {
 	c.hooks[o.event] = append(c.hooks[o.event], HookMatcher{
 		Matcher: o.matcher,
 		Hooks:   []HookCallback{o.callback},
+	})
+}
+
+func (o *hookOptionWithTimeout) Apply(opts *Options) {}
+
+func (o *hookOptionWithTimeout) applyClient(c *Client) {
+	c.hooks[o.event] = append(c.hooks[o.event], HookMatcher{
+		Matcher: o.matcher,
+		Hooks:   []HookCallback{o.callback},
+		Timeout: o.timeout,
 	})
 }
 
@@ -1609,7 +1663,14 @@ After completing Plan 04, you have:
 
 - [x] Client structure with complete options
 - [x] MCP server registration
-- [x] Hook registration (PreToolUse, PostToolUse, Stop)
+- [x] **Complete hook registration (all 6 hooks):**
+  - [x] PreToolUse
+  - [x] PostToolUse
+  - [x] Stop
+  - [x] **UserPromptSubmit**
+  - [x] **SubagentStop**
+  - [x] **PreCompact**
+- [x] **Hook timeout configuration**
 - [x] CanUseTool callback
 - [x] Connect method with initialization
 - [x] Resume and Continue session support
@@ -1622,11 +1683,24 @@ After completing Plan 04, you have:
 - [x] Async iterator pattern (Messages, RawMessages, Errors)
 
 **Key Features:**
-- Complete hook integration at client level
+- **Complete hook integration at client level (all 6 hook events)**
+- **Hook timeout support for fine-grained control**
 - MCP server hosting with tool registration
 - Session resume/continue support
 - Rich message helper methods
 - Multiple iteration patterns (ReceiveAll, Messages channel)
 - Context manager for automatic cleanup
+
+**Configuration Options (defined in Plan 01 options.go):**
+- Model, MaxTurns, PermissionMode, SystemPrompt
+- AllowedTools, DisallowedTools (tool filtering)
+- MaxBudgetUSD (budget control)
+- IncludePartialMessages (streaming deltas)
+- Betas (beta feature flags)
+- SandboxConfig (container isolation)
+- Agents (custom agent definitions)
+- Plugins (plugin configuration)
+- SettingSources (selective configuration loading)
+- Cwd, Env, AddDirs (environment configuration)
 
 **Next:** Plan 05 - Integration & Examples

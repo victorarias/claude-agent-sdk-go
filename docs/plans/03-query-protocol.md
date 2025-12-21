@@ -2324,7 +2324,7 @@ func (q *Query) UnregisterMCPServer(name string) {
 		responseData, err = q.handleMCPToolCall(request)
 */
 
-// handleMCPToolCall handles MCP tool call requests.
+// handleMCPToolCall handles MCP tool call requests (simplified protocol).
 func (q *Query) handleMCPToolCall(request map[string]any) (map[string]any, error) {
 	serverName, _ := request["server_name"].(string)
 	toolName, _ := request["tool_name"].(string)
@@ -2345,9 +2345,157 @@ func (q *Query) handleMCPToolCall(request map[string]any) (map[string]any, error
 
 	return map[string]any{"result": result}, nil
 }
+
+// handleMCPMessage handles full MCP JSONRPC protocol messages.
+// This is the complete MCP protocol bridge that handles:
+// - initialize: Returns server capabilities
+// - notifications/initialized: Acknowledgement (no response)
+// - tools/list: Returns available tools
+// - tools/call: Invokes a tool
+func (q *Query) handleMCPMessage(request map[string]any) (map[string]any, error) {
+	serverName, _ := request["server_name"].(string)
+	message, _ := request["message"].(map[string]any)
+
+	if message == nil {
+		return nil, fmt.Errorf("missing message in mcp_message request")
+	}
+
+	mcpServersMu.RLock()
+	server, exists := mcpServers[serverName]
+	mcpServersMu.RUnlock()
+
+	if !exists {
+		return nil, fmt.Errorf("MCP server not found: %s", serverName)
+	}
+
+	method, _ := message["method"].(string)
+	id := message["id"] // Can be string or number
+	params, _ := message["params"].(map[string]any)
+
+	switch method {
+	case "initialize":
+		return q.handleMCPInitialize(server, id, params)
+	case "notifications/initialized":
+		// Notification - no response needed
+		return nil, nil
+	case "tools/list":
+		return q.handleMCPToolsList(server, id)
+	case "tools/call":
+		return q.handleMCPToolsCall(server, id, params)
+	default:
+		return q.buildMCPError(id, -32601, fmt.Sprintf("Method not found: %s", method)), nil
+	}
+}
+
+// handleMCPInitialize handles the initialize method.
+func (q *Query) handleMCPInitialize(server *MCPServer, id any, params map[string]any) (map[string]any, error) {
+	return map[string]any{
+		"jsonrpc": "2.0",
+		"id":      id,
+		"result": map[string]any{
+			"protocolVersion": "2024-11-05",
+			"capabilities": map[string]any{
+				"tools": map[string]any{},
+			},
+			"serverInfo": map[string]any{
+				"name":    server.Name,
+				"version": "1.0.0",
+			},
+		},
+	}, nil
+}
+
+// handleMCPToolsList handles the tools/list method.
+func (q *Query) handleMCPToolsList(server *MCPServer, id any) (map[string]any, error) {
+	tools := make([]map[string]any, len(server.Tools))
+	for i, tool := range server.Tools {
+		tools[i] = map[string]any{
+			"name":        tool.Name,
+			"description": tool.Description,
+			"inputSchema": tool.InputSchema,
+		}
+	}
+
+	return map[string]any{
+		"jsonrpc": "2.0",
+		"id":      id,
+		"result": map[string]any{
+			"tools": tools,
+		},
+	}, nil
+}
+
+// handleMCPToolsCall handles the tools/call method.
+func (q *Query) handleMCPToolsCall(server *MCPServer, id any, params map[string]any) (map[string]any, error) {
+	toolName, _ := params["name"].(string)
+	arguments, _ := params["arguments"].(map[string]any)
+
+	tool, ok := server.GetTool(toolName)
+	if !ok {
+		return q.buildMCPError(id, -32602, fmt.Sprintf("Tool not found: %s", toolName)), nil
+	}
+
+	result, err := tool.Handler(q.ctx, arguments)
+	if err != nil {
+		return map[string]any{
+			"jsonrpc": "2.0",
+			"id":      id,
+			"result": map[string]any{
+				"content": []map[string]any{
+					{"type": "text", "text": err.Error()},
+				},
+				"isError": true,
+			},
+		}, nil
+	}
+
+	// Convert result to MCP content format
+	content := q.resultToMCPContent(result)
+
+	return map[string]any{
+		"jsonrpc": "2.0",
+		"id":      id,
+		"result": map[string]any{
+			"content": content,
+		},
+	}, nil
+}
+
+// resultToMCPContent converts a tool result to MCP content format.
+func (q *Query) resultToMCPContent(result any) []map[string]any {
+	switch r := result.(type) {
+	case string:
+		return []map[string]any{{"type": "text", "text": r}}
+	case map[string]any:
+		// Check if already in MCP format
+		if _, hasContent := r["content"]; hasContent {
+			if content, ok := r["content"].([]map[string]any); ok {
+				return content
+			}
+		}
+		// Convert to JSON text
+		data, _ := json.Marshal(r)
+		return []map[string]any{{"type": "text", "text": string(data)}}
+	default:
+		data, _ := json.Marshal(result)
+		return []map[string]any{{"type": "text", "text": string(data)}}
+	}
+}
+
+// buildMCPError creates a JSONRPC error response.
+func (q *Query) buildMCPError(id any, code int, message string) map[string]any {
+	return map[string]any{
+		"jsonrpc": "2.0",
+		"id":      id,
+		"error": map[string]any{
+			"code":    code,
+			"message": message,
+		},
+	}
+}
 ```
 
-Update `handleControlRequest` to include MCP tool call:
+Update `handleControlRequest` to include MCP handlers:
 
 ```go
 func (q *Query) handleControlRequest(msg map[string]any) {
@@ -2369,6 +2517,13 @@ func (q *Query) handleControlRequest(msg map[string]any) {
 		responseData, err = q.handleHookCallback(request)
 	case "mcp_tool_call":
 		responseData, err = q.handleMCPToolCall(request)
+	case "mcp_message":
+		// Full MCP JSONRPC protocol bridge
+		responseData, err = q.handleMCPMessage(request)
+		// For notifications, responseData is nil - don't send response
+		if responseData == nil && err == nil {
+			return
+		}
 	default:
 		err = fmt.Errorf("unsupported control request: %s", subtype)
 	}
@@ -2399,6 +2554,8 @@ git commit -m "feat: add MCP tool call handling"
 After completing Plan 03, you have:
 
 - [x] Message parser with content block parsing
+- [x] **StreamEvent parsing** for partial message updates (include_partial_messages)
+- [x] **parent_tool_use_id and uuid fields** for subagent message tracking
 - [x] Mock transport for testing
 - [x] Query structure with enhanced message handling
 - [x] Control request/response handling
@@ -2407,14 +2564,18 @@ After completing Plan 03, you have:
 - [x] Hook callback handling with typed outputs
 - [x] Stream input and message sending
 - [x] MCP server support types and builder
-- [x] MCP tool call handling
+- [x] MCP tool call handling (simplified protocol)
+- [x] **Full MCP JSONRPC bridge** (initialize, notifications/initialized, tools/list, tools/call)
 
 **Key Features:**
 - Bidirectional control protocol with request/response matching
 - Result message tracking for conversation completion
 - Raw message channel for custom handling
 - Full hook callback support with typed outputs
+- **Complete MCP JSONRPC 2.0 protocol implementation**
 - SDK-hosted MCP server integration
 - Permission handling with suggestions
+- **StreamEvent support for real-time UI updates**
+- **Subagent message tracking via parent_tool_use_id**
 
 **Next:** Plan 04 - Client API
