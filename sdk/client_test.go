@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 	"time"
+
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 func TestNewClient(t *testing.T) {
