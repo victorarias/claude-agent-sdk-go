@@ -248,6 +248,8 @@ func (q *Query) handleControlRequest(msg map[string]any) {
 		responseData, err = q.handleCanUseTool(request)
 	case "hook_callback":
 		responseData, err = q.handleHookCallback(request)
+	case "mcp_tool_call":
+		responseData, err = q.handleMCPToolCall(request)
 	default:
 		err = fmt.Errorf("unsupported control request: %s", subtype)
 	}
