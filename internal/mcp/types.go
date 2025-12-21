@@ -1,6 +1,10 @@
 package mcp
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/victorarias/claude-agent-sdk-go/types"
+)
 
 // MCP Protocol Version
 const MCPProtocolVersion = "2024-11-05"

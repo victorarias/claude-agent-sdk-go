@@ -163,7 +163,7 @@ func (h *MCPHandler) handleToolsCall(params map[string]any) (*MCPToolCallResult,
 	result, err := tool.Handler(args)
 	if err != nil {
 		return &MCPToolCallResult{
-			Content: []types.types.MCPContent{{Type: "text", Text: "Error: " + err.Error()}},
+			Content: []types.MCPContent{{Type: "text", Text: "Error: " + err.Error()}},
 			IsError: true,
 		}, nil
 	}
@@ -178,17 +178,17 @@ func (h *MCPHandler) handleToolsCall(params map[string]any) (*MCPToolCallResult,
 func resultToContent(result any) []types.MCPContent {
 	switch v := result.(type) {
 	case string:
-		return []types.types.MCPContent{NewMCPTextContent(v)}
+		return []types.MCPContent{NewMCPTextContent(v)}
 	case []types.MCPContent:
 		return v
 	case types.MCPContent:
-		return []types.types.MCPContent{v}
+		return []types.MCPContent{v}
 	default:
 		// Marshal to JSON
 		data, err := json.Marshal(v)
 		if err != nil {
-			return []types.types.MCPContent{NewMCPTextContent(fmt.Sprintf("%v", v))}
+			return []types.MCPContent{NewMCPTextContent(fmt.Sprintf("%v", v))}
 		}
-		return []types.types.MCPContent{NewMCPTextContent(string(data))}
+		return []types.MCPContent{NewMCPTextContent(string(data))}
 	}
 }
