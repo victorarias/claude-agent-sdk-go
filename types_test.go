@@ -64,3 +64,89 @@ func TestContentBlockJSON(t *testing.T) {
 		t.Errorf("got %q, want %q", textBlock.Text, "hello")
 	}
 }
+
+func TestUserMessage(t *testing.T) {
+	msg := &UserMessage{Content: "hello"}
+	if msg.MessageType() != "user" {
+		t.Errorf("got %q, want %q", msg.MessageType(), "user")
+	}
+}
+
+func TestAssistantMessage(t *testing.T) {
+	msg := &AssistantMessage{
+		Content: []ContentBlock{&TextBlock{Text: "hello"}},
+		Model:   "claude-sonnet-4-5",
+	}
+	if msg.MessageType() != "assistant" {
+		t.Errorf("got %q, want %q", msg.MessageType(), "assistant")
+	}
+}
+
+func TestSystemMessage(t *testing.T) {
+	msg := &SystemMessage{
+		Subtype: "init",
+		Data:    map[string]any{"version": "1.0"},
+	}
+	if msg.MessageType() != "system" {
+		t.Errorf("got %q, want %q", msg.MessageType(), "system")
+	}
+}
+
+func TestResultMessage(t *testing.T) {
+	msg := &ResultMessage{
+		Subtype:      "success",
+		DurationMS:   1000,
+		DurationAPI:  800,
+		IsError:      false,
+		NumTurns:     3,
+		SessionID:    "sess_123",
+		TotalCostUSD: floatPtr(0.05),
+	}
+	if msg.MessageType() != "result" {
+		t.Errorf("got %q, want %q", msg.MessageType(), "result")
+	}
+	if !msg.IsSuccess() {
+		t.Error("expected IsSuccess() to return true")
+	}
+	if msg.Cost() != 0.05 {
+		t.Errorf("got cost %f, want 0.05", msg.Cost())
+	}
+}
+
+func TestStreamEvent(t *testing.T) {
+	msg := &StreamEvent{
+		UUID:      "uuid_123",
+		SessionID: "sess_123",
+		Event:     map[string]any{"type": "content_block_delta"},
+	}
+	if msg.MessageType() != "stream_event" {
+		t.Errorf("got %q, want %q", msg.MessageType(), "stream_event")
+	}
+}
+
+func TestAssistantMessageHelpers(t *testing.T) {
+	msg := &AssistantMessage{
+		Content: []ContentBlock{
+			&TextBlock{Text: "Hello "},
+			&TextBlock{Text: "world"},
+			&ThinkingBlock{Thinking: "Let me think..."},
+			&ToolUseBlock{ID: "tool_1", Name: "Bash", Input: map[string]any{"command": "ls"}},
+		},
+		Model: "claude-sonnet-4-5",
+	}
+
+	if msg.Text() != "Hello world" {
+		t.Errorf("got %q, want %q", msg.Text(), "Hello world")
+	}
+
+	if msg.Thinking() != "Let me think..." {
+		t.Errorf("got %q, want %q", msg.Thinking(), "Let me think...")
+	}
+
+	tools := msg.ToolCalls()
+	if len(tools) != 1 {
+		t.Errorf("got %d tool calls, want 1", len(tools))
+	}
+}
+
+func floatPtr(f float64) *float64 { return &f }
