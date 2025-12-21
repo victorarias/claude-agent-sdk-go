@@ -24,7 +24,7 @@ func TestHandleMCPMessage_Initialize(t *testing.T) {
 		Build()
 
 	// Create query and register server
-	transport := newMockTransport()
+	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 	query.RegisterMCPServer(server)
 
