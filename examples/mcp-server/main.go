@@ -58,19 +58,13 @@ func main() {
 				result = a * b
 			case "divide":
 				if b == 0 {
-					return &sdk.MCPToolResult{
-						IsError: true,
-						Content: []sdk.MCPContent{{Type: "text", Text: "Cannot divide by zero"}},
-					}, nil
+					return nil, fmt.Errorf("cannot divide by zero")
 				}
 				result = a / b
 			case "power":
 				result = math.Pow(a, b)
 			default:
-				return &sdk.MCPToolResult{
-					IsError: true,
-					Content: []sdk.MCPContent{{Type: "text", Text: "Unknown operation: " + op}},
-				}, nil
+				return nil, fmt.Errorf("unknown operation: %s", op)
 			}
 
 			return &sdk.MCPToolResult{
@@ -105,10 +99,7 @@ func main() {
 
 			result, err := convertUnits(value, from, to)
 			if err != nil {
-				return &sdk.MCPToolResult{
-					IsError: true,
-					Content: []sdk.MCPContent{{Type: "text", Text: err.Error()}},
-				}, nil
+				return nil, err
 			}
 
 			return &sdk.MCPToolResult{
@@ -136,10 +127,7 @@ func main() {
 			tzName, _ := input["timezone"].(string)
 			loc, err := time.LoadLocation(tzName)
 			if err != nil {
-				return &sdk.MCPToolResult{
-					IsError: true,
-					Content: []sdk.MCPContent{{Type: "text", Text: fmt.Sprintf("unknown timezone: %s", tzName)}},
-				}, nil
+				return nil, fmt.Errorf("unknown timezone: %s", tzName)
 			}
 			now := time.Now().In(loc)
 			return &sdk.MCPToolResult{
