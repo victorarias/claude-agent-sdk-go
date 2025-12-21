@@ -16,7 +16,8 @@ import (
 	"strings"
 	"time"
 
-	sdk "github.com/victorarias/claude-agent-sdk-go"
+	"github.com/victorarias/claude-agent-sdk-go/sdk"
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 func main() {
@@ -31,13 +32,13 @@ func main() {
 
 	// Create client with custom permission callback
 	client := sdk.NewClient(
-		sdk.WithModel("claude-sonnet-4-5"),
+		types.WithModel("claude-sonnet-4-5"),
 
 		// Permission callback: called for every tool that needs approval
-		sdk.WithCanUseTool(func(toolName string, input map[string]any, permCtx *sdk.ToolPermissionContext) (sdk.PermissionResult, error) {
+		sdk.WithCanUseTool(func(toolName string, input map[string]any, permCtx *types.ToolPermissionContext) (types.PermissionResult, error) {
 			// If user has denied all, reject immediately
 			if denyAll {
-				return &sdk.PermissionResultDeny{
+				return &types.PermissionResultDeny{
 					Behavior: "deny",
 					Message:  "All tool requests denied by user",
 				}, nil
@@ -46,7 +47,7 @@ func main() {
 			// If tool is always allowed, permit immediately
 			if alwaysAllowed[toolName] {
 				fmt.Printf("[Auto-allowed: %s]\n", toolName)
-				return &sdk.PermissionResultAllow{Behavior: "allow"}, nil
+				return &types.PermissionResultAllow{Behavior: "allow"}, nil
 			}
 
 			fmt.Println()
@@ -106,7 +107,7 @@ func main() {
 			fmt.Print("Allow this action? [Y]es / [N]o / [A]lways / [D]eny all: ")
 
 			if !scanner.Scan() {
-				return &sdk.PermissionResultDeny{
+				return &types.PermissionResultDeny{
 					Behavior: "deny",
 					Message:  "Input cancelled",
 				}, nil
@@ -116,11 +117,11 @@ func main() {
 			switch response {
 			case "y", "yes", "":
 				fmt.Println("-> Allowed (this time)")
-				return &sdk.PermissionResultAllow{Behavior: "allow"}, nil
+				return &types.PermissionResultAllow{Behavior: "allow"}, nil
 
 			case "n", "no":
 				fmt.Println("-> Denied")
-				return &sdk.PermissionResultDeny{
+				return &types.PermissionResultDeny{
 					Behavior: "deny",
 					Message:  "User denied permission",
 				}, nil
@@ -128,19 +129,19 @@ func main() {
 			case "a", "always":
 				fmt.Printf("-> Always allow %s\n", toolName)
 				alwaysAllowed[toolName] = true
-				return &sdk.PermissionResultAllow{Behavior: "allow"}, nil
+				return &types.PermissionResultAllow{Behavior: "allow"}, nil
 
 			case "d", "deny":
 				fmt.Println("-> Deny all future requests")
 				denyAll = true
-				return &sdk.PermissionResultDeny{
+				return &types.PermissionResultDeny{
 					Behavior: "deny",
 					Message:  "User denied all permissions",
 				}, nil
 
 			default:
 				fmt.Println("-> Defaulting to deny")
-				return &sdk.PermissionResultDeny{
+				return &types.PermissionResultDeny{
 					Behavior: "deny",
 					Message:  "Invalid response",
 				}, nil
@@ -186,9 +187,9 @@ func main() {
 		}
 
 		switch m := msg.(type) {
-		case *sdk.AssistantMessage:
+		case *types.AssistantMessage:
 			fmt.Print(m.Text())
-		case *sdk.ResultMessage:
+		case *types.ResultMessage:
 			fmt.Println()
 			if m.TotalCostUSD != nil {
 				fmt.Printf("\n[Cost: $%.4f]\n", *m.TotalCostUSD)

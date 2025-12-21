@@ -19,7 +19,8 @@ import (
 	"strings"
 	"time"
 
-	sdk "github.com/victorarias/claude-agent-sdk-go"
+	"github.com/victorarias/claude-agent-sdk-go/sdk"
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 const sessionFile = ".claude_session_id"
@@ -58,7 +59,7 @@ func startNewSession(ctx context.Context) {
 	fmt.Println()
 
 	client := sdk.NewClient(
-		sdk.WithModel("claude-sonnet-4-5"),
+		types.WithModel("claude-sonnet-4-5"),
 	)
 
 	if err := client.Connect(ctx); err != nil {
@@ -83,9 +84,9 @@ func startNewSession(ctx context.Context) {
 		}
 
 		switch m := msg.(type) {
-		case *sdk.AssistantMessage:
+		case *types.AssistantMessage:
 			fmt.Print(m.Text())
-		case *sdk.ResultMessage:
+		case *types.ResultMessage:
 			sessionID = m.SessionID
 			fmt.Println()
 			goto done
@@ -127,8 +128,8 @@ func resumeSession(ctx context.Context) {
 
 	// Resume the previous session
 	client := sdk.NewClient(
-		sdk.WithModel("claude-sonnet-4-5"),
-		sdk.WithResume(sessionID),
+		types.WithModel("claude-sonnet-4-5"),
+		types.WithResume(sessionID),
 	)
 
 	if err := client.Connect(ctx); err != nil {
@@ -152,9 +153,9 @@ func resumeSession(ctx context.Context) {
 		}
 
 		switch m := msg.(type) {
-		case *sdk.AssistantMessage:
+		case *types.AssistantMessage:
 			fmt.Print(m.Text())
-		case *sdk.ResultMessage:
+		case *types.ResultMessage:
 			fmt.Println()
 			truncatedNewID := m.SessionID
 			if len(m.SessionID) > 16 {

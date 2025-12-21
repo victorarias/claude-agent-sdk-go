@@ -24,7 +24,7 @@ func main() {
 	defer cancel()
 
 	// Build custom MCP server with tools
-	mathServer := sdk.NewMCPServerBuilder("math-tools").
+	mathServer := types.NewMCPServerBuilder("math-tools").
 		// Calculator tool
 		WithTool("calculate", "Perform mathematical calculations", map[string]any{
 			"type": "object",
@@ -44,7 +44,7 @@ func main() {
 				},
 			},
 			"required": []string{"a", "b", "operation"},
-		}, func(input map[string]any) (*sdk.MCPToolResult, error) {
+		}, func(input map[string]any) (*types.MCPToolResult, error) {
 			a, _ := input["a"].(float64)
 			b, _ := input["b"].(float64)
 			op, _ := input["operation"].(string)
@@ -68,8 +68,8 @@ func main() {
 				return nil, fmt.Errorf("unknown operation: %s", op)
 			}
 
-			return &sdk.MCPToolResult{
-				Content: []sdk.MCPContent{{
+			return &types.MCPToolResult{
+				Content: []types.MCPContent{{
 					Type: "text",
 					Text: fmt.Sprintf("%.4f %s %.4f = %.4f", a, op, b, result),
 				}},
@@ -93,7 +93,7 @@ func main() {
 				},
 			},
 			"required": []string{"value", "from", "to"},
-		}, func(input map[string]any) (*sdk.MCPToolResult, error) {
+		}, func(input map[string]any) (*types.MCPToolResult, error) {
 			value, _ := input["value"].(float64)
 			from, _ := input["from"].(string)
 			to, _ := input["to"].(string)
@@ -103,8 +103,8 @@ func main() {
 				return nil, err
 			}
 
-			return &sdk.MCPToolResult{
-				Content: []sdk.MCPContent{{
+			return &types.MCPToolResult{
+				Content: []types.MCPContent{{
 					Type: "text",
 					Text: fmt.Sprintf("%.4f %s = %.4f %s", value, from, result, to),
 				}},
@@ -113,7 +113,7 @@ func main() {
 		Build()
 
 	// Build a data lookup server
-	dataServer := sdk.NewMCPServerBuilder("data-lookup").
+	dataServer := types.NewMCPServerBuilder("data-lookup").
 		// Timezone tool
 		WithTool("get_timezone", "Get current time in a timezone", map[string]any{
 			"type": "object",
@@ -124,15 +124,15 @@ func main() {
 				},
 			},
 			"required": []string{"timezone"},
-		}, func(input map[string]any) (*sdk.MCPToolResult, error) {
+		}, func(input map[string]any) (*types.MCPToolResult, error) {
 			tzName, _ := input["timezone"].(string)
 			loc, err := time.LoadLocation(tzName)
 			if err != nil {
 				return nil, fmt.Errorf("unknown timezone: %s", tzName)
 			}
 			now := time.Now().In(loc)
-			return &sdk.MCPToolResult{
-				Content: []sdk.MCPContent{{
+			return &types.MCPToolResult{
+				Content: []types.MCPContent{{
 					Type: "text",
 					Text: fmt.Sprintf("Time in %s: %s (%s)", tzName, now.Format("15:04:05"), now.Format("2006-01-02")),
 				}},
@@ -142,7 +142,7 @@ func main() {
 
 	// Create client with MCP servers
 	client := sdk.NewClient(
-		sdk.WithModel("claude-sonnet-4-5"),
+		types.WithModel("claude-sonnet-4-5"),
 		sdk.WithClientMCPServer(mathServer),
 		sdk.WithClientMCPServer(dataServer),
 	)
@@ -188,7 +188,7 @@ func main() {
 			}
 
 			switch m := msg.(type) {
-			case *sdk.AssistantMessage:
+			case *types.AssistantMessage:
 				fmt.Print(m.Text())
 
 				// Show which tools were used
@@ -202,7 +202,7 @@ func main() {
 					}
 					fmt.Print("]")
 				}
-			case *sdk.ResultMessage:
+			case *types.ResultMessage:
 				fmt.Println()
 				goto nextQuery
 			}

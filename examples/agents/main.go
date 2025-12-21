@@ -29,7 +29,7 @@ func main() {
 	fmt.Println()
 
 	// Define custom agents
-	agents := map[string]sdk.AgentDefinition{
+	agents := map[string]types.AgentDefinition{
 		// Code reviewer agent - focused on reviewing code quality
 		"code-reviewer": {
 			Description: "Code review agent focused on quality and best practices",
@@ -69,8 +69,8 @@ Focus on accuracy and clarity.`,
 
 	// Create client with custom agents
 	client := sdk.NewClient(
-		sdk.WithModel("claude-sonnet-4-5"),
-		sdk.WithAgents(agents),
+		types.WithModel("claude-sonnet-4-5"),
+		types.WithAgents(agents),
 	)
 
 	if err := client.Connect(ctx); err != nil {
@@ -104,9 +104,9 @@ Focus on accuracy and clarity.`,
 		}
 
 		switch m := msg.(type) {
-		case *sdk.AssistantMessage:
+		case *types.AssistantMessage:
 			fmt.Print(m.Text())
-		case *sdk.ResultMessage:
+		case *types.ResultMessage:
 			fmt.Println()
 			if m.TotalCostUSD != nil {
 				fmt.Printf("\n[Cost: $%.4f]\n", *m.TotalCostUSD)
