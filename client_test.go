@@ -1,7 +1,9 @@
 package sdk
 
 import (
+	"context"
 	"testing"
+	"time"
 )
 
 func TestNewClient(t *testing.T) {
@@ -149,4 +151,82 @@ func TestClientWithHookTimeout(t *testing.T) {
 	if client.hooks[HookPreToolUse][0].Timeout == nil || *client.hooks[HookPreToolUse][0].Timeout != timeout {
 		t.Error("expected hook timeout to be set")
 	}
+}
+
+func TestClient_Connect(t *testing.T) {
+	transport := NewMockTransport()
+	client := NewClient(WithTransport(transport))
+
+	// Simulate init response
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		transport.SendMessage(map[string]any{
+			"type":    "system",
+			"subtype": "init",
+			"data": map[string]any{
+				"version":    "2.0.0",
+				"session_id": "test_session_123",
+			},
+		})
+	}()
+
+	ctx := context.Background()
+	err := client.Connect(ctx)
+	if err != nil {
+		t.Errorf("Connect failed: %v", err)
+	}
+
+	if !client.IsConnected() {
+		t.Error("client should be connected")
+	}
+
+	client.Close()
+}
+
+func TestClient_ConnectWithPrompt(t *testing.T) {
+	transport := NewMockTransport()
+	client := NewClient(WithTransport(transport))
+
+	ctx := context.Background()
+	err := client.ConnectWithPrompt(ctx, "Hello Claude!")
+	if err != nil {
+		t.Errorf("ConnectWithPrompt failed: %v", err)
+	}
+
+	if !client.IsConnected() {
+		t.Error("client should be connected")
+	}
+
+	client.Close()
+}
+
+func TestClient_Resume(t *testing.T) {
+	transport := NewMockTransport()
+	client := NewClient(
+		WithResume("previous_session_id"),
+		WithTransport(transport),
+	)
+
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		transport.SendMessage(map[string]any{
+			"type":    "system",
+			"subtype": "init",
+			"data": map[string]any{
+				"session_id": "previous_session_id",
+			},
+		})
+	}()
+
+	ctx := context.Background()
+	err := client.Connect(ctx)
+	if err != nil {
+		t.Errorf("Connect with resume failed: %v", err)
+	}
+
+	if client.SessionID() != "previous_session_id" {
+		t.Error("session ID not set from resume")
+	}
+
+	client.Close()
 }
