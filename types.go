@@ -209,6 +209,21 @@ func (m *AssistantMessage) GetThinking() string {
 	return ""
 }
 
+// Thinking returns the thinking content if present (alias for GetThinking).
+func (m *AssistantMessage) Thinking() string {
+	return m.GetThinking()
+}
+
+// HasToolCalls returns true if the message contains tool calls.
+func (m *AssistantMessage) HasToolCalls() bool {
+	for _, block := range m.Content {
+		if _, ok := block.(*ToolUseBlock); ok {
+			return true
+		}
+	}
+	return false
+}
+
 // SystemMessage represents a system message.
 type SystemMessage struct {
 	Subtype   string         `json:"subtype"`
