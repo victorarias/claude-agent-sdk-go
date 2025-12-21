@@ -48,7 +48,7 @@ func main() {
 	// Messages include assistant responses and a final result
 	for _, msg := range messages {
 		switch m := msg.(type) {
-		case *sdk.AssistantMessage:
+		case *types.AssistantMessage:
 			// Print Claude's text response
 			fmt.Println(m.Text())
 
@@ -57,7 +57,7 @@ func main() {
 				fmt.Printf("\n[Used %d tool(s)]\n", len(m.ToolCalls()))
 			}
 
-		case *sdk.ResultMessage:
+		case *types.ResultMessage:
 			// Print final cost summary
 			fmt.Println()
 			if m.TotalCostUSD != nil {
@@ -73,11 +73,11 @@ func main() {
 // handleError demonstrates proper error handling patterns
 func handleError(err error) {
 	switch {
-	case errors.Is(err, sdk.ErrCLINotFound):
+	case errors.Is(err, types.ErrCLINotFound):
 		fmt.Fprintln(os.Stderr, "Error: Claude CLI not found")
 		fmt.Fprintln(os.Stderr, "Install with: npm install -g @anthropic-ai/claude-code")
 
-	case errors.Is(err, sdk.ErrCLIVersion):
+	case errors.Is(err, types.ErrCLIVersion):
 		fmt.Fprintln(os.Stderr, "Error: Claude CLI version too old")
 		fmt.Fprintln(os.Stderr, "Update with: npm update -g @anthropic-ai/claude-code")
 
