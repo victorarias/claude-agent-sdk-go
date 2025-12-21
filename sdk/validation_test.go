@@ -26,7 +26,7 @@ func TestPermissionValidation(t *testing.T) {
 				},
 			},
 			expectError: true,
-			errorMsg:    "sdk: can_use_tool callback cannot be used with permission_prompt_tool_name",
+			errorMsg:    "sdk: can_use_tool callback cannot be used with permission_prompt_tool_name. Please use one or the other",
 		},
 		{
 			name: "only CanUseTool set - should succeed",
@@ -89,7 +89,7 @@ func TestPermissionValidationOnConnect(t *testing.T) {
 	if err == nil {
 		t.Error("expected error during Connect but got nil")
 	}
-	if err.Error() != "sdk: can_use_tool callback cannot be used with permission_prompt_tool_name" {
+	if err.Error() != "sdk: can_use_tool callback cannot be used with permission_prompt_tool_name. Please use one or the other" {
 		t.Errorf("unexpected error message: %v", err)
 	}
 }
