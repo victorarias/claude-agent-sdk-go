@@ -293,8 +293,18 @@ func TestHandleMCPMessage_UnknownServer(t *testing.T) {
 		t.Fatalf("expected error in response, got %v", respMap)
 	}
 
-	if mcpError["code"] != float64(-32601) {
-		t.Errorf("expected error code -32601, got %v", mcpError["code"])
+	code, ok := mcpError["code"].(int)
+	if !ok {
+		// Try float64 (JSON unmarshaling might give us this)
+		codeFloat, okFloat := mcpError["code"].(float64)
+		if okFloat {
+			code = int(codeFloat)
+		} else {
+			t.Fatalf("expected int or float64 code, got %T: %v", mcpError["code"], mcpError["code"])
+		}
+	}
+	if code != -32601 {
+		t.Errorf("expected error code -32601, got %d", code)
 	}
 
 	message, ok := mcpError["message"].(string)
