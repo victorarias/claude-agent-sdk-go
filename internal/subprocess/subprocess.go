@@ -595,15 +595,27 @@ func parseJSONLine(line string) (map[string]any, error) {
 // jsonAccumulator handles speculative JSON parsing for partial lines.
 type jsonAccumulator struct {
 	buffer strings.Builder
+	limit  int
 }
 
 func newJSONAccumulator() *jsonAccumulator {
-	return &jsonAccumulator{}
+	return &jsonAccumulator{limit: maxBufferSize}
+}
+
+func newJSONAccumulatorWithLimit(limit int) *jsonAccumulator {
+	return &jsonAccumulator{limit: limit}
 }
 
 // addLine adds a line to the accumulator and attempts to parse.
-// Returns (result, nil) if JSON is complete, (nil, nil) if still accumulating.
+// Returns (result, nil) if JSON is complete, (nil, nil) if still accumulating,
+// or (nil, error) if buffer limit is exceeded.
 func (a *jsonAccumulator) addLine(line string) (map[string]any, error) {
+	// Check if adding this line would exceed the buffer limit
+	if a.buffer.Len()+len(line) > a.limit {
+		a.buffer.Reset()
+		return nil, fmt.Errorf("buffer size %d exceeds limit of %d bytes", a.buffer.Len()+len(line), a.limit)
+	}
+
 	a.buffer.WriteString(line)
 
 	// Try to parse speculatively
