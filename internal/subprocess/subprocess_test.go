@@ -189,15 +189,33 @@ func TestBuildCommand_SandboxConfig(t *testing.T) {
 
 	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
 
-	hasSandbox := false
+	// After merging change, sandbox should be in --settings, not --sandbox
+	hasSettings := false
 	for i, arg := range cmd {
-		if arg == "--sandbox" && i+1 < len(cmd) {
-			hasSandbox = true
+		if arg == "--settings" && i+1 < len(cmd) {
+			hasSettings = true
+			// Verify it contains sandbox
+			settingsValue := cmd[i+1]
+			var settingsObj map[string]any
+			if err := json.Unmarshal([]byte(settingsValue), &settingsObj); err == nil {
+				if _, ok := settingsObj["sandbox"]; !ok {
+					t.Error("settings does not contain sandbox key")
+				}
+			} else {
+				t.Errorf("failed to parse settings JSON: %v", err)
+			}
 			break
 		}
 	}
-	if !hasSandbox {
-		t.Error("missing --sandbox flag")
+	if !hasSettings {
+		t.Error("missing --settings flag (sandbox should be merged into settings)")
+	}
+
+	// Verify --sandbox flag is NOT present
+	for _, arg := range cmd {
+		if arg == "--sandbox" {
+			t.Error("--sandbox flag should not be present (should be merged into settings)")
+		}
 	}
 }
 

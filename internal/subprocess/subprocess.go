@@ -172,6 +172,15 @@ func findCLI(explicitPath, bundledPath string) (string, error) {
 // WindowsMaxCommandLength is the maximum command line length on Windows.
 const WindowsMaxCommandLength = 8191
 
+// cmdLengthLimit is the command line length limit (8000 on Windows, 100000 on Unix).
+// Matches Python SDK _CMD_LENGTH_LIMIT.
+func cmdLengthLimit() int {
+	if runtime.GOOS == "windows" {
+		return 8000 // Safety margin below Windows limit of 8191
+	}
+	return 100000 // Unix systems have much higher limits
+}
+
 // buildSettingsValue merges sandbox settings into settings JSON.
 // Matches Python SDK behavior in subprocess_cli.py:118-170.
 func buildSettingsValue(opts *types.Options) (string, error) {
