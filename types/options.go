@@ -125,12 +125,15 @@ type MCPToolHandler func(args map[string]any) (*MCPToolResult, error)
 // MCPToolResult is the result of an MCP tool invocation.
 type MCPToolResult struct {
 	Content []MCPContent `json:"content"`
+	IsError bool         `json:"isError,omitempty"` // Indicates the tool execution resulted in an error
 }
 
 // MCPContent represents content in an MCP result.
 type MCPContent struct {
-	Type string `json:"type"` // "text", "image", etc.
-	Text string `json:"text,omitempty"`
+	Type     string `json:"type"`               // "text", "image", etc.
+	Text     string `json:"text,omitempty"`     // For text content
+	Data     string `json:"data,omitempty"`     // For image content (base64 encoded)
+	MimeType string `json:"mimeType,omitempty"` // For image content (e.g., "image/png")
 }
 
 // Version is the SDK version.
