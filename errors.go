@@ -9,6 +9,7 @@ import (
 // Sentinel errors for error checking with errors.Is
 var (
 	ErrCLINotFound = errors.New("claude CLI not found")
+	ErrCLIVersion  = errors.New("CLI version too old")
 	ErrConnection  = errors.New("connection error")
 	ErrProcess     = errors.New("process error")
 	ErrParse       = errors.New("parse error")
@@ -115,4 +116,18 @@ func (e *MessageParseError) Error() string {
 
 func (e *MessageParseError) Is(target error) bool {
 	return target == ErrParse
+}
+
+// CLIVersionError is returned when the CLI version is too old.
+type CLIVersionError struct {
+	InstalledVersion string
+	MinimumVersion   string
+}
+
+func (e *CLIVersionError) Error() string {
+	return fmt.Sprintf("CLI version %s is below minimum required version %s", e.InstalledVersion, e.MinimumVersion)
+}
+
+func (e *CLIVersionError) Is(target error) bool {
+	return target == ErrCLIVersion
 }
