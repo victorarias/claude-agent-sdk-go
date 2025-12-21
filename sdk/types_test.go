@@ -8,14 +8,14 @@ import (
 )
 
 func TestTextBlock(t *testing.T) {
-	block := TextBlock{TextContent: "hello"}
+	block := types.TextBlock{TextContent: "hello"}
 	if block.BlockType() != "text" {
 		t.Errorf("got %q, want %q", block.BlockType(), "text")
 	}
 }
 
 func TestToolUseBlock(t *testing.T) {
-	block := ToolUseBlock{
+	block := types.ToolUseBlock{
 		ID:        "tool_123",
 		Name:      "Bash",
 		ToolInput: map[string]any{"command": "ls"},
@@ -26,7 +26,7 @@ func TestToolUseBlock(t *testing.T) {
 }
 
 func TestThinkingBlock(t *testing.T) {
-	block := ThinkingBlock{
+	block := types.ThinkingBlock{
 		ThinkingContent: "Let me think...",
 		Signature:       "sig123",
 	}
@@ -36,7 +36,7 @@ func TestThinkingBlock(t *testing.T) {
 }
 
 func TestToolResultBlock(t *testing.T) {
-	block := ToolResultBlock{
+	block := types.ToolResultBlock{
 		ToolUseID:     "tool_123",
 		ResultContent: "output",
 		IsError:       false,
@@ -53,14 +53,14 @@ func TestContentBlockJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	block, err := ParseContentBlock(raw)
+	block, err := types.ParseContentBlock(raw)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	textBlock, ok := block.(*TextBlock)
+	textBlock, ok := block.(*types.TextBlock)
 	if !ok {
-		t.Fatalf("expected *TextBlock, got %T", block)
+		t.Fatalf("expected *types.TextBlock, got %T", block)
 	}
 	if textBlock.TextContent != "hello" {
 		t.Errorf("got %q, want %q", textBlock.TextContent, "hello")
@@ -68,15 +68,15 @@ func TestContentBlockJSON(t *testing.T) {
 }
 
 func TestUserMessage(t *testing.T) {
-	msg := &UserMessage{Content: []ContentBlock{&TextBlock{TextContent: "hello"}}}
+	msg := &types.UserMessage{Content: []types.ContentBlock{&types.TextBlock{TextContent: "hello"}}}
 	if msg.MessageType() != "user" {
 		t.Errorf("got %q, want %q", msg.MessageType(), "user")
 	}
 }
 
 func TestAssistantMessage(t *testing.T) {
-	msg := &AssistantMessage{
-		Content: []ContentBlock{&TextBlock{TextContent: "hello"}},
+	msg := &types.AssistantMessage{
+		Content: []types.ContentBlock{&types.TextBlock{TextContent: "hello"}},
 		Model:   "claude-sonnet-4-5",
 	}
 	if msg.MessageType() != "assistant" {
@@ -85,7 +85,7 @@ func TestAssistantMessage(t *testing.T) {
 }
 
 func TestSystemMessage(t *testing.T) {
-	msg := &SystemMessage{
+	msg := &types.SystemMessage{
 		Subtype: "init",
 		Data:    map[string]any{"version": "1.0"},
 	}
@@ -95,7 +95,7 @@ func TestSystemMessage(t *testing.T) {
 }
 
 func TestResultMessage(t *testing.T) {
-	msg := &ResultMessage{
+	msg := &types.ResultMessage{
 		Subtype:      "success",
 		DurationMS:   1000,
 		DurationAPI:  800,
@@ -116,7 +116,7 @@ func TestResultMessage(t *testing.T) {
 }
 
 func TestStreamEvent(t *testing.T) {
-	msg := &StreamEvent{
+	msg := &types.StreamEvent{
 		UUID:      "uuid_123",
 		SessionID: "sess_123",
 		Event:     map[string]any{"type": "content_block_delta"},
@@ -127,12 +127,12 @@ func TestStreamEvent(t *testing.T) {
 }
 
 func TestAssistantMessageHelpers(t *testing.T) {
-	msg := &AssistantMessage{
-		Content: []ContentBlock{
-			&TextBlock{TextContent: "Hello "},
-			&TextBlock{TextContent: "world"},
-			&ThinkingBlock{ThinkingContent: "Let me think..."},
-			&ToolUseBlock{ID: "tool_1", Name: "Bash", ToolInput: map[string]any{"command": "ls"}},
+	msg := &types.AssistantMessage{
+		Content: []types.ContentBlock{
+			&types.TextBlock{TextContent: "Hello "},
+			&types.TextBlock{TextContent: "world"},
+			&types.ThinkingBlock{ThinkingContent: "Let me think..."},
+			&types.ToolUseBlock{ID: "tool_1", Name: "Bash", ToolInput: map[string]any{"command": "ls"}},
 		},
 		Model: "claude-sonnet-4-5",
 	}
@@ -154,13 +154,13 @@ func TestAssistantMessageHelpers(t *testing.T) {
 func floatPtr(f float64) *float64 { return &f }
 
 func TestHookEvent(t *testing.T) {
-	events := []HookEvent{
-		HookPreToolUse,
-		HookPostToolUse,
-		HookUserPromptSubmit,
-		HookStop,
-		HookSubagentStop,
-		HookPreCompact,
+	events := []types.HookEvent{
+		types.HookPreToolUse,
+		types.HookPostToolUse,
+		types.HookUserPromptSubmit,
+		types.HookStop,
+		types.HookSubagentStop,
+		types.HookPreCompact,
 	}
 
 	if len(events) != 6 {
@@ -169,8 +169,8 @@ func TestHookEvent(t *testing.T) {
 }
 
 func TestHookInput(t *testing.T) {
-	input := &PreToolUseHookInput{
-		BaseHookInput: BaseHookInput{
+	input := &types.PreToolUseHookInput{
+		BaseHookInput: types.BaseHookInput{
 			SessionID:      "sess_123",
 			TranscriptPath: "/tmp/transcript.json",
 			Cwd:            "/home/user",
@@ -190,9 +190,9 @@ func TestHookInput(t *testing.T) {
 
 func TestHookOutput(t *testing.T) {
 	cont := true
-	output := &HookOutput{
-		Continue:   &cont,
-		Decision:   "allow",
+	output := &types.HookOutput{
+		Continue: &cont,
+		Decision: "allow",
 	}
 	if output.Continue == nil || !*output.Continue {
 		t.Error("expected Continue to be true")
@@ -203,7 +203,7 @@ func boolPtr(b bool) *bool { return &b }
 func intPtr(i int) *int    { return &i }
 
 func TestControlRequest(t *testing.T) {
-	req := &ControlRequest{
+	req := &types.ControlRequest{
 		Type:      "control_request",
 		RequestID: "req_123",
 		Request: map[string]any{
@@ -217,9 +217,9 @@ func TestControlRequest(t *testing.T) {
 }
 
 func TestControlResponse(t *testing.T) {
-	resp := &ControlResponse{
+	resp := &types.ControlResponse{
 		Type: "control_response",
-		Response: ControlResponseData{
+		Response: types.ControlResponseData{
 			Subtype:   "success",
 			RequestID: "req_123",
 			Response:  map[string]any{"status": "ok"},
@@ -232,7 +232,7 @@ func TestControlResponse(t *testing.T) {
 }
 
 func TestPermissionResult(t *testing.T) {
-	allow := &PermissionResultAllow{
+	allow := &types.PermissionResultAllow{
 		Behavior:     "allow",
 		UpdatedInput: map[string]any{"command": "ls -la"},
 	}
@@ -241,7 +241,7 @@ func TestPermissionResult(t *testing.T) {
 		t.Errorf("got %q, want %q", allow.Behavior, "allow")
 	}
 
-	deny := &PermissionResultDeny{
+	deny := &types.PermissionResultDeny{
 		Behavior:  "deny",
 		Message:   "not allowed",
 		Interrupt: true,
@@ -253,14 +253,14 @@ func TestPermissionResult(t *testing.T) {
 }
 
 func TestPermissionUpdateToDict(t *testing.T) {
-	update := &PermissionUpdate{
-		Type:        PermissionAddRules,
+	update := &types.PermissionUpdate{
+		Type:        types.PermissionAddRules,
 		Behavior:    "allow",
-		Destination: DestinationSession,
+		Destination: types.DestinationSession,
 	}
 
 	dict := update.ToDict()
-	if dict["type"] != PermissionAddRules {
-		t.Errorf("got %v, want %v", dict["type"], PermissionAddRules)
+	if dict["type"] != types.PermissionAddRules {
+		t.Errorf("got %v, want %v", dict["type"], types.PermissionAddRules)
 	}
 }
