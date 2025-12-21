@@ -675,3 +675,129 @@ func TestQuery_HandleCanUseTool_Deny(t *testing.T) {
 		t.Errorf("expected deny behavior, got %v", respData["behavior"])
 	}
 }
+
+// Task 8: Stream Input and Message Sending Tests
+
+func TestQuery_SendMessage(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	err := query.SendMessage(map[string]any{
+		"type": "test",
+		"data": "hello",
+	})
+	if err != nil {
+		t.Errorf("SendMessage failed: %v", err)
+	}
+
+	written := transport.Written()
+	if len(written) == 0 {
+		t.Fatal("no message written")
+	}
+
+	var msg map[string]any
+	if err := json.Unmarshal([]byte(written[0]), &msg); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if msg["type"] != "test" {
+		t.Errorf("expected type test, got %v", msg["type"])
+	}
+}
+
+func TestQuery_SendUserMessage(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	err := query.SendUserMessage("Hello Claude!", "session_123")
+	if err != nil {
+		t.Errorf("SendUserMessage failed: %v", err)
+	}
+
+	written := transport.Written()
+	if len(written) == 0 {
+		t.Fatal("no message written")
+	}
+
+	var msg map[string]any
+	if err := json.Unmarshal([]byte(written[0]), &msg); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if msg["type"] != "user" {
+		t.Errorf("expected type user, got %v", msg["type"])
+	}
+
+	if msg["session_id"] != "session_123" {
+		t.Errorf("expected session_id session_123, got %v", msg["session_id"])
+	}
+
+	message := msg["message"].(map[string]any)
+	if message["content"] != "Hello Claude!" {
+		t.Errorf("expected content Hello Claude!, got %v", message["content"])
+	}
+}
+
+func TestQuery_StreamInput(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	// Create input channel
+	input := make(chan map[string]any, 3)
+	input <- map[string]any{"type": "user", "message": map[string]any{"content": "hello"}}
+	input <- map[string]any{"type": "user", "message": map[string]any{"content": "world"}}
+	close(input)
+
+	err := query.StreamInput(input)
+	if err != nil {
+		t.Errorf("StreamInput failed: %v", err)
+	}
+
+	written := transport.Written()
+	if len(written) != 2 {
+		t.Errorf("expected 2 messages written, got %d", len(written))
+	}
+}
+
+func TestQuery_StreamInput_ContextCancelled(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	// Create input channel that won't be read
+	input := make(chan map[string]any)
+
+	// Cancel context before streaming
+	cancel()
+
+	// Give goroutine time to see cancellation
+	time.Sleep(50 * time.Millisecond)
+
+	err := query.StreamInput(input)
+	if err == nil {
+		t.Error("expected context cancelled error")
+	}
+}
