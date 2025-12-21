@@ -109,8 +109,8 @@ func main() {
 
 			case *sdk.StreamEvent:
 				// Handle partial updates for true streaming
-				if m.Type == "content_block_delta" {
-					if text, ok := m.Data["text"].(string); ok {
+				if m.EventType == "content_block_delta" {
+					if text, ok := m.Delta["text"].(string); ok {
 						fmt.Print(text)
 					}
 				}
