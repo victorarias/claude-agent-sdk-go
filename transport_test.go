@@ -14,6 +14,7 @@ type MockTransport struct {
 	written      []string
 	inputEnded   bool
 	messageChan  chan map[string]any
+	errorChan    chan error
 	connectErr   error
 	writeErr     error
 	closeErr     error
@@ -24,7 +25,18 @@ type MockTransport struct {
 func NewMockTransport() *MockTransport {
 	return &MockTransport{
 		messageChan: make(chan map[string]any, 100),
+		errorChan:   make(chan error, 1),
 	}
+}
+
+// Errors returns the channel for receiving errors.
+func (m *MockTransport) Errors() <-chan error {
+	return m.errorChan
+}
+
+// SendError simulates receiving an error from the CLI.
+func (m *MockTransport) SendError(err error) {
+	m.errorChan <- err
 }
 
 func (m *MockTransport) Connect(ctx context.Context) error {
