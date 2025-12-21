@@ -301,6 +301,23 @@ func DefaultOptions() *Options {
 	}
 }
 
+// ApplyOptions applies a list of options to an Options struct.
+func ApplyOptions(opts *Options, options ...Option) {
+	for _, opt := range options {
+		opt(opts)
+	}
+}
+
+// CustomTransport returns the custom transport if set.
+func (o *Options) CustomTransport() Transport {
+	return o.customTransport
+}
+
+// SetCustomTransport sets the custom transport.
+func (o *Options) SetCustomTransport(t Transport) {
+	o.customTransport = t
+}
+
 // WithModel sets the model to use.
 func WithModel(model string) Option {
 	return func(o *Options) {
