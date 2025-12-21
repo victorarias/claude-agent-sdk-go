@@ -49,12 +49,16 @@ func (b *ToolUseBlock) Input() map[string]any { return b.ToolInput }
 
 // ToolResultBlock contains the result of a tool execution.
 type ToolResultBlock struct {
-	ToolUseID string `json:"tool_use_id"`
-	Content   any    `json:"content,omitempty"`
-	IsError   bool   `json:"is_error,omitempty"`
+	ToolUseID     string `json:"tool_use_id"`
+	ResultContent string `json:"content,omitempty"`
+	IsError       bool   `json:"is_error,omitempty"`
 }
 
 func (b *ToolResultBlock) BlockType() string { return "tool_result" }
+func (b *ToolResultBlock) Type() string      { return "tool_result" }
+
+// Content returns the result content as string.
+func (b *ToolResultBlock) Content() string { return b.ResultContent }
 
 // ParseContentBlock parses a raw JSON map into a ContentBlock.
 func ParseContentBlock(raw map[string]any) (ContentBlock, error) {
