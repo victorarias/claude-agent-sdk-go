@@ -567,3 +567,49 @@ func (c *Client) Run(ctx context.Context, fn func() error) error {
 	defer c.Close()
 	return fn()
 }
+
+// Messages returns a channel that yields messages until closed or error.
+// Use this for iterating over responses in streaming mode.
+func (c *Client) Messages() <-chan Message {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		ch := make(chan Message)
+		close(ch)
+		return ch
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	return q.Messages()
+}
+
+// RawMessages returns a channel of raw message maps.
+func (c *Client) RawMessages() <-chan map[string]any {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		ch := make(chan map[string]any)
+		close(ch)
+		return ch
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	return q.RawMessages()
+}
+
+// Errors returns the error channel.
+func (c *Client) Errors() <-chan error {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		ch := make(chan error, 1)
+		close(ch)
+		return ch
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	return q.Errors()
+}

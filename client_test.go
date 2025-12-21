@@ -720,3 +720,83 @@ func TestClient_Run(t *testing.T) {
 		t.Error("client should be disconnected after Run")
 	}
 }
+
+func TestClient_Messages(t *testing.T) {
+	transport := NewMockTransport()
+	client := NewClient(WithTransport(transport))
+
+	go func() {
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			reqID, ok := req["request_id"].(string)
+			if !ok {
+				continue
+			}
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{"session_id": "test_session"},
+				},
+			})
+
+			time.Sleep(10 * time.Millisecond)
+			transport.SendMessage(map[string]any{
+				"type": "assistant",
+				"message": map[string]any{
+					"content": []any{
+						map[string]any{"type": "text", "text": "Hello!"},
+					},
+				},
+			})
+			transport.SendMessage(map[string]any{
+				"type": "assistant",
+				"message": map[string]any{
+					"content": []any{
+						map[string]any{"type": "text", "text": "World!"},
+					},
+				},
+			})
+			transport.SendMessage(map[string]any{
+				"type":    "result",
+				"subtype": "success",
+			})
+			return
+		}
+	}()
+
+	ctx := context.Background()
+	if err := client.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	if err := client.SendQuery("Hello"); err != nil {
+		t.Fatal(err)
+	}
+
+	var texts []string
+	for msg := range client.Messages() {
+		if asst, ok := msg.(*AssistantMessage); ok {
+			texts = append(texts, asst.Text())
+		}
+		if _, ok := msg.(*ResultMessage); ok {
+			break
+		}
+	}
+
+	if len(texts) != 2 {
+		t.Errorf("expected 2 texts, got %d: %v", len(texts), texts)
+	}
+}
