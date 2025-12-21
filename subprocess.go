@@ -576,25 +576,7 @@ func (t *SubprocessTransport) readMessages() {
 		}
 	}
 
-	// Wait for process and capture exit error
-	if t.cmd != nil {
-		if err := t.cmd.Wait(); err != nil {
-			t.exitMu.Lock()
-			t.exitError = err
-			t.exitMu.Unlock()
-
-			if exitErr, ok := err.(*exec.ExitError); ok {
-				procErr := &ProcessError{
-					ExitCode: exitErr.ExitCode(),
-					Stderr:   "check stderr for details",
-				}
-				select {
-				case t.errors <- procErr:
-				default:
-				}
-			}
-		}
-	}
+	// Note: cmd.Wait() is called in Close() to avoid duplicate calls
 }
 
 // readStderr reads stderr and optionally invokes callback.
