@@ -57,7 +57,7 @@ func basicExample() {
 	}
 
 	for _, msg := range messages {
-		if m, ok := msg.(*sdk.AssistantMessage); ok {
+		if m, ok := msg.(*types.AssistantMessage); ok {
 			fmt.Printf("   Response: %s\n", m.Text())
 		}
 	}
@@ -126,27 +126,27 @@ func handleError(operation string, err error) {
 
 	switch {
 	// SDK-specific errors
-	case errors.Is(err, sdk.ErrCLINotFound):
+	case errors.Is(err, types.ErrCLINotFound):
 		fmt.Println("Claude CLI not found")
 		fmt.Println("      -> Install: npm install -g @anthropic-ai/claude-code")
 
-	case errors.Is(err, sdk.ErrCLIVersion):
+	case errors.Is(err, types.ErrCLIVersion):
 		fmt.Println("CLI version too old")
 		fmt.Println("      -> Update: npm update -g @anthropic-ai/claude-code")
 
-	case errors.Is(err, sdk.ErrConnection):
+	case errors.Is(err, types.ErrConnection):
 		fmt.Println("Failed to connect to CLI")
 		fmt.Println("      -> Check CLI installation and permissions")
 
-	case errors.Is(err, sdk.ErrProcess):
+	case errors.Is(err, types.ErrProcess):
 		fmt.Println("CLI process exited unexpectedly")
 		fmt.Println("      -> Check stderr for details")
 
-	case errors.Is(err, sdk.ErrParse):
+	case errors.Is(err, types.ErrParse):
 		fmt.Println("Failed to parse CLI output")
 		fmt.Println("      -> This may indicate a CLI version incompatibility")
 
-	case errors.Is(err, sdk.ErrClosed):
+	case errors.Is(err, types.ErrClosed):
 		fmt.Println("Transport was closed")
 		fmt.Println("      -> Reconnect before sending more queries")
 
@@ -172,17 +172,17 @@ func isRetryable(err error) bool {
 	}
 
 	// Don't retry on CLI not found - it won't magically appear
-	if errors.Is(err, sdk.ErrCLINotFound) {
+	if errors.Is(err, types.ErrCLINotFound) {
 		return false
 	}
 
 	// Don't retry on version mismatch - needs manual update
-	if errors.Is(err, sdk.ErrCLIVersion) {
+	if errors.Is(err, types.ErrCLIVersion) {
 		return false
 	}
 
 	// Retry on timeouts, connection issues, process exits
 	return errors.Is(err, context.DeadlineExceeded) ||
-		errors.Is(err, sdk.ErrConnection) ||
-		errors.Is(err, sdk.ErrProcess)
+		errors.Is(err, types.ErrConnection) ||
+		errors.Is(err, types.ErrProcess)
 }
