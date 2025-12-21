@@ -66,7 +66,7 @@ func TestContentBlockJSON(t *testing.T) {
 }
 
 func TestUserMessage(t *testing.T) {
-	msg := &UserMessage{Content: "hello"}
+	msg := &UserMessage{Content: []ContentBlock{&TextBlock{TextContent: "hello"}}}
 	if msg.MessageType() != "user" {
 		t.Errorf("got %q, want %q", msg.MessageType(), "user")
 	}
@@ -74,7 +74,7 @@ func TestUserMessage(t *testing.T) {
 
 func TestAssistantMessage(t *testing.T) {
 	msg := &AssistantMessage{
-		Content: []ContentBlock{&TextBlock{Text: "hello"}},
+		Content: []ContentBlock{&TextBlock{TextContent: "hello"}},
 		Model:   "claude-sonnet-4-5",
 	}
 	if msg.MessageType() != "assistant" {
