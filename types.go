@@ -345,7 +345,7 @@ type HookCallback func(input any, toolUseID *string, ctx *HookContext) (*HookOut
 
 // HookMatcher configures which hooks to run for an event.
 type HookMatcher struct {
-	Matcher *string        `json:"matcher,omitempty"`
+	Matcher map[string]any `json:"matcher,omitempty"` // e.g., {"tool_name": "Bash"} or nil for all
 	Hooks   []HookCallback `json:"-"`
 	Timeout *float64       `json:"timeout,omitempty"`
 }

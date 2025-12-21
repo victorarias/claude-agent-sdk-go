@@ -316,7 +316,7 @@ func TestQuery_Initialize_WithHooks(t *testing.T) {
 	hooks := map[HookEvent][]HookMatcher{
 		HookPreToolUse: {
 			{
-				Matcher: strPtr("Bash"),
+				Matcher: map[string]any{"tool_name": "Bash"},
 				Hooks: []HookCallback{
 					func(input any, toolUseID *string, ctx *HookContext) (*HookOutput, error) {
 						cont := true
