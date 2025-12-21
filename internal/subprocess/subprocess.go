@@ -666,13 +666,18 @@ func (t *SubprocessTransport) readMessages() {
 		}
 
 		// Speculative parsing - try to parse immediately
-		msg, _ := accumulator.addLine(line)
-		if msg == nil {
-			// Still accumulating
-			if accumulator.len() > maxBufferSize {
-				// Buffer overflow - reset and discard
-				accumulator.reset()
+		msg, err := accumulator.addLine(line)
+		if err != nil {
+			// Buffer overflow - send error to error channel
+			select {
+			case t.errors <- err:
+			default:
+				// Error channel full, continue anyway
 			}
+			continue
+		}
+		if msg == nil {
+			// Still accumulating, continue
 			continue
 		}
 
