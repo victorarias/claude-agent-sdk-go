@@ -342,6 +342,17 @@ func parseSystemMessage(raw map[string]any) (*SystemMessage, error) {
 func parseAssistantMessage(raw map[string]any) (*AssistantMessage, error) {
 	msg := &AssistantMessage{}
 
+	// Extract parent_tool_use_id for subagent messages
+	if parentID, ok := raw["parent_tool_use_id"].(string); ok {
+		msg.ParentToolUseID = &parentID
+	}
+
+	// Extract error field for API error messages
+	if errType, ok := raw["error"].(string); ok {
+		err := AssistantMessageError(errType)
+		msg.Error = &err
+	}
+
 	if msgData, ok := raw["message"].(map[string]any); ok {
 		msg.Model = getString(msgData, "model")
 		msg.StopReason = getString(msgData, "stop_reason")
@@ -364,7 +375,14 @@ func parseAssistantMessage(raw map[string]any) (*AssistantMessage, error) {
 }
 
 func parseUserMessage(raw map[string]any) (*UserMessage, error) {
-	msg := &UserMessage{}
+	msg := &UserMessage{
+		UUID: getString(raw, "uuid"),
+	}
+
+	// Extract parent_tool_use_id for subagent messages
+	if parentID, ok := raw["parent_tool_use_id"].(string); ok {
+		msg.ParentToolUseID = &parentID
+	}
 
 	if msgData, ok := raw["message"].(map[string]any); ok {
 		msg.Role = getString(msgData, "role")
