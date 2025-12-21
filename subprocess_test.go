@@ -509,3 +509,62 @@ echo '{"type":"result"}'
 		t.Errorf("expected 2 stderr lines, got %d: %v", len(stderrLines), stderrLines)
 	}
 }
+
+func TestSubprocessTransport_ConcurrentWrites_Race(t *testing.T) {
+	tmpDir := t.TempDir()
+	mockCLI := filepath.Join(tmpDir, "claude")
+	mockScript := `#!/bin/bash
+while read -r line; do
+    echo '{"type":"ack"}'
+done
+`
+	if err := os.WriteFile(mockCLI, []byte(mockScript), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	opts := DefaultOptions()
+	opts.CLIPath = mockCLI
+
+	transport := NewStreamingTransport(opts)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := transport.Connect(ctx); err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+	defer transport.Close()
+
+	// Hammer with concurrent writes to trigger race conditions
+	const numWriters = 50
+	const writesPerWriter = 100
+
+	var wg sync.WaitGroup
+	errors := make(chan error, numWriters*writesPerWriter)
+
+	for i := 0; i < numWriters; i++ {
+		wg.Add(1)
+		go func(writerID int) {
+			defer wg.Done()
+			for j := 0; j < writesPerWriter; j++ {
+				msg := `{"writer":` + string(rune('0'+writerID%10)) + `,"msg":` + string(rune('0'+j%10)) + `}`
+				if err := transport.Write(msg); err != nil {
+					errors <- err
+					return
+				}
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	close(errors)
+
+	var errCount int
+	for err := range errors {
+		t.Errorf("Write error: %v", err)
+		errCount++
+	}
+
+	if errCount > 0 {
+		t.Errorf("Total errors: %d", errCount)
+	}
+}
