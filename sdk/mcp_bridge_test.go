@@ -204,7 +204,7 @@ func TestHandleMCPMessage_ToolsCall(t *testing.T) {
 		}).
 		Build()
 
-	transport := newMockTransport()
+	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 	query.RegisterMCPServer(server)
 
@@ -268,7 +268,7 @@ func TestHandleMCPMessage_ToolsCall(t *testing.T) {
 
 // TestHandleMCPMessage_UnknownServer tests error handling for unknown server
 func TestHandleMCPMessage_UnknownServer(t *testing.T) {
-	transport := newMockTransport()
+	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 
 	mcpMessage := map[string]any{
