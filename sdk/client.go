@@ -420,7 +420,7 @@ func (c *Client) SendQuery(prompt string, sessionID ...string) error {
 }
 
 // ReceiveMessage receives the next message.
-func (c *Client) ReceiveMessage() (Message, error) {
+func (c *Client) ReceiveMessage() (types.Message, error) {
 	c.mu.Lock()
 	if !c.connected || c.query == nil {
 		c.mu.Unlock()
@@ -552,7 +552,7 @@ func (c *Client) LastResult() *types.ResultMessage {
 type ClientFunc func(*Client) error
 
 // WithClient creates a client, connects, runs the function, and ensures cleanup.
-func WithClient(ctx context.Context, opts []Option, fn ClientFunc) error {
+func WithClient(ctx context.Context, opts []types.Option, fn ClientFunc) error {
 	client := NewClient(opts...)
 
 	if err := client.Connect(ctx); err != nil {
