@@ -22,7 +22,7 @@ type Client struct {
 	// Permission callback
 	canUseTool types.CanUseToolCallback
 
-	// types.Transport and query
+	// Transport and query
 	transport types.Transport
 	query     *Query
 
