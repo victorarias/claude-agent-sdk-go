@@ -39,9 +39,9 @@ func TestClientWithMCPServers(t *testing.T) {
 	server := types.NewMCPServerBuilder("test-server").
 		WithTool("echo", "Echoes input", map[string]any{
 			"type": "object",
-		}, func(args map[string]any) (*MCPToolResult, error) {
-			return &MCPToolResult{
-				Content: []MCPContent{{Type: "text", Text: "hello"}},
+		}, func(args map[string]any) (*types.MCPToolResult, error) {
+			return &types.MCPToolResult{
+				Content: []types.MCPContent{{Type: "text", Text: "hello"}},
 			}, nil
 		}).
 		Build()
@@ -60,10 +60,10 @@ func TestClientWithHooks(t *testing.T) {
 	client := NewClient(
 		WithPreToolUseHook(
 			map[string]any{"tool_name": "Bash"},
-			func(input any, toolUseID *string, ctx *HookContext) (*HookOutput, error) {
+			func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
 				preToolUseCalled = true
 				cont := true
-				return &HookOutput{Continue: &cont}, nil
+				return &types.HookOutput{Continue: &cont}, nil
 			},
 		),
 	)
@@ -78,8 +78,8 @@ func TestClientWithPostToolUseHook(t *testing.T) {
 	client := NewClient(
 		WithPostToolUseHook(
 			map[string]any{"tool_name": "Read"},
-			func(input any, toolUseID *string, ctx *HookContext) (*HookOutput, error) {
-				return &HookOutput{}, nil
+			func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
+				return &types.HookOutput{}, nil
 			},
 		),
 	)
@@ -93,8 +93,8 @@ func TestClientWithStopHook(t *testing.T) {
 	client := NewClient(
 		WithStopHook(
 			nil, // No matcher
-			func(input any, toolUseID *string, ctx *HookContext) (*HookOutput, error) {
-				return &HookOutput{}, nil
+			func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
+				return &types.HookOutput{}, nil
 			},
 		),
 	)
@@ -141,8 +141,8 @@ func TestClientWithHookTimeout(t *testing.T) {
 	timeout := 5.0
 	client := NewClient(
 		WithHookTimeout(HookPreToolUse, map[string]any{"tool_name": "Bash"}, timeout,
-			func(input any, toolUseID *string, ctx *HookContext) (*HookOutput, error) {
-				return &HookOutput{}, nil
+			func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
+				return &types.HookOutput{}, nil
 			},
 		),
 	)
