@@ -233,15 +233,36 @@ func TestClient_Resume(t *testing.T) {
 		WithTransport(transport),
 	)
 
+	// Respond to control requests
 	go func() {
-		time.Sleep(10 * time.Millisecond)
-		transport.SendMessage(map[string]any{
-			"type":    "system",
-			"subtype": "init",
-			"data": map[string]any{
-				"session_id": "previous_session_id",
-			},
-		})
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			reqID, ok := req["request_id"].(string)
+			if !ok {
+				continue
+			}
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response": map[string]any{
+						"session_id": "previous_session_id",
+					},
+				},
+			})
+			return
+		}
 	}()
 
 	ctx := context.Background()
