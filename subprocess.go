@@ -1,10 +1,14 @@
 package sdk
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 )
 
 // findCLI locates the Claude CLI binary.
