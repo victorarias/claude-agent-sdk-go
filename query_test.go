@@ -801,3 +801,172 @@ func TestQuery_StreamInput_ContextCancelled(t *testing.T) {
 		t.Error("expected context cancelled error")
 	}
 }
+
+// Task 10: MCP Tool Call Handling Tests
+
+func TestQuery_RegisterMCPServer(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	server := NewMCPServerBuilder("test-server").
+		WithTool("echo", "Echoes input", map[string]any{
+			"type": "object",
+		}, func(args map[string]any) (*MCPToolResult, error) {
+			return &MCPToolResult{
+				Content: []MCPContent{{Type: "text", Text: "hello"}},
+			}, nil
+		}).
+		Build()
+
+	query.RegisterMCPServer(server)
+
+	// Verify server was registered
+	if _, ok := query.mcpServers["test-server"]; !ok {
+		t.Error("expected server to be registered")
+	}
+}
+
+func TestQuery_UnregisterMCPServer(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	server := NewMCPServerBuilder("test-server").Build()
+	query.RegisterMCPServer(server)
+	query.UnregisterMCPServer("test-server")
+
+	if _, ok := query.mcpServers["test-server"]; ok {
+		t.Error("expected server to be unregistered")
+	}
+}
+
+func TestQuery_MCPToolCall(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	// Register an MCP server
+	server := NewMCPServerBuilder("test-server").
+		WithTool("echo", "Echoes input", map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"message": map[string]any{"type": "string"},
+			},
+		}, func(args map[string]any) (*MCPToolResult, error) {
+			msg := args["message"].(string)
+			return &MCPToolResult{
+				Content: []MCPContent{{Type: "text", Text: msg}},
+			}, nil
+		}).
+		Build()
+
+	query.RegisterMCPServer(server)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	// Simulate MCP tool call request
+	transport.SendMessage(map[string]any{
+		"type":       "control_request",
+		"request_id": "req_mcp_1",
+		"request": map[string]any{
+			"subtype":     "mcp_tool_call",
+			"server_name": "test-server",
+			"tool_name":   "echo",
+			"input":       map[string]any{"message": "hello"},
+		},
+	})
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify response was sent
+	written := transport.Written()
+	if len(written) == 0 {
+		t.Fatal("no response written")
+	}
+
+	var resp map[string]any
+	json.Unmarshal([]byte(written[0]), &resp)
+	response := resp["response"].(map[string]any)
+	if response["subtype"] != "success" {
+		t.Errorf("expected success, got %v", response["subtype"])
+	}
+}
+
+func TestQuery_MCPToolCall_ServerNotFound(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	// Simulate MCP tool call request for non-existent server
+	transport.SendMessage(map[string]any{
+		"type":       "control_request",
+		"request_id": "req_mcp_2",
+		"request": map[string]any{
+			"subtype":     "mcp_tool_call",
+			"server_name": "nonexistent",
+			"tool_name":   "echo",
+			"input":       map[string]any{},
+		},
+	})
+
+	time.Sleep(100 * time.Millisecond)
+
+	written := transport.Written()
+	if len(written) == 0 {
+		t.Fatal("no response written")
+	}
+
+	var resp map[string]any
+	json.Unmarshal([]byte(written[0]), &resp)
+	response := resp["response"].(map[string]any)
+	if response["subtype"] != "error" {
+		t.Errorf("expected error response, got %v", response["subtype"])
+	}
+}
+
+func TestQuery_MCPToolCall_ToolNotFound(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	server := NewMCPServerBuilder("test-server").Build()
+	query.RegisterMCPServer(server)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	// Simulate MCP tool call request for non-existent tool
+	transport.SendMessage(map[string]any{
+		"type":       "control_request",
+		"request_id": "req_mcp_3",
+		"request": map[string]any{
+			"subtype":     "mcp_tool_call",
+			"server_name": "test-server",
+			"tool_name":   "nonexistent",
+			"input":       map[string]any{},
+		},
+	})
+
+	time.Sleep(100 * time.Millisecond)
+
+	written := transport.Written()
+	if len(written) == 0 {
+		t.Fatal("no response written")
+	}
+
+	var resp map[string]any
+	json.Unmarshal([]byte(written[0]), &resp)
+	response := resp["response"].(map[string]any)
+	if response["subtype"] != "error" {
+		t.Errorf("expected error response, got %v", response["subtype"])
+	}
+}
