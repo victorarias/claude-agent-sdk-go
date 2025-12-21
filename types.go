@@ -8,14 +8,19 @@ import (
 // ContentBlock represents a block of content in a message.
 type ContentBlock interface {
 	BlockType() string
+	Type() string // Alias for BlockType for compatibility
 }
 
 // TextBlock contains text content.
 type TextBlock struct {
-	Text string `json:"text"`
+	TextContent string `json:"text"`
 }
 
 func (b *TextBlock) BlockType() string { return "text" }
+func (b *TextBlock) Type() string      { return "text" }
+
+// Text returns the text content.
+func (b *TextBlock) Text() string { return b.TextContent }
 
 // ThinkingBlock contains Claude's thinking content.
 type ThinkingBlock struct {
@@ -159,8 +164,10 @@ func (m *AssistantMessage) Thinking() string {
 
 // SystemMessage represents a system message.
 type SystemMessage struct {
-	Subtype string         `json:"subtype"`
-	Data    map[string]any `json:"data,omitempty"`
+	Subtype   string         `json:"subtype"`
+	SessionID string         `json:"session_id,omitempty"`
+	Version   string         `json:"version,omitempty"`
+	Data      map[string]any `json:"data,omitempty"`
 }
 
 func (m *SystemMessage) MessageType() string { return "system" }
@@ -199,6 +206,9 @@ type StreamEvent struct {
 	UUID            string         `json:"uuid"`
 	SessionID       string         `json:"session_id"`
 	Event           map[string]any `json:"event"`
+	EventType       string         `json:"event_type,omitempty"`
+	Index           *int           `json:"index,omitempty"`
+	Delta           map[string]any `json:"delta,omitempty"`
 	ParentToolUseID *string        `json:"parent_tool_use_id,omitempty"`
 }
 
