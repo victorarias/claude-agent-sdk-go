@@ -2,6 +2,7 @@ package sdk
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 )
@@ -157,17 +158,37 @@ func TestClient_Connect(t *testing.T) {
 	transport := NewMockTransport()
 	client := NewClient(WithTransport(transport))
 
-	// Simulate init response
+	// Respond to control requests
 	go func() {
-		time.Sleep(10 * time.Millisecond)
-		transport.SendMessage(map[string]any{
-			"type":    "system",
-			"subtype": "init",
-			"data": map[string]any{
-				"version":    "2.0.0",
-				"session_id": "test_session_123",
-			},
-		})
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+
+			// Parse the last request to get the request_id
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			reqID, ok := req["request_id"].(string)
+			if !ok {
+				continue
+			}
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response": map[string]any{
+						"session_id": "test_session_123",
+					},
+				},
+			})
+			return
+		}
 	}()
 
 	ctx := context.Background()
@@ -180,6 +201,10 @@ func TestClient_Connect(t *testing.T) {
 		t.Error("client should be connected")
 	}
 
+	if client.SessionID() != "test_session_123" {
+		t.Errorf("expected session ID 'test_session_123', got '%s'", client.SessionID())
+	}
+
 	client.Close()
 }
 
@@ -187,6 +212,7 @@ func TestClient_ConnectWithPrompt(t *testing.T) {
 	transport := NewMockTransport()
 	client := NewClient(WithTransport(transport))
 
+	// Non-streaming mode doesn't require Initialize
 	ctx := context.Background()
 	err := client.ConnectWithPrompt(ctx, "Hello Claude!")
 	if err != nil {
