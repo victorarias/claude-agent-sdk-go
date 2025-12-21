@@ -539,3 +539,50 @@ func WithTransport(t Transport) Option {
 		o.customTransport = t
 	}
 }
+
+// MCPServerBuilder provides a fluent API for building MCP servers.
+type MCPServerBuilder struct {
+	name    string
+	version string
+	tools   []*MCPTool
+}
+
+// NewMCPServerBuilder creates a new MCP server builder.
+func NewMCPServerBuilder(name string) *MCPServerBuilder {
+	return &MCPServerBuilder{
+		name:    name,
+		version: "1.0.0",
+		tools:   make([]*MCPTool, 0),
+	}
+}
+
+// WithVersion sets the server version.
+func (b *MCPServerBuilder) WithVersion(version string) *MCPServerBuilder {
+	b.version = version
+	return b
+}
+
+// WithTool adds a tool to the server.
+func (b *MCPServerBuilder) WithTool(
+	name string,
+	description string,
+	schema map[string]any,
+	handler MCPToolHandler,
+) *MCPServerBuilder {
+	b.tools = append(b.tools, &MCPTool{
+		Name:        name,
+		Description: description,
+		Schema:      schema,
+		Handler:     handler,
+	})
+	return b
+}
+
+// Build creates the MCP server.
+func (b *MCPServerBuilder) Build() *MCPServer {
+	return &MCPServer{
+		Name:    b.name,
+		Version: b.version,
+		Tools:   b.tools,
+	}
+}
