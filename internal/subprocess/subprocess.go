@@ -403,6 +403,68 @@ func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) [
 		cmd = append(cmd, "--print", "--", prompt)
 	}
 
+	// Optimize command length if needed (temp file fallback for agents)
+	cmd = optimizeCommandLength(cmd, opts)
+
+	return cmd
+}
+
+// getCmdLength calculates total command line length.
+func getCmdLength(cmd []string) int {
+	totalLen := 0
+	for _, arg := range cmd {
+		totalLen += len(arg) + 1 // +1 for space separator
+	}
+	return totalLen
+}
+
+// optimizeCommandLength optimizes command length using temp file fallback for agents.
+// Returns modified command and temp file path (if created).
+// Matches Python SDK behavior in subprocess_cli.py:336-366.
+func optimizeCommandLength(cmd []string, opts *types.Options) []string {
+	// Only optimize if agents are present
+	if len(opts.Agents) == 0 {
+		return cmd
+	}
+
+	// Check if command exceeds length limit
+	cmdStr := strings.Join(cmd, " ")
+	limit := cmdLengthLimit()
+	if len(cmdStr) <= limit {
+		return cmd
+	}
+
+	// Find --agents argument and replace with temp file reference
+	for i := 0; i < len(cmd)-1; i++ {
+		if cmd[i] == "--agents" {
+			agentsJSON := cmd[i+1]
+
+			// Create temp file
+			tempFile, err := os.CreateTemp("", "claude-agents-*.json")
+			if err != nil {
+				// If temp file creation fails, log but continue with original command
+				// The command length check will catch it later if it's truly too long
+				return cmd
+			}
+
+			// Write agents JSON to temp file
+			if _, err := tempFile.WriteString(agentsJSON); err != nil {
+				tempFile.Close()
+				os.Remove(tempFile.Name())
+				return cmd
+			}
+			tempFile.Close()
+
+			// Replace agents JSON with @filepath reference
+			cmd[i+1] = "@" + tempFile.Name()
+
+			// Note: temp file cleanup is handled by transport.Close()
+			// The transport will track this via AddTempFile() when it detects the @ prefix
+
+			break
+		}
+	}
+
 	return cmd
 }
 
