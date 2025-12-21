@@ -91,7 +91,7 @@ func TestHandleMCPMessage_Initialize(t *testing.T) {
 func TestHandleMCPMessage_NotificationsInitialized(t *testing.T) {
 	server := types.NewMCPServerBuilder("test-server").Build()
 
-	transport := newMockTransport()
+	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 	query.RegisterMCPServer(server)
 
@@ -134,7 +134,7 @@ func TestHandleMCPMessage_ToolsList(t *testing.T) {
 		}).
 		Build()
 
-	transport := newMockTransport()
+	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 	query.RegisterMCPServer(server)
 
