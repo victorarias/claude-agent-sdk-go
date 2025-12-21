@@ -133,3 +133,38 @@ func TestWithPlugins_FunctionalOption(t *testing.T) {
 		t.Errorf("Expected /plugin/two, got %s", opts.Plugins[1].Path)
 	}
 }
+
+// TestBuildCommand_OnlyLocalPluginsIncluded tests that only "local" type plugins are passed to CLI.
+// This matches Python SDK behavior which only supports local plugins currently.
+func TestBuildCommand_OnlyLocalPluginsIncluded(t *testing.T) {
+	opts := types.DefaultOptions()
+	opts.Plugins = []types.PluginConfig{
+		{Type: "local", Path: "/local/plugin"},
+		{Type: "remote", Path: "http://example.com/plugin"}, // Should be ignored
+		{Type: "local", Path: "/another/local/plugin"},
+	}
+
+	cmd := buildCommand("/usr/bin/claude", "Hello", opts, false)
+
+	// Count --plugin-dir flags (should only be 2, not 3)
+	pluginDirCount := 0
+	localPaths := []string{}
+
+	for i := 0; i < len(cmd)-1; i++ {
+		if cmd[i] == "--plugin-dir" {
+			pluginDirCount++
+			localPaths = append(localPaths, cmd[i+1])
+		}
+	}
+
+	if pluginDirCount != 2 {
+		t.Errorf("Expected 2 --plugin-dir flags (only local plugins), got %d", pluginDirCount)
+	}
+
+	// Verify remote plugin is not included
+	for _, path := range localPaths {
+		if path == "http://example.com/plugin" {
+			t.Error("Remote plugin should not be included in command")
+		}
+	}
+}
