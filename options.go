@@ -159,9 +159,10 @@ type Options struct {
 	MaxBufferSize     int     `json:"max_buffer_size,omitempty"`
 
 	// Paths
-	Cwd     string   `json:"cwd,omitempty"`
-	CLIPath string   `json:"cli_path,omitempty"`
-	AddDirs []string `json:"add_dirs,omitempty"`
+	Cwd           string   `json:"cwd,omitempty"`
+	CLIPath       string   `json:"cli_path,omitempty"`
+	BundledCLIPath string  `json:"bundled_cli_path,omitempty"`
+	AddDirs       []string `json:"add_dirs,omitempty"`
 
 	// Environment
 	Env map[string]string `json:"env,omitempty"`
