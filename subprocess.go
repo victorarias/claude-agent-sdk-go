@@ -615,14 +615,60 @@ func (t *SubprocessTransport) Close() error {
 	return nil
 }
 
-// Write sends data to the CLI stdin.
+// Write sends data to the CLI stdin with TOCTOU-safe serialization.
+// CRITICAL: This method serializes concurrent writes from MCP tool calls.
 func (t *SubprocessTransport) Write(data string) error {
-	// Implemented in Task 6
+	// CRITICAL: Acquire write lock FIRST to serialize concurrent MCP tool calls
+	t.writeMu.Lock()
+	defer t.writeMu.Unlock()
+
+	// TOCTOU-safe: Check ready state INSIDE the lock
+	t.closeMu.Lock()
+	ready := t.ready
+	closed := t.closed
+	stdin := t.stdin
+	t.closeMu.Unlock()
+
+	if !ready || closed {
+		return &ConnectionError{Message: "transport not ready for writing"}
+	}
+	if stdin == nil {
+		return &ConnectionError{Message: "stdin is nil"}
+	}
+
+	// Ensure data ends with newline
+	if !strings.HasSuffix(data, "\n") {
+		data += "\n"
+	}
+
+	_, err := io.WriteString(stdin, data)
+	if err != nil {
+		return &ConnectionError{Message: "failed to write to stdin", Cause: err}
+	}
+
 	return nil
+}
+
+// WriteJSON marshals and writes a JSON object.
+func (t *SubprocessTransport) WriteJSON(obj any) error {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+	return t.Write(string(data))
 }
 
 // EndInput closes stdin to signal end of input.
 func (t *SubprocessTransport) EndInput() error {
-	// Implemented in Task 6
+	t.writeMu.Lock()
+	defer t.writeMu.Unlock()
+
+	t.closeMu.Lock()
+	stdin := t.stdin
+	t.closeMu.Unlock()
+
+	if stdin != nil {
+		return stdin.Close()
+	}
 	return nil
 }
