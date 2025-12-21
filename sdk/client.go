@@ -572,9 +572,9 @@ func (c *Client) Run(ctx context.Context, fn func() error) error {
 	return fn()
 }
 
-// types.Messages returns a channel that yields messages until closed or error.
+// Messages returns a channel that yields messages until closed or error.
 // Use this for iterating over responses in streaming mode.
-func (c *Client) types.Messages() <-chan types.Message {
+func (c *Client) Messages() <-chan types.Message {
 	c.mu.Lock()
 	if !c.connected || c.query == nil {
 		c.mu.Unlock()
