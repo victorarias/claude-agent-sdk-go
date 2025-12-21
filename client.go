@@ -41,11 +41,23 @@ func NewClient(opts ...Option) *Client {
 		hooks:      make(map[HookEvent][]HookMatcher),
 	}
 
-	// Apply client-specific options
-	for _, opt := range opts {
-		if clientOpt, ok := opt.(clientOption); ok {
-			clientOpt.applyClient(client)
+	// Copy SDK MCP servers from options
+	if options.SDKMCPServers != nil {
+		for name, server := range options.SDKMCPServers {
+			client.mcpServers[name] = server
 		}
+	}
+
+	// Copy hooks from options
+	if options.Hooks != nil {
+		for event, matchers := range options.Hooks {
+			client.hooks[event] = matchers
+		}
+	}
+
+	// Copy canUseTool from options
+	if options.CanUseTool != nil {
+		client.canUseTool = options.CanUseTool
 	}
 
 	// Use transport if provided in options
@@ -54,11 +66,6 @@ func NewClient(opts ...Option) *Client {
 	}
 
 	return client
-}
-
-// clientOption is an option that applies to the client.
-type clientOption interface {
-	applyClient(*Client)
 }
 
 // Options returns the client's options.
@@ -82,128 +89,111 @@ func (c *Client) SessionID() string {
 
 // WithClientMCPServer adds an MCP server to the client.
 func WithClientMCPServer(server *MCPServer) Option {
-	return &mcpServerOption{server: server}
-}
-
-type mcpServerOption struct {
-	server *MCPServer
-}
-
-func (o *mcpServerOption) Apply(opts *Options) {}
-
-func (o *mcpServerOption) applyClient(c *Client) {
-	c.mcpServers[o.server.Name] = o.server
+	return func(o *Options) {
+		if o.SDKMCPServers == nil {
+			o.SDKMCPServers = make(map[string]*MCPServer)
+		}
+		o.SDKMCPServers[server.Name] = server
+	}
 }
 
 // WithPreToolUseHook adds a pre-tool-use hook.
 func WithPreToolUseHook(matcher map[string]any, callback HookCallback) Option {
-	return &hookOption{
-		event:    HookPreToolUse,
-		matcher:  matcher,
-		callback: callback,
+	return func(o *Options) {
+		if o.Hooks == nil {
+			o.Hooks = make(map[HookEvent][]HookMatcher)
+		}
+		o.Hooks[HookPreToolUse] = append(o.Hooks[HookPreToolUse], HookMatcher{
+			Matcher: matcher,
+			Hooks:   []HookCallback{callback},
+		})
 	}
 }
 
 // WithPostToolUseHook adds a post-tool-use hook.
 func WithPostToolUseHook(matcher map[string]any, callback HookCallback) Option {
-	return &hookOption{
-		event:    HookPostToolUse,
-		matcher:  matcher,
-		callback: callback,
+	return func(o *Options) {
+		if o.Hooks == nil {
+			o.Hooks = make(map[HookEvent][]HookMatcher)
+		}
+		o.Hooks[HookPostToolUse] = append(o.Hooks[HookPostToolUse], HookMatcher{
+			Matcher: matcher,
+			Hooks:   []HookCallback{callback},
+		})
 	}
 }
 
 // WithStopHook adds a stop hook.
 func WithStopHook(matcher map[string]any, callback HookCallback) Option {
-	return &hookOption{
-		event:    HookStop,
-		matcher:  matcher,
-		callback: callback,
+	return func(o *Options) {
+		if o.Hooks == nil {
+			o.Hooks = make(map[HookEvent][]HookMatcher)
+		}
+		o.Hooks[HookStop] = append(o.Hooks[HookStop], HookMatcher{
+			Matcher: matcher,
+			Hooks:   []HookCallback{callback},
+		})
 	}
 }
 
 // WithUserPromptSubmitHook adds a user prompt submit hook.
 func WithUserPromptSubmitHook(callback HookCallback) Option {
-	return &hookOption{
-		event:    HookUserPromptSubmit,
-		matcher:  nil, // No matcher for prompt submit
-		callback: callback,
+	return func(o *Options) {
+		if o.Hooks == nil {
+			o.Hooks = make(map[HookEvent][]HookMatcher)
+		}
+		o.Hooks[HookUserPromptSubmit] = append(o.Hooks[HookUserPromptSubmit], HookMatcher{
+			Matcher: nil,
+			Hooks:   []HookCallback{callback},
+		})
 	}
 }
 
 // WithSubagentStopHook adds a subagent stop hook.
 func WithSubagentStopHook(callback HookCallback) Option {
-	return &hookOption{
-		event:    HookSubagentStop,
-		matcher:  nil,
-		callback: callback,
+	return func(o *Options) {
+		if o.Hooks == nil {
+			o.Hooks = make(map[HookEvent][]HookMatcher)
+		}
+		o.Hooks[HookSubagentStop] = append(o.Hooks[HookSubagentStop], HookMatcher{
+			Matcher: nil,
+			Hooks:   []HookCallback{callback},
+		})
 	}
 }
 
 // WithPreCompactHook adds a pre-compact hook.
 func WithPreCompactHook(callback HookCallback) Option {
-	return &hookOption{
-		event:    HookPreCompact,
-		matcher:  nil,
-		callback: callback,
+	return func(o *Options) {
+		if o.Hooks == nil {
+			o.Hooks = make(map[HookEvent][]HookMatcher)
+		}
+		o.Hooks[HookPreCompact] = append(o.Hooks[HookPreCompact], HookMatcher{
+			Matcher: nil,
+			Hooks:   []HookCallback{callback},
+		})
 	}
 }
 
 // WithHookTimeout adds a hook with a timeout.
 func WithHookTimeout(event HookEvent, matcher map[string]any, timeout float64, callback HookCallback) Option {
-	return &hookOptionWithTimeout{
-		event:    event,
-		matcher:  matcher,
-		callback: callback,
-		timeout:  timeout,
+	return func(o *Options) {
+		if o.Hooks == nil {
+			o.Hooks = make(map[HookEvent][]HookMatcher)
+		}
+		o.Hooks[event] = append(o.Hooks[event], HookMatcher{
+			Matcher: matcher,
+			Hooks:   []HookCallback{callback},
+			Timeout: &timeout,
+		})
 	}
-}
-
-type hookOption struct {
-	event    HookEvent
-	matcher  map[string]any
-	callback HookCallback
-}
-
-type hookOptionWithTimeout struct {
-	event    HookEvent
-	matcher  map[string]any
-	callback HookCallback
-	timeout  float64
-}
-
-func (o *hookOption) Apply(opts *Options) {}
-
-func (o *hookOption) applyClient(c *Client) {
-	c.hooks[o.event] = append(c.hooks[o.event], HookMatcher{
-		Matcher: o.matcher,
-		Hooks:   []HookCallback{o.callback},
-	})
-}
-
-func (o *hookOptionWithTimeout) Apply(opts *Options) {}
-
-func (o *hookOptionWithTimeout) applyClient(c *Client) {
-	c.hooks[o.event] = append(c.hooks[o.event], HookMatcher{
-		Matcher: o.matcher,
-		Hooks:   []HookCallback{o.callback},
-		Timeout: &o.timeout,
-	})
 }
 
 // WithCanUseTool sets the tool permission callback.
 func WithCanUseTool(callback CanUseToolCallback) Option {
-	return &canUseToolOption{callback: callback}
-}
-
-type canUseToolOption struct {
-	callback CanUseToolCallback
-}
-
-func (o *canUseToolOption) Apply(opts *Options) {}
-
-func (o *canUseToolOption) applyClient(c *Client) {
-	c.canUseTool = o.callback
+	return func(o *Options) {
+		o.CanUseTool = callback
+	}
 }
 
 // Connect establishes a connection to Claude in streaming mode.
