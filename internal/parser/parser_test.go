@@ -2,6 +2,8 @@ package parser
 
 import (
 	"testing"
+
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 func TestParseMessage_System(t *testing.T) {
