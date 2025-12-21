@@ -2,6 +2,8 @@ package sdk
 
 import (
 	"testing"
+
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 func TestMCPTool(t *testing.T) {
