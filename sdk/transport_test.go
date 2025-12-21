@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 	"testing"
+
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 // MockTransport implements Transport for testing.
@@ -123,8 +125,8 @@ func (m *MockTransport) SetWriteError(err error) {
 }
 
 func TestTransportInterface(t *testing.T) {
-	// Verify MockTransport implements Transport
-	var _ Transport = (*MockTransport)(nil)
+	// Verify MockTransport implements types.Transport
+	var _ types.Transport = (*MockTransport)(nil)
 }
 
 func TestMockTransportConnect(t *testing.T) {
@@ -214,10 +216,10 @@ func TestMockTransportEndInput(t *testing.T) {
 
 func TestMockTransportConnectError(t *testing.T) {
 	mt := NewMockTransport()
-	mt.SetConnectError(ErrConnection)
+	mt.SetConnectError(types.ErrConnection)
 
 	err := mt.Connect(context.Background())
-	if err != ErrConnection {
+	if err != types.ErrConnection {
 		t.Errorf("expected ErrConnection, got %v", err)
 	}
 }
@@ -225,10 +227,10 @@ func TestMockTransportConnectError(t *testing.T) {
 func TestMockTransportWriteError(t *testing.T) {
 	mt := NewMockTransport()
 	_ = mt.Connect(context.Background())
-	mt.SetWriteError(ErrClosed)
+	mt.SetWriteError(types.ErrClosed)
 
 	err := mt.Write("test")
-	if err != ErrClosed {
+	if err != types.ErrClosed {
 		t.Errorf("expected ErrClosed, got %v", err)
 	}
 }

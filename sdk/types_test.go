@@ -3,6 +3,8 @@ package sdk
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 func TestTextBlock(t *testing.T) {
