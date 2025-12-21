@@ -698,19 +698,27 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 }
 
 // buildEnvironment creates the environment for the subprocess.
+// Environment variable precedence (matching Python SDK):
+// 1. System environment (os.Environ)
+// 2. User-provided env overrides (from Options.Env)
+// 3. SDK-required env (TERM, NO_COLOR, SDK internal vars) - CANNOT be overridden
 func buildEnvironment(opts *types.Options) []string {
+	// Start with system environment
 	env := os.Environ()
 
-	// Add SDK-specific vars
-	env = append(env, "CLAUDE_CODE_ENTRYPOINT=sdk-go")
-	env = append(env, "CLAUDE_AGENT_SDK_VERSION="+types.Version)
-
-	// Add user-provided vars
+	// Add user-provided vars (can override system env)
 	for k, v := range opts.Env {
 		env = append(env, k+"="+v)
 	}
 
-	// Add feature flags
+	// Add SDK-required vars LAST (cannot be overridden by user)
+	// These must come after user env to ensure SDK control
+	env = append(env, "TERM=dumb")
+	env = append(env, "NO_COLOR=1")
+	env = append(env, "CLAUDE_CODE_ENTRYPOINT=sdk-go")
+	env = append(env, "CLAUDE_AGENT_SDK_VERSION="+types.Version)
+
+	// Add feature flags (also SDK-controlled)
 	if opts.EnableFileCheckpointing {
 		env = append(env, "CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING=true")
 	}
