@@ -9,12 +9,12 @@ import (
 
 // MCPHandler processes MCP protocol messages for a server.
 type MCPHandler struct {
-	server      *MCPServer
+	server      *types.MCPServer
 	initialized bool
 }
 
 // NewMCPHandler creates a handler for the given server.
-func NewMCPHandler(server *MCPServer) *MCPHandler {
+func NewMCPHandler(server *types.MCPServer) *MCPHandler {
 	return &MCPHandler{
 		server: server,
 	}

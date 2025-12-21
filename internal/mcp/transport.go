@@ -6,6 +6,8 @@ import (
 	"context"
 	"io"
 	"sync"
+
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 // MCPServerTransport handles stdio communication for an MCP server.
