@@ -247,7 +247,7 @@ func TestNewStreamingTransport(t *testing.T) {
 }
 
 func TestSubprocessTransportImplementsInterface(t *testing.T) {
-	var _ Transport = (*SubprocessTransport)(nil)
+	var _ types.Transport = (*SubprocessTransport)(nil)
 }
 
 func TestSubprocessTransport_Connect_NotFound(t *testing.T) {
