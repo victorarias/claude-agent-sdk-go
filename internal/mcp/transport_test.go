@@ -7,6 +7,8 @@ import (
 	"io"
 	"testing"
 	"time"
+
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 func TestMCPServerTransport_ProcessOne(t *testing.T) {
