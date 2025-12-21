@@ -1,6 +1,7 @@
 package sdk
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"

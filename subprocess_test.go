@@ -294,3 +294,79 @@ sleep 0.1
 		t.Errorf("second Connect should return nil: %v", err)
 	}
 }
+
+func TestParseJSONLine(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{
+			name:    "valid json",
+			input:   `{"type":"assistant","message":{"content":"hello"}}`,
+			wantErr: false,
+		},
+		{
+			name:    "invalid json",
+			input:   `{not valid json`,
+			wantErr: true,
+		},
+		{
+			name:    "empty line",
+			input:   "",
+			wantErr: true,
+		},
+		{
+			name:    "partial json",
+			input:   `{"type":"assistant"`,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseJSONLine(tt.input)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if result == nil {
+					t.Error("expected result, got nil")
+				}
+			}
+		})
+	}
+}
+
+func TestSpeculativeJSONParsing(t *testing.T) {
+	// Test that multi-line JSON is accumulated correctly
+	lines := []string{
+		`{"type":"assistant",`,
+		`"message":{"content":"hello"}}`,
+	}
+
+	parser := newJSONAccumulator()
+	var result map[string]any
+	var err error
+
+	for _, line := range lines {
+		result, err = parser.addLine(line)
+		if result != nil {
+			break
+		}
+	}
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Error("expected result after accumulating lines")
+	}
+	if result["type"] != "assistant" {
+		t.Errorf("got type %v, want assistant", result["type"])
+	}
+}
