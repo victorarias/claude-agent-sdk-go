@@ -135,12 +135,24 @@ type Message interface {
 
 // UserMessage represents a user's message.
 type UserMessage struct {
-	Content         any     `json:"content"` // string or []ContentBlock
-	UUID            *string `json:"uuid,omitempty"`
-	ParentToolUseID *string `json:"parent_tool_use_id,omitempty"`
+	Content         []ContentBlock `json:"content"`
+	Role            string         `json:"role,omitempty"`
+	UUID            string         `json:"uuid,omitempty"`
+	ParentToolUseID *string        `json:"parent_tool_use_id,omitempty"`
 }
 
 func (m *UserMessage) MessageType() string { return "user" }
+
+// Text returns all text content concatenated from a UserMessage.
+func (m *UserMessage) Text() string {
+	var result string
+	for _, block := range m.Content {
+		if textBlock, ok := block.(*TextBlock); ok {
+			result += textBlock.TextContent
+		}
+	}
+	return result
+}
 
 // AssistantMessageError represents error types for assistant messages.
 type AssistantMessageError string
@@ -158,6 +170,7 @@ const (
 type AssistantMessage struct {
 	Content         []ContentBlock         `json:"content"`
 	Model           string                 `json:"model"`
+	StopReason      string                 `json:"stop_reason,omitempty"`
 	ParentToolUseID *string                `json:"parent_tool_use_id,omitempty"`
 	Error           *AssistantMessageError `json:"error,omitempty"`
 }
