@@ -74,36 +74,58 @@ func ParseContentBlock(raw map[string]any) (ContentBlock, error) {
 
 	switch blockType {
 	case "text":
-		var block TextBlock
+		var block textBlockJSON
 		if err := json.Unmarshal(data, &block); err != nil {
 			return nil, fmt.Errorf("failed to parse text block: %w", err)
 		}
-		return &block, nil
+		return &TextBlock{TextContent: block.Text}, nil
 
 	case "thinking":
-		var block ThinkingBlock
+		var block thinkingBlockJSON
 		if err := json.Unmarshal(data, &block); err != nil {
 			return nil, fmt.Errorf("failed to parse thinking block: %w", err)
 		}
-		return &block, nil
+		return &ThinkingBlock{ThinkingContent: block.Thinking, Signature: block.Signature}, nil
 
 	case "tool_use":
-		var block ToolUseBlock
+		var block toolUseBlockJSON
 		if err := json.Unmarshal(data, &block); err != nil {
 			return nil, fmt.Errorf("failed to parse tool_use block: %w", err)
 		}
-		return &block, nil
+		return &ToolUseBlock{ID: block.ID, Name: block.Name, ToolInput: block.Input}, nil
 
 	case "tool_result":
-		var block ToolResultBlock
+		var block toolResultBlockJSON
 		if err := json.Unmarshal(data, &block); err != nil {
 			return nil, fmt.Errorf("failed to parse tool_result block: %w", err)
 		}
-		return &block, nil
+		return &ToolResultBlock{ToolUseID: block.ToolUseID, ResultContent: block.Content, IsError: block.IsError}, nil
 
 	default:
 		return nil, fmt.Errorf("unknown block type: %s", blockType)
 	}
+}
+
+// JSON unmarshaling helper types
+type textBlockJSON struct {
+	Text string `json:"text"`
+}
+
+type thinkingBlockJSON struct {
+	Thinking  string `json:"thinking"`
+	Signature string `json:"signature"`
+}
+
+type toolUseBlockJSON struct {
+	ID    string         `json:"id"`
+	Name  string         `json:"name"`
+	Input map[string]any `json:"input"`
+}
+
+type toolResultBlockJSON struct {
+	ToolUseID string `json:"tool_use_id"`
+	Content   string `json:"content"`
+	IsError   bool   `json:"is_error"`
 }
 
 // Message represents a message in the conversation.
