@@ -385,3 +385,81 @@ func TestSubprocessTransport_Write_NotReady(t *testing.T) {
 		t.Errorf("expected ConnectionError, got %T", err)
 	}
 }
+
+func TestSubprocessTransport_Close_NotConnected(t *testing.T) {
+	opts := DefaultOptions()
+	transport := NewSubprocessTransport("", opts)
+
+	err := transport.Close()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestSubprocessTransport_Close_Idempotent(t *testing.T) {
+	opts := DefaultOptions()
+	transport := NewSubprocessTransport("", opts)
+
+	// Multiple closes should not panic
+	_ = transport.Close()
+	_ = transport.Close()
+	_ = transport.Close()
+}
+
+func TestSubprocessTransport_Close_CleansUpTempFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "temp.txt")
+	if err := os.WriteFile(tmpFile, []byte("test"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	opts := DefaultOptions()
+	transport := NewSubprocessTransport("", opts)
+	transport.AddTempFile(tmpFile)
+
+	if err := transport.Close(); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+
+	// Temp file should be deleted
+	if _, err := os.Stat(tmpFile); !os.IsNotExist(err) {
+		t.Error("temp file should have been deleted")
+	}
+}
+
+func TestSubprocessTransport_Close_GracefulShutdown(t *testing.T) {
+	tmpDir := t.TempDir()
+	mockCLI := filepath.Join(tmpDir, "claude")
+	// Process that responds to SIGTERM
+	mockScript := `#!/bin/bash
+trap 'exit 0' TERM
+while true; do sleep 0.1; done
+`
+	if err := os.WriteFile(mockCLI, []byte(mockScript), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	opts := DefaultOptions()
+	opts.CLIPath = mockCLI
+
+	transport := NewStreamingTransport(opts)
+	ctx := context.Background()
+
+	if err := transport.Connect(ctx); err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+
+	// Close should complete within timeout
+	done := make(chan struct{})
+	go func() {
+		transport.Close()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Good - closed within expected time
+	case <-time.After(10 * time.Second):
+		t.Error("Close took too long")
+	}
+}
