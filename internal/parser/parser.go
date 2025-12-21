@@ -7,7 +7,7 @@ import (
 )
 
 // ParseMessage parses a raw message map into a typed Message.
-func ParseMessage(raw map[string]any) (Message, error) {
+func ParseMessage(raw map[string]any) (types.Message, error) {
 	msgType, _ := raw["type"].(string)
 
 	switch msgType {
@@ -22,7 +22,7 @@ func ParseMessage(raw map[string]any) (Message, error) {
 	case "stream_event":
 		return parseStreamEvent(raw)
 	default:
-		return nil, &MessageParseError{
+		return nil, &types.MessageParseError{
 			Message: fmt.Sprintf("unknown message type: %s", msgType),
 			Data:    raw,
 		}
@@ -30,8 +30,8 @@ func ParseMessage(raw map[string]any) (Message, error) {
 }
 
 // parseStreamEvent parses a StreamEvent for partial message updates.
-func parseStreamEvent(raw map[string]any) (*StreamEvent, error) {
-	event := &StreamEvent{
+func parseStreamEvent(raw map[string]any) (*types.StreamEvent, error) {
+	event := &types.StreamEvent{
 		UUID:      getString(raw, "uuid"),
 		SessionID: getString(raw, "session_id"),
 	}
@@ -61,8 +61,8 @@ func parseStreamEvent(raw map[string]any) (*StreamEvent, error) {
 	return event, nil
 }
 
-func parseSystemMessage(raw map[string]any) (*SystemMessage, error) {
-	msg := &SystemMessage{
+func parseSystemMessage(raw map[string]any) (*types.SystemMessage, error) {
+	msg := &types.SystemMessage{
 		Subtype: getString(raw, "subtype"),
 	}
 
@@ -75,8 +75,8 @@ func parseSystemMessage(raw map[string]any) (*SystemMessage, error) {
 	return msg, nil
 }
 
-func parseAssistantMessage(raw map[string]any) (*AssistantMessage, error) {
-	msg := &AssistantMessage{}
+func parseAssistantMessage(raw map[string]any) (*types.AssistantMessage, error) {
+	msg := &types.AssistantMessage{}
 
 	// Extract parent_tool_use_id for subagent messages
 	if parentID, ok := raw["parent_tool_use_id"].(string); ok {
@@ -85,7 +85,7 @@ func parseAssistantMessage(raw map[string]any) (*AssistantMessage, error) {
 
 	// Extract error field for API error messages
 	if errType, ok := raw["error"].(string); ok {
-		err := AssistantMessageError(errType)
+		err := types.AssistantMessageError(errType)
 		msg.Error = &err
 	}
 
@@ -110,8 +110,8 @@ func parseAssistantMessage(raw map[string]any) (*AssistantMessage, error) {
 	return msg, nil
 }
 
-func parseUserMessage(raw map[string]any) (*UserMessage, error) {
-	msg := &UserMessage{
+func parseUserMessage(raw map[string]any) (*types.UserMessage, error) {
+	msg := &types.UserMessage{
 		UUID: getString(raw, "uuid"),
 	}
 
@@ -126,7 +126,7 @@ func parseUserMessage(raw map[string]any) (*UserMessage, error) {
 		// Content can be string or array
 		switch c := msgData["content"].(type) {
 		case string:
-			msg.Content = []ContentBlock{&TextBlock{TextContent: c}}
+			msg.Content = []types.ContentBlock{&types.TextBlock{TextContent: c}}
 		case []any:
 			for _, item := range c {
 				if blockRaw, ok := item.(map[string]any); ok {
@@ -143,8 +143,8 @@ func parseUserMessage(raw map[string]any) (*UserMessage, error) {
 	return msg, nil
 }
 
-func parseResultMessage(raw map[string]any) (*ResultMessage, error) {
-	msg := &ResultMessage{
+func parseResultMessage(raw map[string]any) (*types.ResultMessage, error) {
+	msg := &types.ResultMessage{
 		Subtype:   getString(raw, "subtype"),
 		SessionID: getString(raw, "session_id"),
 		IsError:   getBool(raw, "is_error"),
@@ -168,23 +168,23 @@ func parseResultMessage(raw map[string]any) (*ResultMessage, error) {
 
 // parseContentBlock parses a raw JSON map into a ContentBlock.
 // This is a simplified version that doesn't use JSON marshaling.
-func parseContentBlock(raw map[string]any) (ContentBlock, error) {
+func parseContentBlock(raw map[string]any) (types.ContentBlock, error) {
 	blockType, _ := raw["type"].(string)
 
 	switch blockType {
 	case "text":
-		return &TextBlock{
+		return &types.TextBlock{
 			TextContent: getString(raw, "text"),
 		}, nil
 
 	case "thinking":
-		return &ThinkingBlock{
+		return &types.ThinkingBlock{
 			ThinkingContent: getString(raw, "thinking"),
 		}, nil
 
 	case "tool_use":
 		input, _ := raw["input"].(map[string]any)
-		return &ToolUseBlock{
+		return &types.ToolUseBlock{
 			ID:        getString(raw, "id"),
 			Name:      getString(raw, "name"),
 			ToolInput: input,
@@ -196,7 +196,7 @@ func parseContentBlock(raw map[string]any) (ContentBlock, error) {
 		case string:
 			content = c
 		}
-		return &ToolResultBlock{
+		return &types.ToolResultBlock{
 			ToolUseID:     getString(raw, "tool_use_id"),
 			ResultContent: content,
 			IsError:       getBool(raw, "is_error"),
