@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 // findCLI locates the Claude CLI binary.
