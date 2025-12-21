@@ -539,10 +539,3 @@ func WithTransport(t Transport) Option {
 		o.customTransport = t
 	}
 }
-
-// ApplyOptions applies functional options to an Options struct.
-func ApplyOptions(opts *Options, options ...Option) {
-	for _, opt := range options {
-		opt(opts)
-	}
-}
