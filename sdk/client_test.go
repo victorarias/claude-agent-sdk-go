@@ -18,10 +18,10 @@ func TestNewClient(t *testing.T) {
 
 func TestNewClientWithOptions(t *testing.T) {
 	client := NewClient(
-		WithModel("claude-opus-4"),
-		WithMaxTurns(10),
-		WithPermissionMode(PermissionBypass),
-		WithSystemPrompt("You are helpful"),
+		types.WithModel("claude-opus-4"),
+		types.WithMaxTurns(10),
+		types.WithPermissionMode(types.PermissionBypass),
+		types.WithSystemPrompt("You are helpful"),
 	)
 
 	if client.options.Model != "claude-opus-4" {
@@ -30,13 +30,13 @@ func TestNewClientWithOptions(t *testing.T) {
 	if client.options.MaxTurns != 10 {
 		t.Errorf("got maxTurns %d, want %d", client.options.MaxTurns, 10)
 	}
-	if client.options.PermissionMode != PermissionBypass {
-		t.Errorf("got permission mode %v, want %v", client.options.PermissionMode, PermissionBypass)
+	if client.options.PermissionMode != types.PermissionBypass {
+		t.Errorf("got permission mode %v, want %v", client.options.PermissionMode, types.PermissionBypass)
 	}
 }
 
 func TestClientWithMCPServers(t *testing.T) {
-	server := NewMCPServerBuilder("test-server").
+	server := types.NewMCPServerBuilder("test-server").
 		WithTool("echo", "Echoes input", map[string]any{
 			"type": "object",
 		}, func(args map[string]any) (*MCPToolResult, error) {
