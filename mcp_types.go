@@ -33,6 +33,11 @@ type MCPError struct {
 	Data    any    `json:"data,omitempty"`
 }
 
+// Error implements the error interface.
+func (e *MCPError) Error() string {
+	return e.Message
+}
+
 // Standard MCP error codes
 const (
 	MCPErrorParseError     = -32700
