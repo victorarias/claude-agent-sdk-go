@@ -19,7 +19,8 @@ import (
 	"syscall"
 	"time"
 
-	sdk "github.com/victorarias/claude-agent-sdk-go"
+	"github.com/victorarias/claude-agent-sdk-go/sdk"
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 func main() {
@@ -37,8 +38,8 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	client := sdk.NewClient(
-		sdk.WithModel("claude-sonnet-4-5"),
-		sdk.WithMaxTurns(10),
+		types.WithModel("claude-sonnet-4-5"),
+		types.WithMaxTurns(10),
 	)
 
 	if err := client.Connect(ctx); err != nil {
@@ -73,9 +74,9 @@ func main() {
 			}
 
 			switch m := msg.(type) {
-			case *sdk.AssistantMessage:
+			case *types.AssistantMessage:
 				fmt.Print(m.Text())
-			case *sdk.ResultMessage:
+			case *types.ResultMessage:
 				fmt.Println()
 				if m.IsSuccess() {
 					fmt.Println("\n[Task completed normally]")
