@@ -1,11 +1,13 @@
 package sdk
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 )
 
 func TestFindCLI_WithExplicitPath(t *testing.T) {
