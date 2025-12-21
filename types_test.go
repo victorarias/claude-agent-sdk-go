@@ -127,10 +127,10 @@ func TestStreamEvent(t *testing.T) {
 func TestAssistantMessageHelpers(t *testing.T) {
 	msg := &AssistantMessage{
 		Content: []ContentBlock{
-			&TextBlock{Text: "Hello "},
-			&TextBlock{Text: "world"},
-			&ThinkingBlock{Thinking: "Let me think..."},
-			&ToolUseBlock{ID: "tool_1", Name: "Bash", Input: map[string]any{"command": "ls"}},
+			&TextBlock{TextContent: "Hello "},
+			&TextBlock{TextContent: "world"},
+			&ThinkingBlock{ThinkingContent: "Let me think..."},
+			&ToolUseBlock{ID: "tool_1", Name: "Bash", ToolInput: map[string]any{"command": "ls"}},
 		},
 		Model: "claude-sonnet-4-5",
 	}
@@ -139,8 +139,8 @@ func TestAssistantMessageHelpers(t *testing.T) {
 		t.Errorf("got %q, want %q", msg.Text(), "Hello world")
 	}
 
-	if msg.Thinking() != "Let me think..." {
-		t.Errorf("got %q, want %q", msg.Thinking(), "Let me think...")
+	if msg.GetThinking() != "Let me think..." {
+		t.Errorf("got %q, want %q", msg.GetThinking(), "Let me think...")
 	}
 
 	tools := msg.ToolCalls()
