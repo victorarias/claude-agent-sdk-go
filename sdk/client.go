@@ -476,8 +476,8 @@ func (c *Client) Interrupt() error {
 	return q.Interrupt()
 }
 
-// Settypes.PermissionMode changes the permission mode.
-func (c *Client) Settypes.PermissionMode(mode types.PermissionMode) error {
+// SetPermissionMode changes the permission mode.
+func (c *Client) SetPermissionMode(mode types.PermissionMode) error {
 	c.mu.Lock()
 	if !c.connected || c.query == nil {
 		c.mu.Unlock()
@@ -486,7 +486,7 @@ func (c *Client) Settypes.PermissionMode(mode types.PermissionMode) error {
 	q := c.query
 	c.mu.Unlock()
 
-	return q.Settypes.PermissionMode(mode)
+	return q.SetPermissionMode(mode)
 }
 
 // SetModel changes the AI model.
