@@ -17,13 +17,13 @@ type Client struct {
 	mcpServers map[string]*types.MCPServer
 
 	// Hooks registered for this client
-	hooks map[types.HookEvent][]types.HookMatcher
+	hooks map[types.types.HookEvent][]types.types.HookMatcher
 
 	// Permission callback
 	canUseTool types.CanUseToolCallback
 
-	// Transport and query
-	transport Transport
+	// types.Transport and query
+	transport types.Transport
 	query     *Query
 
 	// Session management
@@ -35,14 +35,14 @@ type Client struct {
 }
 
 // NewClient creates a new SDK client.
-func NewClient(opts ...Option) *Client {
+func NewClient(opts ...) *Client {
 	options := types.DefaultOptions()
 	types.ApplyOptions(options, opts...)
 
 	client := &Client{
 		options:    options,
 		mcpServers: make(map[string]*types.MCPServer),
-		hooks:      make(map[types.HookEvent][]types.HookMatcher),
+		hooks:      make(map[types.types.HookEvent][]types.types.HookMatcher),
 	}
 
 	// Copy SDK MCP servers from options
@@ -92,7 +92,7 @@ func (c *Client) SessionID() string {
 }
 
 // WithClientMCPServer adds an MCP server to the client.
-func WithClientMCPServer(server *types.MCPServer) Option {
+func WithClientMCPServer(server *types.MCPServer) types.Option {
 	return func(o *types.Options) {
 		if o.SDKMCPServers == nil {
 			o.SDKMCPServers = make(map[string]*types.MCPServer)
@@ -102,12 +102,12 @@ func WithClientMCPServer(server *types.MCPServer) Option {
 }
 
 // WithPreToolUseHook adds a pre-tool-use hook.
-func WithPreToolUseHook(matcher map[string]any, callback types.HookCallback) Option {
+func WithPreToolUseHook(matcher map[string]any, callback types.HookCallback) types.Option {
 	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
+			o.Hooks = make(map[types.types.HookEvent][]types.types.HookMatcher)
 		}
-		o.Hooks[HookPreToolUse] = append(o.Hooks[HookPreToolUse], HookMatcher{
+		o.Hooks[types.HookPreToolUse] = append(o.Hooks[types.HookPreToolUse], types.HookMatcher{
 			Matcher: matcher,
 			Hooks:   []types.HookCallback{callback},
 		})
@@ -115,12 +115,12 @@ func WithPreToolUseHook(matcher map[string]any, callback types.HookCallback) Opt
 }
 
 // WithPostToolUseHook adds a post-tool-use hook.
-func WithPostToolUseHook(matcher map[string]any, callback types.HookCallback) Option {
+func WithPostToolUseHook(matcher map[string]any, callback types.HookCallback) types.Option {
 	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
+			o.Hooks = make(map[types.types.HookEvent][]types.types.HookMatcher)
 		}
-		o.Hooks[HookPostToolUse] = append(o.Hooks[HookPostToolUse], HookMatcher{
+		o.Hooks[types.HookPostToolUse] = append(o.Hooks[types.HookPostToolUse], types.HookMatcher{
 			Matcher: matcher,
 			Hooks:   []types.HookCallback{callback},
 		})
@@ -128,12 +128,12 @@ func WithPostToolUseHook(matcher map[string]any, callback types.HookCallback) Op
 }
 
 // WithStopHook adds a stop hook.
-func WithStopHook(matcher map[string]any, callback types.HookCallback) Option {
+func WithStopHook(matcher map[string]any, callback types.HookCallback) types.Option {
 	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
+			o.Hooks = make(map[types.types.HookEvent][]types.types.HookMatcher)
 		}
-		o.Hooks[HookStop] = append(o.Hooks[HookStop], HookMatcher{
+		o.Hooks[types.HookStop] = append(o.Hooks[types.HookStop], types.HookMatcher{
 			Matcher: matcher,
 			Hooks:   []types.HookCallback{callback},
 		})
@@ -141,12 +141,12 @@ func WithStopHook(matcher map[string]any, callback types.HookCallback) Option {
 }
 
 // WithUserPromptSubmitHook adds a user prompt submit hook.
-func WithUserPromptSubmitHook(callback types.HookCallback) Option {
+func WithUserPromptSubmitHook(callback types.HookCallback) types.Option {
 	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
+			o.Hooks = make(map[types.types.HookEvent][]types.types.HookMatcher)
 		}
-		o.Hooks[HookUserPromptSubmit] = append(o.Hooks[HookUserPromptSubmit], HookMatcher{
+		o.Hooks[types.HookUserPromptSubmit] = append(o.Hooks[types.HookUserPromptSubmit], types.HookMatcher{
 			Matcher: nil,
 			Hooks:   []types.HookCallback{callback},
 		})
@@ -154,12 +154,12 @@ func WithUserPromptSubmitHook(callback types.HookCallback) Option {
 }
 
 // WithSubagentStopHook adds a subagent stop hook.
-func WithSubagentStopHook(callback types.HookCallback) Option {
+func WithSubagentStopHook(callback types.HookCallback) types.Option {
 	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
+			o.Hooks = make(map[types.types.HookEvent][]types.types.HookMatcher)
 		}
-		o.Hooks[HookSubagentStop] = append(o.Hooks[HookSubagentStop], HookMatcher{
+		o.Hooks[types.HookSubagentStop] = append(o.Hooks[types.HookSubagentStop], types.HookMatcher{
 			Matcher: nil,
 			Hooks:   []types.HookCallback{callback},
 		})
@@ -167,12 +167,12 @@ func WithSubagentStopHook(callback types.HookCallback) Option {
 }
 
 // WithPreCompactHook adds a pre-compact hook.
-func WithPreCompactHook(callback types.HookCallback) Option {
+func WithPreCompactHook(callback types.HookCallback) types.Option {
 	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
+			o.Hooks = make(map[types.types.HookEvent][]types.types.HookMatcher)
 		}
-		o.Hooks[HookPreCompact] = append(o.Hooks[HookPreCompact], HookMatcher{
+		o.Hooks[types.HookPreCompact] = append(o.Hooks[types.HookPreCompact], types.HookMatcher{
 			Matcher: nil,
 			Hooks:   []types.HookCallback{callback},
 		})
@@ -180,12 +180,12 @@ func WithPreCompactHook(callback types.HookCallback) Option {
 }
 
 // WithHookTimeout adds a hook with a timeout.
-func WithHookTimeout(event HookEvent, matcher map[string]any, timeout float64, callback types.HookCallback) Option {
+func WithHookTimeout(event types.HookEvent, matcher map[string]any, timeout float64, callback types.HookCallback) types.Option {
 	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
+			o.Hooks = make(map[types.types.HookEvent][]types.types.HookMatcher)
 		}
-		o.Hooks[event] = append(o.Hooks[event], HookMatcher{
+		o.Hooks[event] = append(o.Hooks[event], types.HookMatcher{
 			Matcher: matcher,
 			Hooks:   []types.HookCallback{callback},
 			Timeout: &timeout,
@@ -194,7 +194,7 @@ func WithHookTimeout(event HookEvent, matcher map[string]any, timeout float64, c
 }
 
 // WithCanUseTool sets the tool permission callback.
-func WithCanUseTool(callback types.CanUseToolCallback) Option {
+func WithCanUseTool(callback types.CanUseToolCallback) types.Option {
 	return func(o *types.Options) {
 		o.CanUseTool = callback
 	}
@@ -306,12 +306,12 @@ func (c *Client) Close() error {
 }
 
 // RunQuery performs a one-shot query and returns all messages.
-func RunQuery(ctx context.Context, prompt string, opts ...Option) ([]Message, error) {
+func RunQuery(ctx context.Context, prompt string, opts ...) ([]types.Message, error) {
 	options := types.DefaultOptions()
 	types.ApplyOptions(options, opts...)
 
 	// Extract transport if provided
-	var transport Transport
+	var transport types.Transport
 	if options.customTransport != nil {
 		transport = options.customTransport
 	} else {
@@ -325,7 +325,7 @@ func RunQuery(ctx context.Context, prompt string, opts ...Option) ([]Message, er
 	defer transport.Close()
 
 	// Collect messages
-	var messages []Message
+	var messages []types.Message
 
 	for msg := range transport.Messages() {
 		parsed, err := parser.ParseMessage(msg)
@@ -336,7 +336,7 @@ func RunQuery(ctx context.Context, prompt string, opts ...Option) ([]Message, er
 		messages = append(messages, parsed)
 
 		// Stop on result
-		if _, ok := parsed.(*ResultMessage); ok {
+		if _, ok := parsed.(*types.ResultMessage); ok {
 			break
 		}
 	}
@@ -345,7 +345,7 @@ func RunQuery(ctx context.Context, prompt string, opts ...Option) ([]Message, er
 }
 
 // QueryStream performs a query and streams messages back.
-func QueryStream(ctx context.Context, prompt string, opts ...Option) (<-chan Message, <-chan error) {
+func QueryStream(ctx context.Context, prompt string, opts ...) (<-chan types.Message, <-chan error) {
 	msgChan := make(chan Message, 100)
 	errChan := make(chan error, 1)
 
@@ -356,7 +356,7 @@ func QueryStream(ctx context.Context, prompt string, opts ...Option) (<-chan Mes
 		options := types.DefaultOptions()
 		types.ApplyOptions(options, opts...)
 
-		var transport Transport
+		var transport types.Transport
 		if options.customTransport != nil {
 			transport = options.customTransport
 		} else {
@@ -389,7 +389,7 @@ func QueryStream(ctx context.Context, prompt string, opts ...Option) (<-chan Mes
 				return
 			}
 
-			if _, ok := parsed.(*ResultMessage); ok {
+			if _, ok := parsed.(*types.ResultMessage); ok {
 				return
 			}
 		}
@@ -403,7 +403,7 @@ func (c *Client) SendQuery(prompt string, sessionID ...string) error {
 	c.mu.Lock()
 	if !c.connected || c.query == nil {
 		c.mu.Unlock()
-		return &ConnectionError{Message: "not connected"}
+		return &types.ConnectionError{Message: "not connected"}
 	}
 	q := c.query
 	sid := c.sessionID
@@ -424,7 +424,7 @@ func (c *Client) ReceiveMessage() (Message, error) {
 	c.mu.Lock()
 	if !c.connected || c.query == nil {
 		c.mu.Unlock()
-		return nil, &ConnectionError{Message: "not connected"}
+		return nil, &types.ConnectionError{Message: "not connected"}
 	}
 	q := c.query
 	c.mu.Unlock()
@@ -432,7 +432,7 @@ func (c *Client) ReceiveMessage() (Message, error) {
 	select {
 	case msg, ok := <-q.Messages():
 		if !ok {
-			return nil, &ConnectionError{Message: "channel closed"}
+			return nil, &types.ConnectionError{Message: "channel closed"}
 		}
 		return msg, nil
 	case err := <-q.Errors():
@@ -441,22 +441,22 @@ func (c *Client) ReceiveMessage() (Message, error) {
 }
 
 // ReceiveAll receives all messages until result.
-func (c *Client) ReceiveAll() ([]Message, error) {
-	var messages []Message
+func (c *Client) ReceiveAll() ([]types.Message, error) {
+	var messages []types.Message
 	for {
 		msg, err := c.ReceiveMessage()
 		if err != nil {
 			return messages, err
 		}
 		messages = append(messages, msg)
-		if _, ok := msg.(*ResultMessage); ok {
+		if _, ok := msg.(*types.ResultMessage); ok {
 			return messages, nil
 		}
 	}
 }
 
 // ReceiveResponse sends a query and receives all response messages.
-func (c *Client) ReceiveResponse(prompt string) ([]Message, error) {
+func (c *Client) ReceiveResponse(prompt string) ([]types.Message, error) {
 	if err := c.SendQuery(prompt); err != nil {
 		return nil, err
 	}
@@ -468,7 +468,7 @@ func (c *Client) Interrupt() error {
 	c.mu.Lock()
 	if !c.connected || c.query == nil {
 		c.mu.Unlock()
-		return &ConnectionError{Message: "not connected"}
+		return &types.ConnectionError{Message: "not connected"}
 	}
 	q := c.query
 	c.mu.Unlock()
@@ -481,7 +481,7 @@ func (c *Client) SetPermissionMode(mode PermissionMode) error {
 	c.mu.Lock()
 	if !c.connected || c.query == nil {
 		c.mu.Unlock()
-		return &ConnectionError{Message: "not connected"}
+		return &types.ConnectionError{Message: "not connected"}
 	}
 	q := c.query
 	c.mu.Unlock()
@@ -494,7 +494,7 @@ func (c *Client) SetModel(model string) error {
 	c.mu.Lock()
 	if !c.connected || c.query == nil {
 		c.mu.Unlock()
-		return &ConnectionError{Message: "not connected"}
+		return &types.ConnectionError{Message: "not connected"}
 	}
 	q := c.query
 	c.mu.Unlock()
@@ -507,7 +507,7 @@ func (c *Client) RewindFiles(userMessageID string) error {
 	c.mu.Lock()
 	if !c.connected || c.query == nil {
 		c.mu.Unlock()
-		return &ConnectionError{Message: "not connected"}
+		return &types.ConnectionError{Message: "not connected"}
 	}
 	q := c.query
 	c.mu.Unlock()
@@ -538,7 +538,7 @@ func (c *Client) ResultReceived() bool {
 }
 
 // LastResult returns the last result message.
-func (c *Client) LastResult() *ResultMessage {
+func (c *Client) LastResult() *types.ResultMessage {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -574,7 +574,7 @@ func (c *Client) Run(ctx context.Context, fn func() error) error {
 
 // Messages returns a channel that yields messages until closed or error.
 // Use this for iterating over responses in streaming mode.
-func (c *Client) Messages() <-chan Message {
+func (c *Client) Messages() <-chan types.Message {
 	c.mu.Lock()
 	if !c.connected || c.query == nil {
 		c.mu.Unlock()
