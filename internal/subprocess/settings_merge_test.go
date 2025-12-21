@@ -227,7 +227,14 @@ func TestSettingsMerge_NestedSandboxSettings(t *testing.T) {
 	}
 
 	// Verify sandbox merged with all nested fields
-	sandboxMap := settingsObj["sandbox"].(map[string]any)
+	sandboxValue, ok := settingsObj["sandbox"]
+	if !ok {
+		t.Fatal("sandbox key not found in merged settings")
+	}
+	sandboxMap, ok := sandboxValue.(map[string]any)
+	if !ok {
+		t.Fatalf("sandbox value is not a map: %T", sandboxValue)
+	}
 	if sandboxMap["enabled"] != true {
 		t.Errorf("sandbox.enabled: got %v, want true", sandboxMap["enabled"])
 	}
