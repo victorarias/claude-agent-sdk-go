@@ -594,3 +594,129 @@ func TestClient_ReceiveAll(t *testing.T) {
 		t.Errorf("expected 2 messages, got %d", len(messages))
 	}
 }
+
+func TestWithClient(t *testing.T) {
+	transport := NewMockTransport()
+
+	go func() {
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			reqID, ok := req["request_id"].(string)
+			if !ok {
+				continue
+			}
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{"session_id": "test_session"},
+				},
+			})
+
+			time.Sleep(10 * time.Millisecond)
+			transport.SendMessage(map[string]any{
+				"type": "assistant",
+				"message": map[string]any{
+					"content": []any{
+						map[string]any{"type": "text", "text": "Hello!"},
+					},
+				},
+			})
+			transport.SendMessage(map[string]any{
+				"type":    "result",
+				"subtype": "success",
+			})
+			return
+		}
+	}()
+
+	ctx := context.Background()
+	var receivedMessages []Message
+
+	err := WithClient(ctx, []Option{WithTransport(transport)}, func(c *Client) error {
+		if err := c.SendQuery("Hello"); err != nil {
+			return err
+		}
+
+		messages, err := c.ReceiveAll()
+		if err != nil {
+			return err
+		}
+
+		receivedMessages = messages
+		return nil
+	})
+
+	if err != nil {
+		t.Errorf("WithClient failed: %v", err)
+	}
+
+	if len(receivedMessages) != 2 {
+		t.Errorf("expected 2 messages, got %d", len(receivedMessages))
+	}
+}
+
+func TestClient_Run(t *testing.T) {
+	transport := NewMockTransport()
+
+	go func() {
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			reqID, ok := req["request_id"].(string)
+			if !ok {
+				continue
+			}
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{},
+				},
+			})
+			return
+		}
+	}()
+
+	client := NewClient(WithTransport(transport))
+	ctx := context.Background()
+
+	runCalled := false
+	err := client.Run(ctx, func() error {
+		runCalled = true
+		return nil
+	})
+
+	if err != nil {
+		t.Errorf("Run failed: %v", err)
+	}
+
+	if !runCalled {
+		t.Error("run function was not called")
+	}
+
+	if client.IsConnected() {
+		t.Error("client should be disconnected after Run")
+	}
+}
