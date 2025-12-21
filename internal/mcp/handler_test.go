@@ -3,10 +3,12 @@ package mcp
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 func TestMCPHandler_Initialize(t *testing.T) {
-	server := NewMCPServerBuilder("test").Build()
+	server := types.NewMCPServerBuilder("test").Build()
 	handler := NewMCPHandler(server)
 
 	req := &MCPRequest{
@@ -43,12 +45,12 @@ func TestMCPHandler_Initialize(t *testing.T) {
 }
 
 func TestMCPHandler_ToolsList(t *testing.T) {
-	server := NewMCPServerBuilder("test").
-		WithTool("greet", "Greet someone", nil, func(args map[string]any) (*MCPToolResult, error) {
-			return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: "hello"}}}, nil
+	server := types.NewMCPServerBuilder("test").
+		WithTool("greet", "Greet someone", nil, func(args map[string]any) (*types.MCPToolResult, error) {
+			return &MCPToolResult{Content: []types.MCPContent{{Type: "text", Text: "hello"}}}, nil
 		}).
-		WithTool("calculate", "Do math", nil, func(args map[string]any) (*MCPToolResult, error) {
-			return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: "4"}}}, nil
+		WithTool("calculate", "Do math", nil, func(args map[string]any) (*types.MCPToolResult, error) {
+			return &MCPToolResult{Content: []types.MCPContent{{Type: "text", Text: "4"}}}, nil
 		}).
 		Build()
 	handler := NewMCPHandler(server)
@@ -75,16 +77,16 @@ func TestMCPHandler_ToolsList(t *testing.T) {
 }
 
 func TestMCPHandler_ToolsCall(t *testing.T) {
-	server := NewMCPServerBuilder("test").
+	server := types.NewMCPServerBuilder("test").
 		WithTool("greet", "Greet someone", map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"name": map[string]any{"type": "string"},
 			},
-		}, func(args map[string]any) (*MCPToolResult, error) {
+		}, func(args map[string]any) (*types.MCPToolResult, error) {
 			name := args["name"].(string)
 			return &MCPToolResult{
-				Content: []MCPContent{{Type: "text", Text: "Hello, " + name + "!"}},
+				Content: []types.MCPContent{{Type: "text", Text: "Hello, " + name + "!"}},
 			}, nil
 		}).
 		Build()
@@ -130,7 +132,7 @@ func TestMCPHandler_ToolsCall(t *testing.T) {
 }
 
 func TestMCPHandler_ToolsCall_NotFound(t *testing.T) {
-	server := NewMCPServerBuilder("test").Build()
+	server := types.NewMCPServerBuilder("test").Build()
 	handler := NewMCPHandler(server)
 
 	req := &MCPRequest{
@@ -153,7 +155,7 @@ func TestMCPHandler_ToolsCall_NotFound(t *testing.T) {
 }
 
 func TestMCPHandler_UnknownMethod(t *testing.T) {
-	server := NewMCPServerBuilder("test").Build()
+	server := types.NewMCPServerBuilder("test").Build()
 	handler := NewMCPHandler(server)
 
 	req := &MCPRequest{
@@ -173,11 +175,11 @@ func TestMCPHandler_UnknownMethod(t *testing.T) {
 }
 
 func TestMCPHandler_HandleBytes(t *testing.T) {
-	server := NewMCPServerBuilder("test").
-		WithTool("echo", "Echo input", nil, func(args map[string]any) (*MCPToolResult, error) {
+	server := types.NewMCPServerBuilder("test").
+		WithTool("echo", "Echo input", nil, func(args map[string]any) (*types.MCPToolResult, error) {
 			text, _ := args["text"].(string)
 			return &MCPToolResult{
-				Content: []MCPContent{{Type: "text", Text: text}},
+				Content: []types.MCPContent{{Type: "text", Text: text}},
 			}, nil
 		}).
 		Build()
@@ -209,7 +211,7 @@ func TestMCPHandler_HandleBytes(t *testing.T) {
 }
 
 func TestMCPHandler_Ping(t *testing.T) {
-	server := NewMCPServerBuilder("test").Build()
+	server := types.NewMCPServerBuilder("test").Build()
 	handler := NewMCPHandler(server)
 
 	req := &MCPRequest{
@@ -228,7 +230,7 @@ func TestMCPHandler_Ping(t *testing.T) {
 }
 
 func TestMCPHandler_Notification(t *testing.T) {
-	server := NewMCPServerBuilder("test").Build()
+	server := types.NewMCPServerBuilder("test").Build()
 	handler := NewMCPHandler(server)
 
 	// Notifications have no ID
