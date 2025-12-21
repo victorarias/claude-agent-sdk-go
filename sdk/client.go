@@ -17,7 +17,7 @@ type Client struct {
 	mcpServers map[string]*types.MCPServer
 
 	// Hooks registered for this client
-	hooks map[types.types.HookEvent][]types.types.HookMatcher
+	hooks map[types.HookEvent][]types.HookMatcher
 
 	// Permission callback
 	canUseTool types.CanUseToolCallback
@@ -35,14 +35,14 @@ type Client struct {
 }
 
 // NewClient creates a new SDK client.
-func NewClient(opts ...) *Client {
+func NewClient(opts ...types.Option) *Client {
 	options := types.DefaultOptions()
 	types.ApplyOptions(options, opts...)
 
 	client := &Client{
 		options:    options,
 		mcpServers: make(map[string]*types.MCPServer),
-		hooks:      make(map[types.types.HookEvent][]types.types.HookMatcher),
+		hooks:      make(map[types.HookEvent][]types.HookMatcher),
 	}
 
 	// Copy SDK MCP servers from options
@@ -105,7 +105,7 @@ func WithClientMCPServer(server *types.MCPServer) types.Option {
 func WithPreToolUseHook(matcher map[string]any, callback types.HookCallback) types.Option {
 	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[types.types.HookEvent][]types.types.HookMatcher)
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
 		}
 		o.Hooks[types.HookPreToolUse] = append(o.Hooks[types.HookPreToolUse], types.HookMatcher{
 			Matcher: matcher,
@@ -118,7 +118,7 @@ func WithPreToolUseHook(matcher map[string]any, callback types.HookCallback) typ
 func WithPostToolUseHook(matcher map[string]any, callback types.HookCallback) types.Option {
 	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[types.types.HookEvent][]types.types.HookMatcher)
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
 		}
 		o.Hooks[types.HookPostToolUse] = append(o.Hooks[types.HookPostToolUse], types.HookMatcher{
 			Matcher: matcher,
@@ -131,7 +131,7 @@ func WithPostToolUseHook(matcher map[string]any, callback types.HookCallback) ty
 func WithStopHook(matcher map[string]any, callback types.HookCallback) types.Option {
 	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[types.types.HookEvent][]types.types.HookMatcher)
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
 		}
 		o.Hooks[types.HookStop] = append(o.Hooks[types.HookStop], types.HookMatcher{
 			Matcher: matcher,
@@ -144,7 +144,7 @@ func WithStopHook(matcher map[string]any, callback types.HookCallback) types.Opt
 func WithUserPromptSubmitHook(callback types.HookCallback) types.Option {
 	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[types.types.HookEvent][]types.types.HookMatcher)
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
 		}
 		o.Hooks[types.HookUserPromptSubmit] = append(o.Hooks[types.HookUserPromptSubmit], types.HookMatcher{
 			Matcher: nil,
@@ -157,7 +157,7 @@ func WithUserPromptSubmitHook(callback types.HookCallback) types.Option {
 func WithSubagentStopHook(callback types.HookCallback) types.Option {
 	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[types.types.HookEvent][]types.types.HookMatcher)
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
 		}
 		o.Hooks[types.HookSubagentStop] = append(o.Hooks[types.HookSubagentStop], types.HookMatcher{
 			Matcher: nil,
@@ -170,7 +170,7 @@ func WithSubagentStopHook(callback types.HookCallback) types.Option {
 func WithPreCompactHook(callback types.HookCallback) types.Option {
 	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[types.types.HookEvent][]types.types.HookMatcher)
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
 		}
 		o.Hooks[types.HookPreCompact] = append(o.Hooks[types.HookPreCompact], types.HookMatcher{
 			Matcher: nil,
@@ -183,7 +183,7 @@ func WithPreCompactHook(callback types.HookCallback) types.Option {
 func WithHookTimeout(event types.HookEvent, matcher map[string]any, timeout float64, callback types.HookCallback) types.Option {
 	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[types.types.HookEvent][]types.types.HookMatcher)
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
 		}
 		o.Hooks[event] = append(o.Hooks[event], types.HookMatcher{
 			Matcher: matcher,
@@ -306,7 +306,7 @@ func (c *Client) Close() error {
 }
 
 // RunQuery performs a one-shot query and returns all messages.
-func RunQuery(ctx context.Context, prompt string, opts ...) ([]types.Message, error) {
+func RunQuery(ctx context.Context, prompt string, opts ...types.Option) ([]types.Message, error) {
 	options := types.DefaultOptions()
 	types.ApplyOptions(options, opts...)
 
@@ -345,7 +345,7 @@ func RunQuery(ctx context.Context, prompt string, opts ...) ([]types.Message, er
 }
 
 // QueryStream performs a query and streams messages back.
-func QueryStream(ctx context.Context, prompt string, opts ...) (<-chan types.Message, <-chan error) {
+func QueryStream(ctx context.Context, prompt string, opts ...types.Option) (<-chan types.Message, <-chan error) {
 	msgChan := make(chan Message, 100)
 	errChan := make(chan error, 1)
 
