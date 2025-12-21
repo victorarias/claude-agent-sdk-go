@@ -49,8 +49,8 @@ func NewClient(opts ...Option) *Client {
 	}
 
 	// Use transport if provided in options
-	if options.CustomTransport != nil {
-		client.transport = options.CustomTransport
+	if options.customTransport != nil {
+		client.transport = options.customTransport
 	}
 
 	return client
