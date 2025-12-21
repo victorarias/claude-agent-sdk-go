@@ -19,7 +19,7 @@ type MCPServerTransport struct {
 }
 
 // NewMCPServerTransport creates a new transport for the given server.
-func NewMCPServerTransport(server *MCPServer, input io.Reader, output io.Writer) *MCPServerTransport {
+func NewMCPServerTransport(server *types.MCPServer, input io.Reader, output io.Writer) *types.MCPServerTransport {
 	return &MCPServerTransport{
 		handler: NewMCPHandler(server),
 		reader:  bufio.NewReader(input),
@@ -28,7 +28,7 @@ func NewMCPServerTransport(server *MCPServer, input io.Reader, output io.Writer)
 }
 
 // Run processes messages until context is cancelled or input is closed.
-func (t *MCPServerTransport) Run(ctx context.Context) error {
+func (t *types.MCPServerTransport) Run(ctx context.Context) error {
 	// Use a channel to signal when a line is ready
 	lineCh := make(chan []byte, 1)
 	errCh := make(chan error, 1)
@@ -63,7 +63,7 @@ func (t *MCPServerTransport) Run(ctx context.Context) error {
 }
 
 // ProcessOne reads and handles a single message.
-func (t *MCPServerTransport) ProcessOne() error {
+func (t *types.MCPServerTransport) ProcessOne() error {
 	line, err := t.reader.ReadBytes('\n')
 	if err != nil {
 		return err
@@ -73,7 +73,7 @@ func (t *MCPServerTransport) ProcessOne() error {
 }
 
 // processLine processes a single line of input.
-func (t *MCPServerTransport) processLine(line []byte) error {
+func (t *types.MCPServerTransport) processLine(line []byte) error {
 	// Skip empty lines
 	line = bytes.TrimSpace(line)
 	if len(line) == 0 {
@@ -101,6 +101,6 @@ func (t *MCPServerTransport) processLine(line []byte) error {
 }
 
 // Server returns the underlying MCP server.
-func (t *MCPServerTransport) Server() *MCPServer {
+func (t *types.MCPServerTransport) Server() *types.MCPServer {
 	return t.handler.server
 }
