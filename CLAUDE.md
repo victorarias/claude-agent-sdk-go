@@ -12,9 +12,9 @@ Implementation plans are in `docs/plans/`:
 - `05-integration.md` - Examples and integration tests
 - `06-mcp-servers.md` - MCP server support
 
-## Beads (TodoWrite)
+## Beads
 
-Use TodoWrite ("beads") to track progress. Run `bd prime` to learn the CLI.
+Use beads to track progress. Run `bd prime` to learn the CLI.
 
 Rules:
 
