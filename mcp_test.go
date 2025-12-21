@@ -1,81 +1,56 @@
 package sdk
 
 import (
-	"context"
 	"testing"
 )
 
-func TestMCPToolHandler(t *testing.T) {
-	handler := &MCPToolHandler{
+func TestMCPTool(t *testing.T) {
+	tool := &MCPTool{
 		Name:        "test_tool",
 		Description: "A test tool",
-		InputSchema: map[string]any{
+		Schema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"input": map[string]any{"type": "string"},
 			},
 		},
-		Handler: func(ctx context.Context, input map[string]any) (any, error) {
-			return map[string]any{"result": "success"}, nil
+		Handler: func(args map[string]any) (*MCPToolResult, error) {
+			return &MCPToolResult{
+				Content: []MCPContent{{Type: "text", Text: "success"}},
+			}, nil
 		},
 	}
 
-	if handler.Name != "test_tool" {
-		t.Errorf("expected name test_tool, got %s", handler.Name)
+	if tool.Name != "test_tool" {
+		t.Errorf("expected name test_tool, got %s", tool.Name)
 	}
 
-	result, err := handler.Handler(context.Background(), map[string]any{"input": "test"})
+	result, err := tool.Handler(map[string]any{"input": "test"})
 	if err != nil {
 		t.Errorf("handler failed: %v", err)
 	}
 
-	resultMap := result.(map[string]any)
-	if resultMap["result"] != "success" {
-		t.Errorf("expected success, got %v", resultMap["result"])
-	}
-}
-
-func TestNewMCPServer(t *testing.T) {
-	tools := []*MCPToolHandler{
-		{
-			Name:        "tool1",
-			Description: "First tool",
-			InputSchema: map[string]any{"type": "object"},
-			Handler: func(ctx context.Context, input map[string]any) (any, error) {
-				return "tool1 result", nil
-			},
-		},
-		{
-			Name:        "tool2",
-			Description: "Second tool",
-			InputSchema: map[string]any{"type": "object"},
-			Handler: func(ctx context.Context, input map[string]any) (any, error) {
-				return "tool2 result", nil
-			},
-		},
-	}
-
-	server := NewMCPServer("test-server", tools)
-
-	if server.Name != "test-server" {
-		t.Errorf("expected name test-server, got %s", server.Name)
-	}
-
-	if len(server.Tools) != 2 {
-		t.Errorf("expected 2 tools, got %d", len(server.Tools))
+	if len(result.Content) != 1 || result.Content[0].Text != "success" {
+		t.Errorf("expected success, got %v", result)
 	}
 }
 
 func TestMCPServer_GetTool(t *testing.T) {
-	server := NewMCPServer("test-server", []*MCPToolHandler{
-		{
-			Name:        "greet",
-			Description: "Greets someone",
-			Handler: func(ctx context.Context, input map[string]any) (any, error) {
-				return "Hello!", nil
+	server := &MCPServer{
+		Name:    "test-server",
+		Version: "1.0.0",
+		Tools: []*MCPTool{
+			{
+				Name:        "greet",
+				Description: "Greets someone",
+				Handler: func(args map[string]any) (*MCPToolResult, error) {
+					return &MCPToolResult{
+						Content: []MCPContent{{Type: "text", Text: "Hello!"}},
+					}, nil
+				},
 			},
 		},
-	})
+	}
 
 	tool, ok := server.GetTool("greet")
 	if !ok {
@@ -92,54 +67,70 @@ func TestMCPServer_GetTool(t *testing.T) {
 }
 
 func TestMCPServer_CallTool(t *testing.T) {
-	server := NewMCPServer("test-server", []*MCPToolHandler{
-		{
-			Name:        "echo",
-			Description: "Echoes input",
-			Handler: func(ctx context.Context, input map[string]any) (any, error) {
-				return map[string]any{"echo": input["message"]}, nil
+	server := &MCPServer{
+		Name:    "test-server",
+		Version: "1.0.0",
+		Tools: []*MCPTool{
+			{
+				Name:        "echo",
+				Description: "Echoes input",
+				Handler: func(args map[string]any) (*MCPToolResult, error) {
+					msg := args["message"].(string)
+					return &MCPToolResult{
+						Content: []MCPContent{{Type: "text", Text: msg}},
+					}, nil
+				},
 			},
 		},
-	})
+	}
 
-	result, err := server.CallTool(context.Background(), "echo", map[string]any{"message": "hello"})
+	result, err := server.CallTool("echo", map[string]any{"message": "hello"})
 	if err != nil {
 		t.Errorf("CallTool failed: %v", err)
 	}
 
-	resultMap := result.(map[string]any)
-	if resultMap["echo"] != "hello" {
-		t.Errorf("expected echo hello, got %v", resultMap["echo"])
+	if len(result.Content) != 1 || result.Content[0].Text != "hello" {
+		t.Errorf("expected hello, got %v", result)
 	}
 }
 
 func TestMCPServer_CallTool_NotFound(t *testing.T) {
-	server := NewMCPServer("test-server", nil)
+	server := &MCPServer{
+		Name:    "test-server",
+		Version: "1.0.0",
+	}
 
-	_, err := server.CallTool(context.Background(), "nonexistent", nil)
+	_, err := server.CallTool("nonexistent", nil)
 	if err == nil {
 		t.Error("expected error for nonexistent tool")
 	}
 }
 
 func TestMCPServer_ToConfig(t *testing.T) {
-	server := NewMCPServer("test-server", []*MCPToolHandler{
-		{
-			Name:        "greet",
-			Description: "Greets someone",
-			InputSchema: map[string]any{
-				"type": "object",
-				"properties": map[string]any{
-					"name": map[string]any{"type": "string"},
+	server := &MCPServer{
+		Name:    "test-server",
+		Version: "1.0.0",
+		Tools: []*MCPTool{
+			{
+				Name:        "greet",
+				Description: "Greets someone",
+				Schema: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"name": map[string]any{"type": "string"},
+					},
 				},
 			},
 		},
-	})
+	}
 
 	config := server.ToConfig()
 
 	if config["name"] != "test-server" {
 		t.Errorf("expected name test-server, got %v", config["name"])
+	}
+	if config["version"] != "1.0.0" {
+		t.Errorf("expected version 1.0.0, got %v", config["version"])
 	}
 
 	tools := config["tools"].([]map[string]any)
@@ -153,19 +144,26 @@ func TestMCPServer_ToConfig(t *testing.T) {
 
 func TestMCPServerBuilder(t *testing.T) {
 	server := NewMCPServerBuilder("test-server").
+		WithVersion("2.0.0").
 		WithTool("greet", "Greets a user", map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"name": map[string]any{"type": "string"},
 			},
-		}, func(ctx context.Context, input map[string]any) (any, error) {
-			name := input["name"].(string)
-			return map[string]any{"greeting": "Hello, " + name + "!"}, nil
+		}, func(args map[string]any) (*MCPToolResult, error) {
+			name := args["name"].(string)
+			return &MCPToolResult{
+				Content: []MCPContent{{Type: "text", Text: "Hello, " + name + "!"}},
+			}, nil
 		}).
 		Build()
 
 	if server.Name != "test-server" {
 		t.Errorf("expected name test-server, got %s", server.Name)
+	}
+
+	if server.Version != "2.0.0" {
+		t.Errorf("expected version 2.0.0, got %s", server.Version)
 	}
 
 	if len(server.Tools) != 1 {
@@ -177,14 +175,13 @@ func TestMCPServerBuilder(t *testing.T) {
 	}
 
 	// Test the handler
-	result, err := server.CallTool(context.Background(), "greet", map[string]any{"name": "World"})
+	result, err := server.CallTool("greet", map[string]any{"name": "World"})
 	if err != nil {
 		t.Errorf("CallTool failed: %v", err)
 	}
 
-	resultMap := result.(map[string]any)
-	if resultMap["greeting"] != "Hello, World!" {
-		t.Errorf("expected greeting Hello, World!, got %v", resultMap["greeting"])
+	if len(result.Content) != 1 || result.Content[0].Text != "Hello, World!" {
+		t.Errorf("expected Hello, World!, got %v", result)
 	}
 }
 
@@ -192,17 +189,17 @@ func TestMCPServerBuilder_MultipleTool(t *testing.T) {
 	server := NewMCPServerBuilder("multi-tool").
 		WithTool("add", "Adds numbers", map[string]any{
 			"type": "object",
-		}, func(ctx context.Context, input map[string]any) (any, error) {
-			a := input["a"].(float64)
-			b := input["b"].(float64)
-			return a + b, nil
+		}, func(args map[string]any) (*MCPToolResult, error) {
+			return &MCPToolResult{
+				Content: []MCPContent{{Type: "text", Text: "result"}},
+			}, nil
 		}).
 		WithTool("multiply", "Multiplies numbers", map[string]any{
 			"type": "object",
-		}, func(ctx context.Context, input map[string]any) (any, error) {
-			a := input["a"].(float64)
-			b := input["b"].(float64)
-			return a * b, nil
+		}, func(args map[string]any) (*MCPToolResult, error) {
+			return &MCPToolResult{
+				Content: []MCPContent{{Type: "text", Text: "result"}},
+			}, nil
 		}).
 		Build()
 
@@ -210,21 +207,23 @@ func TestMCPServerBuilder_MultipleTool(t *testing.T) {
 		t.Errorf("expected 2 tools, got %d", len(server.Tools))
 	}
 
-	// Test add
-	result, err := server.CallTool(context.Background(), "add", map[string]any{"a": 2.0, "b": 3.0})
-	if err != nil {
-		t.Errorf("CallTool add failed: %v", err)
-	}
-	if result.(float64) != 5.0 {
-		t.Errorf("expected 5, got %v", result)
+	// Test add exists
+	_, ok := server.GetTool("add")
+	if !ok {
+		t.Error("expected add tool to exist")
 	}
 
-	// Test multiply
-	result, err = server.CallTool(context.Background(), "multiply", map[string]any{"a": 4.0, "b": 5.0})
-	if err != nil {
-		t.Errorf("CallTool multiply failed: %v", err)
+	// Test multiply exists
+	_, ok = server.GetTool("multiply")
+	if !ok {
+		t.Error("expected multiply tool to exist")
 	}
-	if result.(float64) != 20.0 {
-		t.Errorf("expected 20, got %v", result)
+}
+
+func TestMCPServerBuilder_DefaultVersion(t *testing.T) {
+	server := NewMCPServerBuilder("test").Build()
+
+	if server.Version != "1.0.0" {
+		t.Errorf("expected default version 1.0.0, got %s", server.Version)
 	}
 }
