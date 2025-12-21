@@ -1723,6 +1723,15 @@ type PermissionResultDeny struct {
 
 func (r *PermissionResultDeny) isPermissionResult() {}
 
+// PermissionBehavior represents the behavior for permission updates.
+type PermissionBehavior string
+
+const (
+	PermissionBehaviorAllow PermissionBehavior = "allow"
+	PermissionBehaviorDeny  PermissionBehavior = "deny"
+	PermissionBehaviorAsk   PermissionBehavior = "ask"
+)
+
 // PermissionUpdateType represents the type of permission update.
 type PermissionUpdateType string
 
