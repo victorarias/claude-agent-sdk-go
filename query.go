@@ -376,3 +376,38 @@ func (q *Query) InitResult() map[string]any {
 	defer q.initMu.RUnlock()
 	return q.initResult
 }
+
+// Interrupt sends an interrupt signal to the CLI.
+func (q *Query) Interrupt() error {
+	_, err := q.sendControlRequest(map[string]any{
+		"subtype": "interrupt",
+	}, 30*time.Second)
+	return err
+}
+
+// SetPermissionMode changes the permission mode.
+func (q *Query) SetPermissionMode(mode PermissionMode) error {
+	_, err := q.sendControlRequest(map[string]any{
+		"subtype": "set_permission_mode",
+		"mode":    string(mode),
+	}, 30*time.Second)
+	return err
+}
+
+// SetModel changes the AI model.
+func (q *Query) SetModel(model string) error {
+	_, err := q.sendControlRequest(map[string]any{
+		"subtype": "set_model",
+		"model":   model,
+	}, 30*time.Second)
+	return err
+}
+
+// RewindFiles rewinds tracked files to a specific user message.
+func (q *Query) RewindFiles(userMessageID string) error {
+	_, err := q.sendControlRequest(map[string]any{
+		"subtype":         "rewind_files",
+		"user_message_id": userMessageID,
+	}, 30*time.Second)
+	return err
+}
