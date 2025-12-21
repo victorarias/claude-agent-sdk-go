@@ -459,6 +459,42 @@ func (q *Query) StreamInput(input <-chan map[string]any) error {
 	}
 }
 
+// RegisterMCPServer registers an MCP server with the query.
+func (q *Query) RegisterMCPServer(server *MCPServer) {
+	q.mcpServersMu.Lock()
+	defer q.mcpServersMu.Unlock()
+	q.mcpServers[server.Name] = server
+}
+
+// UnregisterMCPServer removes an MCP server.
+func (q *Query) UnregisterMCPServer(name string) {
+	q.mcpServersMu.Lock()
+	defer q.mcpServersMu.Unlock()
+	delete(q.mcpServers, name)
+}
+
+// handleMCPToolCall handles MCP tool call requests.
+func (q *Query) handleMCPToolCall(request map[string]any) (map[string]any, error) {
+	serverName, _ := request["server_name"].(string)
+	toolName, _ := request["tool_name"].(string)
+	input, _ := request["input"].(map[string]any)
+
+	q.mcpServersMu.RLock()
+	server, exists := q.mcpServers[serverName]
+	q.mcpServersMu.RUnlock()
+
+	if !exists {
+		return nil, fmt.Errorf("MCP server not found: %s", serverName)
+	}
+
+	result, err := server.CallTool(toolName, input)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]any{"result": result}, nil
+}
+
 // handleCancelRequest handles a request cancellation.
 func (q *Query) handleCancelRequest(raw map[string]any) {
 	requestID, _ := raw["request_id"].(string)
