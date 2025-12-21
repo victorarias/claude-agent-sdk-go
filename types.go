@@ -24,20 +24,28 @@ func (b *TextBlock) Text() string { return b.TextContent }
 
 // ThinkingBlock contains Claude's thinking content.
 type ThinkingBlock struct {
-	Thinking  string `json:"thinking"`
-	Signature string `json:"signature"`
+	ThinkingContent string `json:"thinking"`
+	Signature       string `json:"signature"`
 }
 
 func (b *ThinkingBlock) BlockType() string { return "thinking" }
+func (b *ThinkingBlock) Type() string      { return "thinking" }
+
+// Thinking returns the thinking content.
+func (b *ThinkingBlock) Thinking() string { return b.ThinkingContent }
 
 // ToolUseBlock represents a tool invocation.
 type ToolUseBlock struct {
-	ID    string         `json:"id"`
-	Name  string         `json:"name"`
-	Input map[string]any `json:"input"`
+	ID        string         `json:"id"`
+	Name      string         `json:"name"`
+	ToolInput map[string]any `json:"input"`
 }
 
 func (b *ToolUseBlock) BlockType() string { return "tool_use" }
+func (b *ToolUseBlock) Type() string      { return "tool_use" }
+
+// Input returns the tool input.
+func (b *ToolUseBlock) Input() map[string]any { return b.ToolInput }
 
 // ToolResultBlock contains the result of a tool execution.
 type ToolResultBlock struct {
