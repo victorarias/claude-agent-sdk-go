@@ -14,6 +14,13 @@ type mockTransportWithClient struct {
 	connectErr     error
 	closeCallCount int
 	closeShouldErr bool
+	messageChan    chan map[string]any
+}
+
+func newMockTransportWithClient() *mockTransportWithClient {
+	return &mockTransportWithClient{
+		messageChan: make(chan map[string]any, 10),
+	}
 }
 
 func (m *mockTransportWithClient) Connect(ctx context.Context) error {
@@ -21,6 +28,16 @@ func (m *mockTransportWithClient) Connect(ctx context.Context) error {
 		return m.connectErr
 	}
 	m.connected = true
+
+	// Send initialization messages that query expects
+	go func() {
+		// Send init response
+		m.messageChan <- map[string]any{
+			"type":       "result",
+			"session_id": "test-session",
+		}
+	}()
+
 	return nil
 }
 
@@ -30,13 +47,20 @@ func (m *mockTransportWithClient) Close() error {
 	if m.closeShouldErr {
 		return errors.New("close error")
 	}
+	if m.messageChan != nil {
+		close(m.messageChan)
+		m.messageChan = nil
+	}
 	return nil
 }
 
 func (m *mockTransportWithClient) Messages() <-chan map[string]any {
-	ch := make(chan map[string]any)
-	close(ch)
-	return ch
+	if m.messageChan == nil {
+		ch := make(chan map[string]any)
+		close(ch)
+		return ch
+	}
+	return m.messageChan
 }
 
 func (m *mockTransportWithClient) Write(data string) error {
