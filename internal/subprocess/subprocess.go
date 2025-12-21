@@ -306,6 +306,10 @@ func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) [
 		cmd = append(cmd, "--resume", opts.Resume)
 	}
 
+	if opts.ForkSession {
+		cmd = append(cmd, "--fork-session")
+	}
+
 	// Settings - merge sandbox into settings if both are provided
 	if settingsValue, err := buildSettingsValue(opts); err == nil && settingsValue != "" {
 		cmd = append(cmd, "--settings", settingsValue)
@@ -384,6 +388,13 @@ func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) [
 	if len(opts.Agents) > 0 {
 		if agentsJSON, err := json.Marshal(opts.Agents); err == nil {
 			cmd = append(cmd, "--agents", string(agentsJSON))
+		}
+	}
+
+	// Plugins - add plugin directories
+	for _, plugin := range opts.Plugins {
+		if plugin.Type == "local" {
+			cmd = append(cmd, "--plugin-dir", plugin.Path)
 		}
 	}
 
