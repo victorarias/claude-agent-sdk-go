@@ -39,8 +39,16 @@ func (m *mockTransportWithClient) Messages() <-chan map[string]any {
 	return ch
 }
 
-func (m *mockTransportWithClient) Send(msg map[string]any) error {
+func (m *mockTransportWithClient) Write(data string) error {
 	return nil
+}
+
+func (m *mockTransportWithClient) EndInput() error {
+	return nil
+}
+
+func (m *mockTransportWithClient) IsReady() bool {
+	return m.connected
 }
 
 // TestWithClient_Success tests that WithClient creates client, runs function, and disconnects
