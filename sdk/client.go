@@ -77,7 +77,7 @@ func (c *Client) validateOptions() error {
 	// CanUseTool and PermissionPromptToolName are mutually exclusive
 	if c.canUseTool != nil && c.options.PermissionPromptToolName != "" {
 		return &types.SDKError{
-			Message: "can_use_tool callback cannot be used with permission_prompt_tool_name",
+			Message: "can_use_tool callback cannot be used with permission_prompt_tool_name. Please use one or the other",
 		}
 	}
 	return nil
