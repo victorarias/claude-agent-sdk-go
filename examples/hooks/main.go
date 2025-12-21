@@ -32,13 +32,13 @@ func main() {
 
 	// Create client with hooks
 	client := sdk.NewClient(
-		sdk.WithModel("claude-sonnet-4-5"),
+		types.WithModel("claude-sonnet-4-5"),
 
 		// PreToolUse hook: Called BEFORE each tool execution
 		// Can modify inputs, block execution, or log the attempt
-		sdk.WithPreToolUseHook(nil, func(input any, toolUseID *string, ctx *sdk.HookContext) (*sdk.HookOutput, error) {
+		sdk.WithPreToolUseHook(nil, func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
 			// Type assert to get the pre-tool-use input
-			preInput, ok := input.(*sdk.PreToolUseHookInput)
+			preInput, ok := input.(*types.PreToolUseHookInput)
 			if !ok {
 				return nil, nil
 			}
@@ -62,7 +62,7 @@ func main() {
 					for _, d := range dangerous {
 						if strings.Contains(cmd, d) {
 							fmt.Printf("   BLOCKED: dangerous command detected\n")
-							return &sdk.HookOutput{
+							return &types.HookOutput{
 								Decision: "block",
 								Reason:   fmt.Sprintf("Blocked: command contains '%s'", d),
 							}, nil
@@ -78,7 +78,7 @@ func main() {
 					for _, p := range protected {
 						if strings.Contains(path, p) {
 							fmt.Printf("   BLOCKED: protected path\n")
-							return &sdk.HookOutput{
+							return &types.HookOutput{
 								Decision: "block",
 								Reason:   fmt.Sprintf("Cannot write to protected path: %s", path),
 							}, nil
@@ -93,9 +93,9 @@ func main() {
 
 		// PostToolUse hook: Called AFTER each tool execution
 		// Can log results, track metrics, or trigger side effects
-		sdk.WithPostToolUseHook(nil, func(input any, toolUseID *string, ctx *sdk.HookContext) (*sdk.HookOutput, error) {
+		sdk.WithPostToolUseHook(nil, func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
 			// Type assert to get the post-tool-use input
-			postInput, ok := input.(*sdk.PostToolUseHookInput)
+			postInput, ok := input.(*types.PostToolUseHookInput)
 			if !ok {
 				return nil, nil
 			}
@@ -118,8 +118,8 @@ func main() {
 		}),
 
 		// Stop hook: Called when Claude wants to stop
-		sdk.WithStopHook(nil, func(input any, toolUseID *string, ctx *sdk.HookContext) (*sdk.HookOutput, error) {
-			stopInput, ok := input.(*sdk.StopHookInput)
+		sdk.WithStopHook(nil, func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
+			stopInput, ok := input.(*types.StopHookInput)
 			if !ok {
 				return nil, nil
 			}
@@ -160,9 +160,9 @@ func main() {
 		}
 
 		switch m := msg.(type) {
-		case *sdk.AssistantMessage:
+		case *types.AssistantMessage:
 			fmt.Print(m.Text())
-		case *sdk.ResultMessage:
+		case *types.ResultMessage:
 			fmt.Println()
 			goto done
 		}
