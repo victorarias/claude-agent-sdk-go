@@ -203,3 +203,92 @@ type StreamEvent struct {
 }
 
 func (m *StreamEvent) MessageType() string { return "stream_event" }
+
+// HookEvent represents the type of hook event.
+type HookEvent string
+
+const (
+	HookPreToolUse       HookEvent = "PreToolUse"
+	HookPostToolUse      HookEvent = "PostToolUse"
+	HookUserPromptSubmit HookEvent = "UserPromptSubmit"
+	HookStop             HookEvent = "Stop"
+	HookSubagentStop     HookEvent = "SubagentStop"
+	HookPreCompact       HookEvent = "PreCompact"
+)
+
+// HookContext provides context for hook callbacks.
+type HookContext struct {
+	Signal any // Future: abort signal support
+}
+
+// BaseHookInput contains fields common to all hook inputs.
+type BaseHookInput struct {
+	SessionID      string `json:"session_id"`
+	TranscriptPath string `json:"transcript_path"`
+	Cwd            string `json:"cwd"`
+	PermissionMode string `json:"permission_mode,omitempty"`
+	HookEventName  string `json:"hook_event_name"`
+}
+
+// PreToolUseHookInput is the input for PreToolUse hooks.
+type PreToolUseHookInput struct {
+	BaseHookInput
+	ToolName  string         `json:"tool_name"`
+	ToolInput map[string]any `json:"tool_input"`
+}
+
+// PostToolUseHookInput is the input for PostToolUse hooks.
+type PostToolUseHookInput struct {
+	BaseHookInput
+	ToolName     string         `json:"tool_name"`
+	ToolInput    map[string]any `json:"tool_input"`
+	ToolResponse any            `json:"tool_response"`
+}
+
+// UserPromptSubmitHookInput is the input for UserPromptSubmit hooks.
+type UserPromptSubmitHookInput struct {
+	BaseHookInput
+	Prompt string `json:"prompt"`
+}
+
+// StopHookInput is the input for Stop hooks.
+type StopHookInput struct {
+	BaseHookInput
+	StopHookActive bool `json:"stop_hook_active"`
+}
+
+// SubagentStopHookInput is the input for SubagentStop hooks.
+type SubagentStopHookInput struct {
+	BaseHookInput
+	StopHookActive bool `json:"stop_hook_active"`
+}
+
+// PreCompactHookInput is the input for PreCompact hooks.
+type PreCompactHookInput struct {
+	BaseHookInput
+	Trigger            string  `json:"trigger"`
+	CustomInstructions *string `json:"custom_instructions,omitempty"`
+}
+
+// HookOutput is the output from a hook callback.
+type HookOutput struct {
+	Continue       *bool          `json:"continue,omitempty"`
+	SuppressOutput bool           `json:"suppressOutput,omitempty"`
+	StopReason     string         `json:"stopReason,omitempty"`
+	Decision       string         `json:"decision,omitempty"`
+	SystemMessage  string         `json:"systemMessage,omitempty"`
+	Reason         string         `json:"reason,omitempty"`
+	HookSpecific   map[string]any `json:"hookSpecificOutput,omitempty"`
+	Async          bool           `json:"async,omitempty"`
+	AsyncTimeout   *int           `json:"asyncTimeout,omitempty"`
+}
+
+// HookCallback is the signature for hook callback functions.
+type HookCallback func(input any, toolUseID *string, ctx *HookContext) (*HookOutput, error)
+
+// HookMatcher configures which hooks to run for an event.
+type HookMatcher struct {
+	Matcher *string        `json:"matcher,omitempty"`
+	Hooks   []HookCallback `json:"-"`
+	Timeout *float64       `json:"timeout,omitempty"`
+}
