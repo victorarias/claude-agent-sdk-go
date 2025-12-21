@@ -472,17 +472,141 @@ func buildEnvironment(opts *Options) []string {
 	return env
 }
 
-// readMessages reads JSON messages from stdout (placeholder).
+// parseJSONLine parses a single JSON line.
+func parseJSONLine(line string) (map[string]any, error) {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return nil, fmt.Errorf("empty line")
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal([]byte(line), &result); err != nil {
+		return nil, fmt.Errorf("invalid JSON: %w", err)
+	}
+
+	return result, nil
+}
+
+// jsonAccumulator handles speculative JSON parsing for partial lines.
+type jsonAccumulator struct {
+	buffer strings.Builder
+}
+
+func newJSONAccumulator() *jsonAccumulator {
+	return &jsonAccumulator{}
+}
+
+// addLine adds a line to the accumulator and attempts to parse.
+// Returns (result, nil) if JSON is complete, (nil, nil) if still accumulating.
+func (a *jsonAccumulator) addLine(line string) (map[string]any, error) {
+	a.buffer.WriteString(line)
+
+	// Try to parse speculatively
+	result, err := parseJSONLine(a.buffer.String())
+	if err != nil {
+		// Still accumulating - not an error yet
+		return nil, nil
+	}
+
+	// Successfully parsed - reset buffer
+	a.buffer.Reset()
+	return result, nil
+}
+
+// reset clears the accumulator.
+func (a *jsonAccumulator) reset() {
+	a.buffer.Reset()
+}
+
+// len returns the current buffer length.
+func (a *jsonAccumulator) len() int {
+	return a.buffer.Len()
+}
+
+const maxBufferSize = 1024 * 1024 // 1MB
+
+// readMessages reads JSON messages from stdout with speculative parsing.
 func (t *SubprocessTransport) readMessages() {
 	defer t.wg.Done()
 	defer close(t.messages)
-	// Full implementation in Task 5
+
+	scanner := bufio.NewScanner(t.stdout)
+	buf := make([]byte, maxBufferSize)
+	scanner.Buffer(buf, maxBufferSize)
+
+	accumulator := newJSONAccumulator()
+
+	for scanner.Scan() {
+		select {
+		case <-t.ctx.Done():
+			return
+		default:
+		}
+
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+
+		// Speculative parsing - try to parse immediately
+		msg, _ := accumulator.addLine(line)
+		if msg == nil {
+			// Still accumulating
+			if accumulator.len() > maxBufferSize {
+				// Buffer overflow - reset and discard
+				accumulator.reset()
+			}
+			continue
+		}
+
+		// Successfully parsed
+		select {
+		case t.messages <- msg:
+		case <-t.ctx.Done():
+			return
+		}
+	}
+
+	// Check for scanner errors
+	if err := scanner.Err(); err != nil {
+		select {
+		case t.errors <- err:
+		default:
+		}
+	}
+
+	// Wait for process and capture exit error
+	if t.cmd != nil {
+		if err := t.cmd.Wait(); err != nil {
+			t.exitMu.Lock()
+			t.exitError = err
+			t.exitMu.Unlock()
+
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				procErr := &ProcessError{
+					ExitCode: exitErr.ExitCode(),
+					Stderr:   "check stderr for details",
+				}
+				select {
+				case t.errors <- procErr:
+				default:
+				}
+			}
+		}
+	}
 }
 
 // readStderr reads stderr and optionally invokes callback.
 func (t *SubprocessTransport) readStderr() {
 	defer t.wg.Done()
-	// Implemented in Task 5
+
+	scanner := bufio.NewScanner(t.stderr)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if t.stderrCallback != nil {
+			t.stderrCallback(line)
+		}
+	}
 }
 
 // Close terminates the subprocess and cleans up resources.
