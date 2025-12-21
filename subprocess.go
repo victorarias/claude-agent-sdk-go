@@ -373,12 +373,115 @@ func (t *SubprocessTransport) ExitError() error {
 	return t.exitError
 }
 
-// Placeholder methods to satisfy Transport interface (implemented in later tasks)
-
 // Connect starts the CLI subprocess.
 func (t *SubprocessTransport) Connect(ctx context.Context) error {
-	// Implemented in Task 4
+	t.closeMu.Lock()
+	defer t.closeMu.Unlock()
+
+	// Already connected
+	if t.ready {
+		return nil
+	}
+
+	// Find CLI
+	cliPath, err := findCLI(t.options.CLIPath, t.options.BundledCLIPath)
+	if err != nil {
+		return err
+	}
+	t.cliPath = cliPath
+
+	// Build command
+	args := buildCommand(cliPath, t.prompt, t.options, t.streaming)
+
+	// Check command length on Windows
+	if err := checkCommandLength(args); err != nil {
+		return &ConnectionError{Message: err.Error()}
+	}
+
+	// Create context for cancellation
+	t.ctx, t.cancel = context.WithCancel(ctx)
+
+	// Create command
+	t.cmd = exec.CommandContext(t.ctx, args[0], args[1:]...)
+
+	// Set working directory
+	if t.options.Cwd != "" {
+		t.cmd.Dir = t.options.Cwd
+	}
+
+	// Set environment
+	t.cmd.Env = buildEnvironment(t.options)
+
+	// Setup pipes
+	t.stdin, err = t.cmd.StdinPipe()
+	if err != nil {
+		return &ConnectionError{Message: "failed to create stdin pipe", Cause: err}
+	}
+
+	t.stdout, err = t.cmd.StdoutPipe()
+	if err != nil {
+		return &ConnectionError{Message: "failed to create stdout pipe", Cause: err}
+	}
+
+	t.stderr, err = t.cmd.StderrPipe()
+	if err != nil {
+		return &ConnectionError{Message: "failed to create stderr pipe", Cause: err}
+	}
+
+	// Start process
+	if err := t.cmd.Start(); err != nil {
+		return &ConnectionError{Message: "failed to start CLI", Cause: err}
+	}
+
+	// Start reading stdout (to be implemented in Task 5)
+	t.wg.Add(1)
+	go t.readMessages()
+
+	// Start reading stderr
+	t.wg.Add(1)
+	go t.readStderr()
+
+	// For non-streaming mode, close stdin immediately after start
+	if !t.streaming {
+		t.stdin.Close()
+	}
+
+	t.ready = true
 	return nil
+}
+
+// buildEnvironment creates the environment for the subprocess.
+func buildEnvironment(opts *Options) []string {
+	env := os.Environ()
+
+	// Add SDK-specific vars
+	env = append(env, "CLAUDE_CODE_ENTRYPOINT=sdk-go")
+	env = append(env, "CLAUDE_AGENT_SDK_VERSION="+Version)
+
+	// Add user-provided vars
+	for k, v := range opts.Env {
+		env = append(env, k+"="+v)
+	}
+
+	// Add feature flags
+	if opts.EnableFileCheckpointing {
+		env = append(env, "CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING=true")
+	}
+
+	return env
+}
+
+// readMessages reads JSON messages from stdout (placeholder).
+func (t *SubprocessTransport) readMessages() {
+	defer t.wg.Done()
+	defer close(t.messages)
+	// Full implementation in Task 5
+}
+
+// readStderr reads stderr and optionally invokes callback.
+func (t *SubprocessTransport) readStderr() {
+	defer t.wg.Done()
+	// Implemented in Task 5
 }
 
 // Close terminates the subprocess and cleans up resources.
