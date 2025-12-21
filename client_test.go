@@ -277,3 +277,60 @@ func TestClient_Resume(t *testing.T) {
 
 	client.Close()
 }
+
+func TestQuery_OneShot(t *testing.T) {
+	transport := NewMockTransport()
+	go func() {
+		transport.SendMessage(map[string]any{
+			"type": "assistant",
+			"message": map[string]any{
+				"content": []any{
+					map[string]any{"type": "text", "text": "Hello!"},
+				},
+				"model": "claude-test",
+			},
+		})
+		transport.SendMessage(map[string]any{
+			"type":            "result",
+			"subtype":         "success",
+			"duration_ms":     float64(100),
+			"duration_api_ms": float64(80),
+			"is_error":        false,
+			"num_turns":       float64(1),
+			"session_id":      "test_123",
+			"total_cost_usd":  float64(0.001),
+		})
+	}()
+
+	ctx := context.Background()
+	messages, err := Query(ctx, "Hello", WithTransport(transport))
+
+	if err != nil {
+		t.Fatalf("Query failed: %v", err)
+	}
+
+	if len(messages) != 2 {
+		t.Errorf("expected 2 messages, got %d", len(messages))
+	}
+
+	// Verify assistant message
+	if asst, ok := messages[0].(*AssistantMessage); ok {
+		if asst.Text() != "Hello!" {
+			t.Errorf("got text %q, want Hello!", asst.Text())
+		}
+	} else {
+		t.Errorf("expected AssistantMessage, got %T", messages[0])
+	}
+
+	// Verify result message
+	if result, ok := messages[1].(*ResultMessage); ok {
+		if !result.IsSuccess() {
+			t.Error("expected success result")
+		}
+		if result.Cost() != 0.001 {
+			t.Errorf("got cost %f, want 0.001", result.Cost())
+		}
+	} else {
+		t.Errorf("expected ResultMessage, got %T", messages[1])
+	}
+}

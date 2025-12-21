@@ -300,3 +300,42 @@ func (c *Client) Close() error {
 
 	return nil
 }
+
+// RunQuery performs a one-shot query and returns all messages.
+func RunQuery(ctx context.Context, prompt string, opts ...Option) ([]Message, error) {
+	options := DefaultOptions()
+	ApplyOptions(options, opts...)
+
+	// Extract transport if provided
+	var transport Transport
+	if options.customTransport != nil {
+		transport = options.customTransport
+	} else {
+		transport = NewSubprocessTransport(prompt, options)
+	}
+
+	// Connect
+	if err := transport.Connect(ctx); err != nil {
+		return nil, err
+	}
+	defer transport.Close()
+
+	// Collect messages
+	var messages []Message
+
+	for msg := range transport.Messages() {
+		parsed, err := ParseMessage(msg)
+		if err != nil {
+			// Skip unparseable messages
+			continue
+		}
+		messages = append(messages, parsed)
+
+		// Stop on result
+		if _, ok := parsed.(*ResultMessage); ok {
+			break
+		}
+	}
+
+	return messages, nil
+}
