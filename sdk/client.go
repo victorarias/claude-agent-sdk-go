@@ -65,8 +65,8 @@ func NewClient(opts ...types.Option) *Client {
 	}
 
 	// Use transport if provided in options
-	if options.customTransport != nil {
-		client.transport = options.customTransport
+	if options.CustomTransport() != nil {
+		client.transport = options.CustomTransport()
 	}
 
 	return client
@@ -312,8 +312,8 @@ func RunQuery(ctx context.Context, prompt string, opts ...types.Option) ([]types
 
 	// Extract transport if provided
 	var transport types.Transport
-	if options.customTransport != nil {
-		transport = options.customTransport
+	if options.CustomTransport() != nil {
+		transport = options.CustomTransport()
 	} else {
 		transport = subprocess.NewSubprocessTransport(prompt, options)
 	}
@@ -346,7 +346,7 @@ func RunQuery(ctx context.Context, prompt string, opts ...types.Option) ([]types
 
 // QueryStream performs a query and streams messages back.
 func QueryStream(ctx context.Context, prompt string, opts ...types.Option) (<-chan types.Message, <-chan error) {
-	msgChan := make(chan Message, 100)
+	msgChan := make(chan types.Message, 100)
 	errChan := make(chan error, 1)
 
 	go func() {
@@ -357,8 +357,8 @@ func QueryStream(ctx context.Context, prompt string, opts ...types.Option) (<-ch
 		types.ApplyOptions(options, opts...)
 
 		var transport types.Transport
-		if options.customTransport != nil {
-			transport = options.customTransport
+		if options.CustomTransport() != nil {
+			transport = options.CustomTransport()
 		} else {
 			transport = subprocess.NewSubprocessTransport(prompt, options)
 		}
@@ -476,8 +476,8 @@ func (c *Client) Interrupt() error {
 	return q.Interrupt()
 }
 
-// SetPermissionMode changes the permission mode.
-func (c *Client) SetPermissionMode(mode PermissionMode) error {
+// Settypes.PermissionMode changes the permission mode.
+func (c *Client) Settypes.PermissionMode(mode types.PermissionMode) error {
 	c.mu.Lock()
 	if !c.connected || c.query == nil {
 		c.mu.Unlock()
@@ -486,7 +486,7 @@ func (c *Client) SetPermissionMode(mode PermissionMode) error {
 	q := c.query
 	c.mu.Unlock()
 
-	return q.SetPermissionMode(mode)
+	return q.Settypes.PermissionMode(mode)
 }
 
 // SetModel changes the AI model.
@@ -572,13 +572,13 @@ func (c *Client) Run(ctx context.Context, fn func() error) error {
 	return fn()
 }
 
-// Messages returns a channel that yields messages until closed or error.
+// types.Messages returns a channel that yields messages until closed or error.
 // Use this for iterating over responses in streaming mode.
-func (c *Client) Messages() <-chan types.Message {
+func (c *Client) types.Messages() <-chan types.Message {
 	c.mu.Lock()
 	if !c.connected || c.query == nil {
 		c.mu.Unlock()
-		ch := make(chan Message)
+		ch := make(chan types.Message)
 		close(ch)
 		return ch
 	}
