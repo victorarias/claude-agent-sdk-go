@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 func TestNewQuery(t *testing.T) {
@@ -313,14 +315,14 @@ func TestQuery_Initialize_WithHooks(t *testing.T) {
 		}
 	}()
 
-	hooks := map[HookEvent][]HookMatcher{
-		HookPreToolUse: {
+	hooks := map[types.HookEvent][]types.HookMatcher{
+		types.HookPreToolUse: {
 			{
 				Matcher: map[string]any{"tool_name": "Bash"},
 				Hooks: []HookCallback{
-					func(input any, toolUseID *string, ctx *HookContext) (*HookOutput, error) {
+					func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
 						cont := true
-						return &HookOutput{Continue: &cont}, nil
+						return &types.HookOutput{Continue: &cont}, nil
 					},
 				},
 			},
@@ -419,7 +421,7 @@ func TestQuery_SetPermissionMode(t *testing.T) {
 		}
 	}()
 
-	err := query.SetPermissionMode(PermissionBypass)
+	err := query.SetPermissionMode(types.PermissionBypass)
 	if err != nil {
 		t.Errorf("SetPermissionMode failed: %v", err)
 	}
@@ -514,10 +516,10 @@ func TestQuery_HandleHookCallback(t *testing.T) {
 	// Register a hook callback
 	callbackCalled := false
 	query.hookMu.Lock()
-	query.hookCallbacks["hook_1"] = func(input any, toolUseID *string, ctx *HookContext) (*HookOutput, error) {
+	query.hookCallbacks["hook_1"] = func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
 		callbackCalled = true
 		cont := true
-		return &HookOutput{Continue: &cont}, nil
+		return &types.HookOutput{Continue: &cont}, nil
 	}
 	query.hookMu.Unlock()
 
@@ -559,7 +561,7 @@ func TestQuery_HandleHookCallback_Error(t *testing.T) {
 	query := NewQuery(transport, true)
 
 	query.hookMu.Lock()
-	query.hookCallbacks["hook_err"] = func(input any, toolUseID *string, ctx *HookContext) (*HookOutput, error) {
+	query.hookCallbacks["hook_err"] = func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
 		return nil, fmt.Errorf("hook error")
 	}
 	query.hookMu.Unlock()
@@ -601,7 +603,7 @@ func TestQuery_HandleCanUseTool(t *testing.T) {
 	query := NewQuery(transport, true)
 
 	called := false
-	query.SetCanUseTool(func(toolName string, input map[string]any, ctx *ToolPermissionContext) (PermissionResult, error) {
+	query.SetCanUseTool(func(toolName string, input map[string]any, ctx *types.ToolPermissionContext) (PermissionResult, error) {
 		called = true
 		return &PermissionResultAllow{Behavior: "allow"}, nil
 	})
@@ -640,7 +642,7 @@ func TestQuery_HandleCanUseTool_Deny(t *testing.T) {
 	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 
-	query.SetCanUseTool(func(toolName string, input map[string]any, ctx *ToolPermissionContext) (PermissionResult, error) {
+	query.SetCanUseTool(func(toolName string, input map[string]any, ctx *types.ToolPermissionContext) (PermissionResult, error) {
 		return &PermissionResultDeny{Behavior: "deny", Message: "not allowed"}, nil
 	})
 
