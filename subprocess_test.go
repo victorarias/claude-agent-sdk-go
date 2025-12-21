@@ -370,3 +370,18 @@ func TestSpeculativeJSONParsing(t *testing.T) {
 		t.Errorf("got type %v, want assistant", result["type"])
 	}
 }
+
+func TestSubprocessTransport_Write_NotReady(t *testing.T) {
+	opts := DefaultOptions()
+	transport := NewSubprocessTransport("", opts)
+
+	err := transport.Write(`{"type":"user","message":{"content":"hello"}}`)
+	if err == nil {
+		t.Error("expected error when writing to non-ready transport")
+	}
+
+	var connErr *ConnectionError
+	if !errors.As(err, &connErr) {
+		t.Errorf("expected ConnectionError, got %T", err)
+	}
+}
