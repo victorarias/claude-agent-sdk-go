@@ -2,8 +2,11 @@ package sdk
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // Query handles the bidirectional control protocol.
