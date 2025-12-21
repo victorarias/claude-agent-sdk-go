@@ -275,3 +275,136 @@ func checkCommandLength(cmd []string) error {
 
 	return nil
 }
+
+// SubprocessTransport manages the Claude CLI subprocess.
+// CRITICAL: This implements write serialization for concurrent MCP tool calls.
+type SubprocessTransport struct {
+	prompt    string
+	options   *Options
+	streaming bool
+
+	cliPath string
+	cmd     *exec.Cmd
+
+	stdin  io.WriteCloser
+	stdout io.ReadCloser
+	stderr io.ReadCloser
+
+	messages chan map[string]any
+	errors   chan error
+
+	ready   bool
+	closed  bool
+	closeMu sync.Mutex
+
+	// CRITICAL: Write mutex for concurrent MCP tool call serialization
+	// All writes to stdin MUST be protected by this mutex
+	writeMu sync.Mutex
+
+	// Exit error tracking for proper error reporting
+	exitError error
+	exitMu    sync.Mutex
+
+	// Temp files to clean up on close
+	tempFiles []string
+	tempMu    sync.Mutex
+
+	// Stderr callback for debugging
+	stderrCallback func(string)
+
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+}
+
+// NewSubprocessTransport creates a new subprocess transport.
+func NewSubprocessTransport(prompt string, opts *Options) *SubprocessTransport {
+	if opts == nil {
+		opts = DefaultOptions()
+	}
+
+	return &SubprocessTransport{
+		prompt:    prompt,
+		options:   opts,
+		streaming: prompt == "", // Empty prompt = streaming mode
+		messages:  make(chan map[string]any, 100),
+		errors:    make(chan error, 1),
+		tempFiles: make([]string, 0),
+	}
+}
+
+// NewStreamingTransport creates a transport for streaming mode.
+func NewStreamingTransport(opts *Options) *SubprocessTransport {
+	return NewSubprocessTransport("", opts)
+}
+
+// IsReady returns true if the transport is connected and not closed.
+func (t *SubprocessTransport) IsReady() bool {
+	t.closeMu.Lock()
+	defer t.closeMu.Unlock()
+	return t.ready && !t.closed
+}
+
+// Messages returns the channel of messages from the CLI.
+func (t *SubprocessTransport) Messages() <-chan map[string]any {
+	return t.messages
+}
+
+// Errors returns the channel of errors from the CLI.
+func (t *SubprocessTransport) Errors() <-chan error {
+	return t.errors
+}
+
+// SetStderrCallback sets a callback for stderr output.
+func (t *SubprocessTransport) SetStderrCallback(callback func(string)) {
+	t.stderrCallback = callback
+}
+
+// AddTempFile adds a temp file to be cleaned up on close.
+func (t *SubprocessTransport) AddTempFile(path string) {
+	t.tempMu.Lock()
+	defer t.tempMu.Unlock()
+	t.tempFiles = append(t.tempFiles, path)
+}
+
+// ExitError returns the exit error if the process has exited.
+func (t *SubprocessTransport) ExitError() error {
+	t.exitMu.Lock()
+	defer t.exitMu.Unlock()
+	return t.exitError
+}
+
+// Placeholder methods to satisfy Transport interface (implemented in later tasks)
+
+// Connect starts the CLI subprocess.
+func (t *SubprocessTransport) Connect(ctx context.Context) error {
+	// Implemented in Task 4
+	return nil
+}
+
+// Close terminates the subprocess and cleans up resources.
+func (t *SubprocessTransport) Close() error {
+	// Implemented in Task 7
+	return nil
+}
+
+// Write sends data to the CLI stdin.
+func (t *SubprocessTransport) Write(data string) error {
+	// Implemented in Task 6
+	return nil
+}
+
+// EndInput closes stdin to signal end of input.
+func (t *SubprocessTransport) EndInput() error {
+	// Implemented in Task 6
+	return nil
+}
+
+// Suppress unused variable warnings
+var (
+	_ = (*SubprocessTransport)(nil).stdin
+	_ = (*SubprocessTransport)(nil).stdout
+	_ = (*SubprocessTransport)(nil).stderr
+	_ = bufio.Scanner{}
+	_ io.Reader = nil
+)
