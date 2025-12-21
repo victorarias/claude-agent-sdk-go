@@ -464,3 +464,48 @@ while true; do sleep 0.1; done
 		t.Error("Close took too long")
 	}
 }
+
+func TestSubprocessTransport_StderrCallback(t *testing.T) {
+	tmpDir := t.TempDir()
+	mockCLI := filepath.Join(tmpDir, "claude")
+	mockScript := `#!/bin/bash
+echo "stderr line 1" >&2
+echo "stderr line 2" >&2
+echo '{"type":"result"}'
+`
+	if err := os.WriteFile(mockCLI, []byte(mockScript), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	opts := DefaultOptions()
+	opts.CLIPath = mockCLI
+
+	transport := NewSubprocessTransport("Hello", opts)
+
+	stderrLines := make([]string, 0)
+	var mu sync.Mutex
+	transport.SetStderrCallback(func(line string) {
+		mu.Lock()
+		stderrLines = append(stderrLines, line)
+		mu.Unlock()
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := transport.Connect(ctx); err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+
+	// Drain messages
+	for range transport.Messages() {
+	}
+	transport.Close()
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(stderrLines) != 2 {
+		t.Errorf("expected 2 stderr lines, got %d: %v", len(stderrLines), stderrLines)
+	}
+}
