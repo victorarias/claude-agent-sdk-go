@@ -47,7 +47,7 @@ func (m *mockTransportWithClient) Send(msg map[string]any) error {
 func TestWithClient_Success(t *testing.T) {
 	mock := &mockTransportWithClient{}
 	opts := []types.Option{
-		types.WithCustomTransport(mock),
+		types.WithTransport(mock),
 	}
 
 	functionCalled := false
@@ -77,7 +77,7 @@ func TestWithClient_Success(t *testing.T) {
 func TestWithClient_FunctionError(t *testing.T) {
 	mock := &mockTransportWithClient{}
 	opts := []types.Option{
-		types.WithCustomTransport(mock),
+		types.WithTransport(mock),
 	}
 
 	expectedErr := errors.New("function error")
@@ -100,7 +100,7 @@ func TestWithClient_FunctionError(t *testing.T) {
 func TestWithClient_FunctionPanic(t *testing.T) {
 	mock := &mockTransportWithClient{}
 	opts := []types.Option{
-		types.WithCustomTransport(mock),
+		types.WithTransport(mock),
 	}
 
 	expectedPanic := "intentional panic"
@@ -136,7 +136,7 @@ func TestWithClient_FunctionPanic(t *testing.T) {
 func TestWithClient_PanicReraise(t *testing.T) {
 	mock := &mockTransportWithClient{}
 	opts := []types.Option{
-		types.WithCustomTransport(mock),
+		types.WithTransport(mock),
 	}
 
 	type customPanic struct {
