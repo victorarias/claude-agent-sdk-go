@@ -14,7 +14,9 @@ Implementation plans are in `docs/plans/`:
 
 ## Beads (TodoWrite)
 
-Use TodoWrite ("beads") to track progress. Rules:
+Use TodoWrite ("beads") to track progress. Run `bd prime` to learn the CLI.
+
+Rules:
 
 1. **One epic per plan** - Create todos for each task in the current plan
 2. **Add reference** - Include plan name and task number (e.g., "Plan01/Task3: Content blocks")
