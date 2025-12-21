@@ -556,7 +556,7 @@ func TestQuery_HandleHookCallback(t *testing.T) {
 	}
 }
 
-func TestQuery_Handletypes.HookCallback_Error(t *testing.T) {
+func TestQuery_HandleHookCallback_Error(t *testing.T) {
 	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 
