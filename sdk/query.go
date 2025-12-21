@@ -268,6 +268,19 @@ func (q *Query) handleControlRequest(msg map[string]any) {
 		responseData, err = q.handleHookCallback(request)
 	case "mcp_tool_call":
 		responseData, err = q.handleMCPToolCall(request)
+	case "mcp_message":
+		serverName, _ := request["server_name"].(string)
+		mcpMessage, _ := request["message"].(map[string]any)
+		if serverName == "" || mcpMessage == nil {
+			err = fmt.Errorf("missing server_name or message for MCP request")
+		} else {
+			var mcpResponse any
+			mcpResponse, err = q.handleMCPMessage(serverName, mcpMessage)
+			if err == nil {
+				// Wrap the MCP response as expected by the control protocol
+				responseData = map[string]any{"mcp_response": mcpResponse}
+			}
+		}
 	default:
 		err = fmt.Errorf("unsupported control request: %s", subtype)
 	}
