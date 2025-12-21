@@ -227,7 +227,188 @@ func (q *Query) handleControlResponse(msg map[string]any) {
 
 // handleControlRequest handles incoming control requests from CLI.
 func (q *Query) handleControlRequest(msg map[string]any) {
-	// TODO: Implement in Task 7
+	requestID, _ := msg["request_id"].(string)
+	request, _ := msg["request"].(map[string]any)
+	if request == nil {
+		return
+	}
+
+	subtype, _ := request["subtype"].(string)
+
+	var responseData map[string]any
+	var err error
+
+	switch subtype {
+	case "can_use_tool":
+		responseData, err = q.handleCanUseTool(request)
+	case "hook_callback":
+		responseData, err = q.handleHookCallback(request)
+	default:
+		err = fmt.Errorf("unsupported control request: %s", subtype)
+	}
+
+	// Send response
+	q.sendControlResponse(requestID, responseData, err)
+}
+
+// handleHookCallback invokes a registered hook callback.
+func (q *Query) handleHookCallback(request map[string]any) (map[string]any, error) {
+	callbackID, _ := request["callback_id"].(string)
+	input := request["input"]
+
+	var toolUseID *string
+	if id, ok := request["tool_use_id"].(string); ok {
+		toolUseID = &id
+	}
+
+	q.hookMu.RLock()
+	callback, exists := q.hookCallbacks[callbackID]
+	q.hookMu.RUnlock()
+
+	if !exists {
+		return nil, fmt.Errorf("hook callback not found: %s", callbackID)
+	}
+
+	output, err := callback(input, toolUseID, &HookContext{})
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert HookOutput to response
+	return q.hookOutputToResponse(output), nil
+}
+
+// hookOutputToResponse converts a HookOutput to a response map.
+func (q *Query) hookOutputToResponse(output *HookOutput) map[string]any {
+	if output == nil {
+		return make(map[string]any)
+	}
+
+	result := make(map[string]any)
+
+	if output.Continue != nil && *output.Continue {
+		result["continue"] = true
+	}
+	if output.SuppressOutput {
+		result["suppressOutput"] = true
+	}
+	if output.StopReason != "" {
+		result["stopReason"] = output.StopReason
+	}
+	if output.Decision != "" {
+		result["decision"] = output.Decision
+	}
+	if output.SystemMessage != "" {
+		result["systemMessage"] = output.SystemMessage
+	}
+	if output.Reason != "" {
+		result["reason"] = output.Reason
+	}
+	if output.HookSpecific != nil {
+		result["hookSpecificOutput"] = output.HookSpecific
+	}
+
+	return result
+}
+
+// handleCanUseTool handles tool permission requests.
+func (q *Query) handleCanUseTool(request map[string]any) (map[string]any, error) {
+	if q.canUseTool == nil {
+		// Default: allow all
+		return map[string]any{"behavior": "allow"}, nil
+	}
+
+	toolName, _ := request["tool_name"].(string)
+	input, _ := request["input"].(map[string]any)
+	suggestions, _ := request["permission_suggestions"].([]any)
+
+	ctx := &ToolPermissionContext{
+		Suggestions: q.parsePermissionSuggestions(suggestions),
+	}
+
+	result, err := q.canUseTool(toolName, input, ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return q.permissionResultToResponse(result)
+}
+
+// parsePermissionSuggestions converts raw suggestions to PermissionUpdate slice.
+func (q *Query) parsePermissionSuggestions(raw []any) []PermissionUpdate {
+	if raw == nil {
+		return nil
+	}
+
+	var updates []PermissionUpdate
+	for _, item := range raw {
+		if m, ok := item.(map[string]any); ok {
+			update := PermissionUpdate{
+				Type: PermissionUpdateType(getString(m, "type")),
+			}
+			updates = append(updates, update)
+		}
+	}
+	return updates
+}
+
+// permissionResultToResponse converts a permission result to a response map.
+func (q *Query) permissionResultToResponse(result PermissionResult) (map[string]any, error) {
+	switch r := result.(type) {
+	case *PermissionResultAllow:
+		resp := map[string]any{
+			"behavior": "allow",
+		}
+		if r.UpdatedInput != nil {
+			resp["updatedInput"] = r.UpdatedInput
+		}
+		if len(r.UpdatedPermissions) > 0 {
+			resp["permissionUpdates"] = r.UpdatedPermissions
+		}
+		return resp, nil
+
+	case *PermissionResultDeny:
+		resp := map[string]any{
+			"behavior": "deny",
+			"message":  r.Message,
+		}
+		if r.Interrupt {
+			resp["interrupt"] = true
+		}
+		return resp, nil
+
+	default:
+		return nil, fmt.Errorf("invalid permission result type: %T", result)
+	}
+}
+
+// sendControlResponse sends a control response.
+func (q *Query) sendControlResponse(requestID string, data map[string]any, err error) {
+	response := map[string]any{
+		"type": "control_response",
+	}
+
+	if err != nil {
+		response["response"] = map[string]any{
+			"subtype":    "error",
+			"request_id": requestID,
+			"error":      err.Error(),
+		}
+	} else {
+		response["response"] = map[string]any{
+			"subtype":    "success",
+			"request_id": requestID,
+			"response":   data,
+		}
+	}
+
+	responseData, _ := json.Marshal(response)
+	q.transport.Write(string(responseData))
+}
+
+// SetCanUseTool sets the tool permission callback.
+func (q *Query) SetCanUseTool(callback CanUseToolCallback) {
+	q.canUseTool = callback
 }
 
 // handleCancelRequest handles a request cancellation.

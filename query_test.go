@@ -3,6 +3,7 @@ package sdk
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -503,5 +504,174 @@ func TestQuery_RewindFiles(t *testing.T) {
 	err := query.RewindFiles("msg_123")
 	if err != nil {
 		t.Errorf("RewindFiles failed: %v", err)
+	}
+}
+
+func TestQuery_HandleHookCallback(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	// Register a hook callback
+	callbackCalled := false
+	query.hookMu.Lock()
+	query.hookCallbacks["hook_1"] = func(input any, toolUseID *string, ctx *HookContext) (*HookOutput, error) {
+		callbackCalled = true
+		cont := true
+		return &HookOutput{Continue: &cont}, nil
+	}
+	query.hookMu.Unlock()
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	// Send hook callback request
+	transport.SendMessage(map[string]any{
+		"type":       "control_request",
+		"request_id": "req_hook_1",
+		"request": map[string]any{
+			"subtype":     "hook_callback",
+			"callback_id": "hook_1",
+			"input": map[string]any{
+				"tool_name": "Bash",
+			},
+		},
+	})
+
+	// Wait for processing
+	time.Sleep(100 * time.Millisecond)
+
+	if !callbackCalled {
+		t.Error("hook callback was not called")
+	}
+
+	// Verify response was sent
+	written := transport.Written()
+	if len(written) == 0 {
+		t.Error("no response was written")
+	}
+}
+
+func TestQuery_HandleHookCallback_Error(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	query.hookMu.Lock()
+	query.hookCallbacks["hook_err"] = func(input any, toolUseID *string, ctx *HookContext) (*HookOutput, error) {
+		return nil, fmt.Errorf("hook error")
+	}
+	query.hookMu.Unlock()
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	transport.SendMessage(map[string]any{
+		"type":       "control_request",
+		"request_id": "req_hook_err",
+		"request": map[string]any{
+			"subtype":     "hook_callback",
+			"callback_id": "hook_err",
+			"input":       map[string]any{},
+		},
+	})
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify error response was sent
+	written := transport.Written()
+	if len(written) == 0 {
+		t.Fatal("no response was written")
+	}
+
+	var resp map[string]any
+	json.Unmarshal([]byte(written[0]), &resp)
+	response := resp["response"].(map[string]any)
+	if response["subtype"] != "error" {
+		t.Error("expected error response")
+	}
+}
+
+func TestQuery_HandleCanUseTool(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	called := false
+	query.SetCanUseTool(func(toolName string, input map[string]any, ctx *ToolPermissionContext) (PermissionResult, error) {
+		called = true
+		return &PermissionResultAllow{Behavior: "allow"}, nil
+	})
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	// Simulate can_use_tool request
+	transport.SendMessage(map[string]any{
+		"type":       "control_request",
+		"request_id": "req_perm_1",
+		"request": map[string]any{
+			"subtype":   "can_use_tool",
+			"tool_name": "Bash",
+			"input":     map[string]any{"command": "ls"},
+		},
+	})
+
+	time.Sleep(100 * time.Millisecond)
+
+	if !called {
+		t.Error("canUseTool callback was not called")
+	}
+
+	// Verify response was sent
+	written := transport.Written()
+	if len(written) == 0 {
+		t.Error("no response was written")
+	}
+}
+
+func TestQuery_HandleCanUseTool_Deny(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	query.SetCanUseTool(func(toolName string, input map[string]any, ctx *ToolPermissionContext) (PermissionResult, error) {
+		return &PermissionResultDeny{Behavior: "deny", Message: "not allowed"}, nil
+	})
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	transport.SendMessage(map[string]any{
+		"type":       "control_request",
+		"request_id": "req_perm_2",
+		"request": map[string]any{
+			"subtype":   "can_use_tool",
+			"tool_name": "Bash",
+			"input":     map[string]any{"command": "rm -rf /"},
+		},
+	})
+
+	time.Sleep(100 * time.Millisecond)
+
+	written := transport.Written()
+	if len(written) == 0 {
+		t.Fatal("no response was written")
+	}
+
+	var resp map[string]any
+	json.Unmarshal([]byte(written[0]), &resp)
+	response := resp["response"].(map[string]any)
+	respData := response["response"].(map[string]any)
+	if respData["behavior"] != "deny" {
+		t.Errorf("expected deny behavior, got %v", respData["behavior"])
 	}
 }
