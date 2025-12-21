@@ -38,9 +38,9 @@ func main() {
 
 	// Create client with options
 	client := sdk.NewClient(
-		sdk.WithModel("claude-sonnet-4-5"),
-		sdk.WithMaxTurns(10),
-		sdk.WithSystemPrompt("You are a helpful assistant. Be concise but thorough."),
+		types.WithModel("claude-sonnet-4-5"),
+		types.WithMaxTurns(10),
+		types.WithSystemPrompt("You are a helpful assistant. Be concise but thorough."),
 	)
 
 	// Connect in streaming mode
@@ -104,11 +104,11 @@ func main() {
 			}
 
 			switch m := msg.(type) {
-			case *sdk.AssistantMessage:
+			case *types.AssistantMessage:
 				// Stream text as it arrives
 				fmt.Print(m.Text())
 
-			case *sdk.StreamEvent:
+			case *types.StreamEvent:
 				// Handle partial updates for true streaming
 				if m.EventType == "content_block_delta" {
 					if text, ok := m.Delta["text"].(string); ok {
@@ -116,7 +116,7 @@ func main() {
 					}
 				}
 
-			case *sdk.ResultMessage:
+			case *types.ResultMessage:
 				fmt.Println()
 				if m.TotalCostUSD != nil {
 					cost := *m.TotalCostUSD
