@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Define all Go types that mirror the Python SDK's type system.
+**Goal:** Define all Go types that mirror the Python SDK's type system with complete feature parity.
 
 **Architecture:** Use Go structs with JSON tags for serialization. Use interfaces for polymorphic types (Message, ContentBlock). Use functional options pattern for ClaudeAgentOptions.
 
@@ -37,6 +37,9 @@ package sdk
 
 // Version is the SDK version.
 const Version = "0.1.0"
+
+// MinimumCLIVersion is the minimum supported CLI version.
+const MinimumCLIVersion = "2.0.0"
 ```
 
 **Step 3: Verify module**
@@ -102,6 +105,21 @@ func TestProcessError(t *testing.T) {
 		t.Errorf("got exit code %d, want 1", err.ExitCode)
 	}
 }
+
+func TestJSONDecodeError(t *testing.T) {
+	origErr := errors.New("unexpected token")
+	err := &JSONDecodeError{Line: `{"invalid`, OriginalError: origErr}
+	if !errors.Is(err, ErrParse) {
+		t.Error("JSONDecodeError should match ErrParse")
+	}
+}
+
+func TestMessageParseError(t *testing.T) {
+	err := &MessageParseError{Message: "unknown type", Data: map[string]any{"type": "unknown"}}
+	if !errors.Is(err, ErrParse) {
+		t.Error("MessageParseError should match ErrParse")
+	}
+}
 ```
 
 **Step 2: Run test to verify it fails**
@@ -132,6 +150,7 @@ var (
 	ErrProcess     = errors.New("process error")
 	ErrParse       = errors.New("parse error")
 	ErrTimeout     = errors.New("timeout error")
+	ErrClosed      = errors.New("transport closed")
 )
 
 // SDKError is the base error type for all SDK errors.
@@ -154,9 +173,13 @@ func (e *SDKError) Unwrap() error {
 // CLINotFoundError is returned when the Claude CLI cannot be found.
 type CLINotFoundError struct {
 	SearchedPaths []string
+	CLIPath       string // The explicit path that was tried (if any)
 }
 
 func (e *CLINotFoundError) Error() string {
+	if e.CLIPath != "" {
+		return fmt.Sprintf("claude CLI not found at: %s", e.CLIPath)
+	}
 	return fmt.Sprintf("claude CLI not found, searched: %s", strings.Join(e.SearchedPaths, ", "))
 }
 
@@ -199,17 +222,35 @@ func (e *ProcessError) Is(target error) bool {
 	return target == ErrProcess
 }
 
-// ParseError is returned when message parsing fails.
-type ParseError struct {
+// JSONDecodeError is returned when JSON from CLI cannot be decoded.
+type JSONDecodeError struct {
+	Line          string
+	OriginalError error
+}
+
+func (e *JSONDecodeError) Error() string {
+	return fmt.Sprintf("JSON decode error on line %q: %v", e.Line, e.OriginalError)
+}
+
+func (e *JSONDecodeError) Is(target error) bool {
+	return target == ErrParse
+}
+
+func (e *JSONDecodeError) Unwrap() error {
+	return e.OriginalError
+}
+
+// MessageParseError is returned when a message cannot be parsed.
+type MessageParseError struct {
 	Message string
-	RawData string
+	Data    map[string]any
 }
 
-func (e *ParseError) Error() string {
-	return fmt.Sprintf("parse error: %s", e.Message)
+func (e *MessageParseError) Error() string {
+	return fmt.Sprintf("message parse error: %s", e.Message)
 }
 
-func (e *ParseError) Is(target error) bool {
+func (e *MessageParseError) Is(target error) bool {
 	return target == ErrParse
 }
 ```
@@ -217,7 +258,7 @@ func (e *ParseError) Is(target error) bool {
 **Step 4: Run tests**
 
 ```bash
-go test -run "TestSDKError|TestCLINotFoundError|TestConnectionError|TestProcessError" -v
+go test -run "TestSDKError|TestCLINotFoundError|TestConnectionError|TestProcessError|TestJSONDecodeError|TestMessageParseError" -v
 ```
 
 Expected: PASS
@@ -328,6 +369,7 @@ package sdk
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // ContentBlock represents a block of content in a message.
@@ -413,6 +455,38 @@ func ParseContentBlock(raw map[string]any) (ContentBlock, error) {
 		return nil, fmt.Errorf("unknown block type: %s", blockType)
 	}
 }
+
+// Text returns all text content concatenated from an AssistantMessage.
+func (m *AssistantMessage) Text() string {
+	var parts []string
+	for _, block := range m.Content {
+		if textBlock, ok := block.(*TextBlock); ok {
+			parts = append(parts, textBlock.Text)
+		}
+	}
+	return strings.Join(parts, "")
+}
+
+// ToolCalls returns all tool use blocks from an AssistantMessage.
+func (m *AssistantMessage) ToolCalls() []*ToolUseBlock {
+	var tools []*ToolUseBlock
+	for _, block := range m.Content {
+		if toolBlock, ok := block.(*ToolUseBlock); ok {
+			tools = append(tools, toolBlock)
+		}
+	}
+	return tools
+}
+
+// Thinking returns the thinking content if present.
+func (m *AssistantMessage) Thinking() string {
+	for _, block := range m.Content {
+		if thinkingBlock, ok := block.(*ThinkingBlock); ok {
+			return thinkingBlock.Thinking
+		}
+	}
+	return ""
+}
 ```
 
 **Step 4: Run tests**
@@ -483,6 +557,23 @@ func TestResultMessage(t *testing.T) {
 	if msg.MessageType() != "result" {
 		t.Errorf("got %q, want %q", msg.MessageType(), "result")
 	}
+	if !msg.IsSuccess() {
+		t.Error("expected IsSuccess() to return true")
+	}
+	if msg.Cost() != 0.05 {
+		t.Errorf("got cost %f, want 0.05", msg.Cost())
+	}
+}
+
+func TestStreamEvent(t *testing.T) {
+	msg := &StreamEvent{
+		UUID:      "uuid_123",
+		SessionID: "sess_123",
+		Event:     map[string]any{"type": "content_block_delta"},
+	}
+	if msg.MessageType() != "stream_event" {
+		t.Errorf("got %q, want %q", msg.MessageType(), "stream_event")
+	}
 }
 
 func floatPtr(f float64) *float64 { return &f }
@@ -515,12 +606,24 @@ type UserMessage struct {
 
 func (m *UserMessage) MessageType() string { return "user" }
 
+// AssistantMessageError represents error types for assistant messages.
+type AssistantMessageError string
+
+const (
+	ErrorAuthenticationFailed AssistantMessageError = "authentication_failed"
+	ErrorBillingError         AssistantMessageError = "billing_error"
+	ErrorRateLimit            AssistantMessageError = "rate_limit"
+	ErrorInvalidRequest       AssistantMessageError = "invalid_request"
+	ErrorServerError          AssistantMessageError = "server_error"
+	ErrorUnknown              AssistantMessageError = "unknown"
+)
+
 // AssistantMessage represents Claude's response.
 type AssistantMessage struct {
-	Content         []ContentBlock `json:"content"`
-	Model           string         `json:"model"`
-	ParentToolUseID *string        `json:"parent_tool_use_id,omitempty"`
-	Error           *string        `json:"error,omitempty"`
+	Content         []ContentBlock         `json:"content"`
+	Model           string                 `json:"model"`
+	ParentToolUseID *string                `json:"parent_tool_use_id,omitempty"`
+	Error           *AssistantMessageError `json:"error,omitempty"`
 }
 
 func (m *AssistantMessage) MessageType() string { return "assistant" }
@@ -549,7 +652,20 @@ type ResultMessage struct {
 
 func (m *ResultMessage) MessageType() string { return "result" }
 
-// StreamEvent represents a streaming event.
+// IsSuccess returns true if the result is successful.
+func (m *ResultMessage) IsSuccess() bool {
+	return !m.IsError && m.Subtype == "success"
+}
+
+// Cost returns the cost in USD.
+func (m *ResultMessage) Cost() float64 {
+	if m.TotalCostUSD != nil {
+		return *m.TotalCostUSD
+	}
+	return 0
+}
+
+// StreamEvent represents a streaming event with partial updates.
 type StreamEvent struct {
 	UUID            string         `json:"uuid"`
 	SessionID       string         `json:"session_id"`
@@ -563,7 +679,7 @@ func (m *StreamEvent) MessageType() string { return "stream_event" }
 **Step 4: Run tests**
 
 ```bash
-go test -run "TestUserMessage|TestAssistantMessage|TestSystemMessage|TestResultMessage" -v
+go test -run "TestUserMessage|TestAssistantMessage|TestSystemMessage|TestResultMessage|TestStreamEvent" -v
 ```
 
 Expected: PASS
@@ -577,7 +693,7 @@ git commit -m "feat: add message types"
 
 ---
 
-## Task 5: Define Options Types
+## Task 5: Define Options Types (Complete)
 
 **Files:**
 - Create: `options.go`
@@ -632,6 +748,52 @@ func TestOptionsWithEnv(t *testing.T) {
 		t.Errorf("got %q, want %q", opts.Env["FOO"], "bar")
 	}
 }
+
+func TestOptionsWithHooks(t *testing.T) {
+	opts := DefaultOptions()
+	callback := func(input any, toolUseID *string, ctx *HookContext) (*HookOutput, error) {
+		return &HookOutput{Continue: true}, nil
+	}
+	WithHook(HookPreToolUse, HookMatcher{
+		Matcher: strPtr("Bash"),
+		Hooks:   []HookCallback{callback},
+	})(opts)
+	if len(opts.Hooks[HookPreToolUse]) != 1 {
+		t.Error("expected 1 hook matcher")
+	}
+}
+
+func TestOptionsWithCanUseTool(t *testing.T) {
+	opts := DefaultOptions()
+	called := false
+	WithCanUseTool(func(toolName string, input map[string]any, ctx *ToolPermissionContext) (PermissionResult, error) {
+		called = true
+		return &PermissionResultAllow{}, nil
+	})(opts)
+	if opts.CanUseTool == nil {
+		t.Error("expected CanUseTool to be set")
+	}
+}
+
+func TestOptionsWithSandbox(t *testing.T) {
+	opts := DefaultOptions()
+	WithSandbox(SandboxSettings{Enabled: true})(opts)
+	if opts.Sandbox == nil || !opts.Sandbox.Enabled {
+		t.Error("expected sandbox to be enabled")
+	}
+}
+
+func TestOptionsWithAgents(t *testing.T) {
+	opts := DefaultOptions()
+	WithAgents(map[string]AgentDefinition{
+		"test": {Description: "Test agent", Prompt: "You are a test"},
+	})(opts)
+	if opts.Agents["test"].Description != "Test agent" {
+		t.Error("expected agent to be set")
+	}
+}
+
+func strPtr(s string) *string { return &s }
 ```
 
 **Step 2: Run test to verify it fails**
@@ -653,11 +815,90 @@ package sdk
 type PermissionMode string
 
 const (
-	PermissionDefault  PermissionMode = "default"
-	PermissionAccept   PermissionMode = "acceptEdits"
-	PermissionPlan     PermissionMode = "plan"
-	PermissionBypass   PermissionMode = "bypassPermissions"
+	PermissionDefault PermissionMode = "default"
+	PermissionAccept  PermissionMode = "acceptEdits"
+	PermissionPlan    PermissionMode = "plan"
+	PermissionBypass  PermissionMode = "bypassPermissions"
 )
+
+// SettingSource specifies where settings come from.
+type SettingSource string
+
+const (
+	SettingSourceUser    SettingSource = "user"
+	SettingSourceProject SettingSource = "project"
+	SettingSourceLocal   SettingSource = "local"
+)
+
+// SdkBeta represents beta feature flags.
+type SdkBeta string
+
+const (
+	BetaContext1M SdkBeta = "context-1m-2025-08-07"
+)
+
+// AgentModel specifies the model for custom agents.
+type AgentModel string
+
+const (
+	AgentModelSonnet  AgentModel = "sonnet"
+	AgentModelOpus    AgentModel = "opus"
+	AgentModelHaiku   AgentModel = "haiku"
+	AgentModelInherit AgentModel = "inherit"
+)
+
+// AgentDefinition defines a custom agent.
+type AgentDefinition struct {
+	Description string     `json:"description"`
+	Prompt      string     `json:"prompt"`
+	Tools       []string   `json:"tools,omitempty"`
+	Model       AgentModel `json:"model,omitempty"`
+}
+
+// PluginConfig defines a plugin configuration.
+type PluginConfig struct {
+	Type string `json:"type"` // "local"
+	Path string `json:"path"`
+}
+
+// SandboxNetworkConfig defines network isolation settings.
+type SandboxNetworkConfig struct {
+	AllowUnixSockets    []string `json:"allowUnixSockets,omitempty"`
+	AllowAllUnixSockets bool     `json:"allowAllUnixSockets,omitempty"`
+	AllowLocalBinding   bool     `json:"allowLocalBinding,omitempty"`
+	HTTPProxyPort       *int     `json:"httpProxyPort,omitempty"`
+	SocksProxyPort      *int     `json:"socksProxyPort,omitempty"`
+}
+
+// SandboxIgnoreViolations defines violation ignore rules.
+type SandboxIgnoreViolations struct {
+	File    []string `json:"file,omitempty"`
+	Network []string `json:"network,omitempty"`
+}
+
+// SandboxSettings defines sandbox configuration for isolation.
+type SandboxSettings struct {
+	Enabled                   bool                     `json:"enabled,omitempty"`
+	AutoAllowBashIfSandboxed  bool                     `json:"autoAllowBashIfSandboxed,omitempty"`
+	ExcludedCommands          []string                 `json:"excludedCommands,omitempty"`
+	AllowUnsandboxedCommands  bool                     `json:"allowUnsandboxedCommands,omitempty"`
+	Network                   *SandboxNetworkConfig    `json:"network,omitempty"`
+	IgnoreViolations          *SandboxIgnoreViolations `json:"ignoreViolations,omitempty"`
+	EnableWeakerNestedSandbox bool                     `json:"enableWeakerNestedSandbox,omitempty"`
+}
+
+// SystemPromptPreset allows using preset system prompts.
+type SystemPromptPreset struct {
+	Type   string  `json:"type"`   // "preset"
+	Preset string  `json:"preset"` // "claude_code"
+	Append *string `json:"append,omitempty"`
+}
+
+// ToolsPreset allows using preset tool configurations.
+type ToolsPreset struct {
+	Type   string `json:"type"`   // "preset"
+	Preset string `json:"preset"` // "claude_code"
+}
 
 // Options configures the Claude SDK client.
 type Options struct {
@@ -666,8 +907,8 @@ type Options struct {
 	AllowedTools    []string `json:"allowed_tools,omitempty"`
 	DisallowedTools []string `json:"disallowed_tools,omitempty"`
 
-	// System prompt
-	SystemPrompt       string `json:"system_prompt,omitempty"`
+	// System prompt - can be string or SystemPromptPreset
+	SystemPrompt       any    `json:"system_prompt,omitempty"`
 	AppendSystemPrompt string `json:"append_system_prompt,omitempty"`
 
 	// Model configuration
@@ -687,17 +928,21 @@ type Options struct {
 	MaxTurns          int     `json:"max_turns,omitempty"`
 	MaxBudgetUSD      float64 `json:"max_budget_usd,omitempty"`
 	MaxThinkingTokens int     `json:"max_thinking_tokens,omitempty"`
+	MaxBufferSize     int     `json:"max_buffer_size,omitempty"` // Max bytes for stdout buffering (default 1MB)
 
 	// Paths
-	Cwd     string `json:"cwd,omitempty"`
-	CLIPath string `json:"cli_path,omitempty"`
+	Cwd     string   `json:"cwd,omitempty"`
+	CLIPath string   `json:"cli_path,omitempty"`
 	AddDirs []string `json:"add_dirs,omitempty"`
 
 	// Environment
 	Env map[string]string `json:"env,omitempty"`
 
-	// MCP Servers
-	MCPServers map[string]MCPServerConfig `json:"mcp_servers,omitempty"`
+	// MCP Servers - can be dict or path to config file
+	MCPServers any `json:"mcp_servers,omitempty"`
+
+	// SDK MCP Servers (in-process)
+	SDKMCPServers map[string]*MCPServer `json:"-"`
 
 	// Streaming
 	IncludePartialMessages bool `json:"include_partial_messages,omitempty"`
@@ -705,28 +950,81 @@ type Options struct {
 	// File checkpointing
 	EnableFileCheckpointing bool `json:"enable_file_checkpointing,omitempty"`
 
-	// Output format
+	// Output format for structured outputs
 	OutputFormat map[string]any `json:"output_format,omitempty"`
 
 	// Extra CLI arguments
 	ExtraArgs map[string]string `json:"extra_args,omitempty"`
 
-	// Betas
-	Betas []string `json:"betas,omitempty"`
+	// Beta features
+	Betas []SdkBeta `json:"betas,omitempty"`
 
 	// Settings sources
-	SettingSources []string `json:"setting_sources,omitempty"`
-	Settings       string   `json:"settings,omitempty"`
+	SettingSources []SettingSource `json:"setting_sources,omitempty"`
+	Settings       string          `json:"settings,omitempty"`
+
+	// User identifier
+	User string `json:"user,omitempty"`
+
+	// Custom agents
+	Agents map[string]AgentDefinition `json:"agents,omitempty"`
+
+	// Sandbox configuration
+	Sandbox *SandboxSettings `json:"sandbox,omitempty"`
+
+	// Plugins
+	Plugins []PluginConfig `json:"plugins,omitempty"`
+
+	// Hooks
+	Hooks map[HookEvent][]HookMatcher `json:"-"`
+
+	// Permission callback
+	CanUseTool CanUseToolCallback `json:"-"`
+
+	// Stderr callback for debugging
+	StderrCallback func(string) `json:"-"`
+
+	// Internal: custom transport for testing
+	customTransport Transport `json:"-"`
 }
 
-// MCPServerConfig defines an MCP server.
+// MCPServerConfig defines an external MCP server.
 type MCPServerConfig struct {
-	Type    string            `json:"type"` // "stdio", "sse", "http"
+	Type    string            `json:"type"` // "stdio", "sse", "http", "sdk"
 	Command string            `json:"command,omitempty"`
 	Args    []string          `json:"args,omitempty"`
 	Env     map[string]string `json:"env,omitempty"`
 	URL     string            `json:"url,omitempty"`
 	Headers map[string]string `json:"headers,omitempty"`
+}
+
+// MCPServer represents an in-process SDK MCP server.
+type MCPServer struct {
+	Name    string
+	Version string
+	Tools   []*MCPTool
+}
+
+// MCPTool represents a tool in an MCP server.
+type MCPTool struct {
+	Name        string
+	Description string
+	Schema      map[string]any
+	Handler     MCPToolHandler
+}
+
+// MCPToolHandler is the function signature for MCP tool handlers.
+type MCPToolHandler func(args map[string]any) (*MCPToolResult, error)
+
+// MCPToolResult is the result of an MCP tool invocation.
+type MCPToolResult struct {
+	Content []MCPContent `json:"content"`
+}
+
+// MCPContent represents content in an MCP result.
+type MCPContent struct {
+	Type string `json:"type"` // "text", "image", etc.
+	Text string `json:"text,omitempty"`
 }
 
 // Option is a functional option for configuring Options.
@@ -735,7 +1033,9 @@ type Option func(*Options)
 // DefaultOptions returns options with sensible defaults.
 func DefaultOptions() *Options {
 	return &Options{
-		Env: make(map[string]string),
+		Env:           make(map[string]string),
+		Hooks:         make(map[HookEvent][]HookMatcher),
+		MaxBufferSize: 1024 * 1024, // 1MB default
 	}
 }
 
@@ -776,6 +1076,20 @@ func WithSystemPrompt(prompt string) Option {
 	}
 }
 
+// WithSystemPromptPreset sets a system prompt preset.
+func WithSystemPromptPreset(preset SystemPromptPreset) Option {
+	return func(o *Options) {
+		o.SystemPrompt = preset
+	}
+}
+
+// WithAppendSystemPrompt appends to the system prompt.
+func WithAppendSystemPrompt(prompt string) Option {
+	return func(o *Options) {
+		o.AppendSystemPrompt = prompt
+	}
+}
+
 // WithMaxTurns limits the number of conversation turns.
 func WithMaxTurns(n int) Option {
 	return func(o *Options) {
@@ -790,10 +1104,31 @@ func WithMaxBudget(usd float64) Option {
 	}
 }
 
+// WithMaxThinkingTokens sets max thinking tokens.
+func WithMaxThinkingTokens(tokens int) Option {
+	return func(o *Options) {
+		o.MaxThinkingTokens = tokens
+	}
+}
+
 // WithTools specifies which tools to enable.
 func WithTools(tools ...string) Option {
 	return func(o *Options) {
 		o.Tools = tools
+	}
+}
+
+// WithAllowedTools specifies allowed tools.
+func WithAllowedTools(tools ...string) Option {
+	return func(o *Options) {
+		o.AllowedTools = tools
+	}
+}
+
+// WithDisallowedTools specifies disallowed tools.
+func WithDisallowedTools(tools ...string) Option {
+	return func(o *Options) {
+		o.DisallowedTools = tools
 	}
 }
 
@@ -818,6 +1153,131 @@ func WithContinue() Option {
 	}
 }
 
+// WithForkSession forks the session.
+func WithForkSession() Option {
+	return func(o *Options) {
+		o.ForkSession = true
+	}
+}
+
+// WithFileCheckpointing enables file checkpointing.
+func WithFileCheckpointing() Option {
+	return func(o *Options) {
+		o.EnableFileCheckpointing = true
+	}
+}
+
+// WithPartialMessages enables partial message streaming.
+func WithPartialMessages() Option {
+	return func(o *Options) {
+		o.IncludePartialMessages = true
+	}
+}
+
+// WithOutputFormat sets structured output format.
+func WithOutputFormat(format map[string]any) Option {
+	return func(o *Options) {
+		o.OutputFormat = format
+	}
+}
+
+// WithBetas enables beta features.
+func WithBetas(betas ...SdkBeta) Option {
+	return func(o *Options) {
+		o.Betas = betas
+	}
+}
+
+// WithSettingSources sets the setting sources.
+func WithSettingSources(sources ...SettingSource) Option {
+	return func(o *Options) {
+		o.SettingSources = sources
+	}
+}
+
+// WithSettings sets the settings path or JSON.
+func WithSettings(settings string) Option {
+	return func(o *Options) {
+		o.Settings = settings
+	}
+}
+
+// WithSandbox enables sandbox mode.
+func WithSandbox(sandbox SandboxSettings) Option {
+	return func(o *Options) {
+		o.Sandbox = &sandbox
+	}
+}
+
+// WithAgents sets custom agent definitions.
+func WithAgents(agents map[string]AgentDefinition) Option {
+	return func(o *Options) {
+		o.Agents = agents
+	}
+}
+
+// WithPlugins sets plugin configurations.
+func WithPlugins(plugins ...PluginConfig) Option {
+	return func(o *Options) {
+		o.Plugins = plugins
+	}
+}
+
+// WithHook adds a hook for an event.
+func WithHook(event HookEvent, matcher HookMatcher) Option {
+	return func(o *Options) {
+		if o.Hooks == nil {
+			o.Hooks = make(map[HookEvent][]HookMatcher)
+		}
+		o.Hooks[event] = append(o.Hooks[event], matcher)
+	}
+}
+
+// WithCanUseTool sets the tool permission callback.
+func WithCanUseTool(callback CanUseToolCallback) Option {
+	return func(o *Options) {
+		o.CanUseTool = callback
+	}
+}
+
+// WithStderrCallback sets the stderr callback.
+func WithStderrCallback(callback func(string)) Option {
+	return func(o *Options) {
+		o.StderrCallback = callback
+	}
+}
+
+// WithMaxBufferSize sets the max buffer size for stdout.
+func WithMaxBufferSize(size int) Option {
+	return func(o *Options) {
+		o.MaxBufferSize = size
+	}
+}
+
+// WithMCPServers sets external MCP server configurations.
+func WithMCPServers(servers map[string]MCPServerConfig) Option {
+	return func(o *Options) {
+		o.MCPServers = servers
+	}
+}
+
+// WithSDKMCPServer adds an in-process MCP server.
+func WithSDKMCPServer(name string, server *MCPServer) Option {
+	return func(o *Options) {
+		if o.SDKMCPServers == nil {
+			o.SDKMCPServers = make(map[string]*MCPServer)
+		}
+		o.SDKMCPServers[name] = server
+	}
+}
+
+// WithTransport sets a custom transport (for testing).
+func WithTransport(t Transport) Option {
+	return func(o *Options) {
+		o.customTransport = t
+	}
+}
+
 // ApplyOptions applies functional options to an Options struct.
 func ApplyOptions(opts *Options, options ...Option) {
 	for _, opt := range options {
@@ -838,12 +1298,12 @@ Expected: PASS
 
 ```bash
 git add options.go options_test.go
-git commit -m "feat: add options types with functional options pattern"
+git commit -m "feat: add complete options types with functional options pattern"
 ```
 
 ---
 
-## Task 6: Define Hook Types
+## Task 6: Define Hook Types (Complete)
 
 **Files:**
 - Modify: `types.go`
@@ -875,6 +1335,7 @@ func TestHookInput(t *testing.T) {
 			SessionID:      "sess_123",
 			TranscriptPath: "/tmp/transcript.json",
 			Cwd:            "/home/user",
+			HookEventName:  "PreToolUse",
 		},
 		ToolName:  "Bash",
 		ToolInput: map[string]any{"command": "ls"},
@@ -883,7 +1344,38 @@ func TestHookInput(t *testing.T) {
 	if input.SessionID != "sess_123" {
 		t.Errorf("got %q, want %q", input.SessionID, "sess_123")
 	}
+	if input.HookEventName != "PreToolUse" {
+		t.Errorf("got %q, want %q", input.HookEventName, "PreToolUse")
+	}
 }
+
+func TestHookOutput(t *testing.T) {
+	output := &SyncHookOutput{
+		Continue:       boolPtr(true),
+		SuppressOutput: false,
+		Decision:       "allow",
+		HookSpecificOutput: map[string]any{
+			"hookEventName":      "PreToolUse",
+			"permissionDecision": "allow",
+		},
+	}
+	if output.Continue == nil || !*output.Continue {
+		t.Error("expected Continue to be true")
+	}
+}
+
+func TestAsyncHookOutput(t *testing.T) {
+	output := &AsyncHookOutput{
+		Async:        true,
+		AsyncTimeout: intPtr(30),
+	}
+	if !output.Async {
+		t.Error("expected Async to be true")
+	}
+}
+
+func boolPtr(b bool) *bool { return &b }
+func intPtr(i int) *int    { return &i }
 ```
 
 **Step 2: Run test to verify it fails**
@@ -903,13 +1395,18 @@ Add to `types.go`:
 type HookEvent string
 
 const (
-	HookPreToolUse        HookEvent = "PreToolUse"
-	HookPostToolUse       HookEvent = "PostToolUse"
-	HookUserPromptSubmit  HookEvent = "UserPromptSubmit"
-	HookStop              HookEvent = "Stop"
-	HookSubagentStop      HookEvent = "SubagentStop"
-	HookPreCompact        HookEvent = "PreCompact"
+	HookPreToolUse       HookEvent = "PreToolUse"
+	HookPostToolUse      HookEvent = "PostToolUse"
+	HookUserPromptSubmit HookEvent = "UserPromptSubmit"
+	HookStop             HookEvent = "Stop"
+	HookSubagentStop     HookEvent = "SubagentStop"
+	HookPreCompact       HookEvent = "PreCompact"
 )
+
+// HookContext provides context for hook callbacks.
+type HookContext struct {
+	Signal any // Future: abort signal support
+}
 
 // BaseHookInput contains fields common to all hook inputs.
 type BaseHookInput struct {
@@ -917,6 +1414,7 @@ type BaseHookInput struct {
 	TranscriptPath string `json:"transcript_path"`
 	Cwd            string `json:"cwd"`
 	PermissionMode string `json:"permission_mode,omitempty"`
+	HookEventName  string `json:"hook_event_name"` // Discriminator field for type safety
 }
 
 // PreToolUseHookInput is the input for PreToolUse hooks.
@@ -959,32 +1457,62 @@ type PreCompactHookInput struct {
 	CustomInstructions *string `json:"custom_instructions,omitempty"`
 }
 
-// HookOutput is the output from a hook callback.
+// AsyncHookOutput indicates the hook runs asynchronously.
+type AsyncHookOutput struct {
+	Async        bool `json:"async"`
+	AsyncTimeout *int `json:"asyncTimeout,omitempty"`
+}
+
+// SyncHookOutput is the output from a synchronous hook.
+type SyncHookOutput struct {
+	Continue           *bool          `json:"continue,omitempty"`
+	SuppressOutput     bool           `json:"suppressOutput,omitempty"`
+	StopReason         string         `json:"stopReason,omitempty"`
+	Decision           string         `json:"decision,omitempty"` // "block", "allow"
+	SystemMessage      string         `json:"systemMessage,omitempty"`
+	Reason             string         `json:"reason,omitempty"`
+	HookSpecificOutput map[string]any `json:"hookSpecificOutput,omitempty"`
+}
+
+// HookOutput is the combined output from a hook callback (sync or async).
 type HookOutput struct {
-	Continue       bool                   `json:"continue,omitempty"`
-	SuppressOutput bool                   `json:"suppressOutput,omitempty"`
-	StopReason     string                 `json:"stopReason,omitempty"`
-	Decision       string                 `json:"decision,omitempty"` // "block"
-	SystemMessage  string                 `json:"systemMessage,omitempty"`
-	Reason         string                 `json:"reason,omitempty"`
-	HookSpecific   map[string]any         `json:"hookSpecificOutput,omitempty"`
+	// For sync hooks
+	Continue           bool           `json:"continue,omitempty"`
+	SuppressOutput     bool           `json:"suppressOutput,omitempty"`
+	StopReason         string         `json:"stopReason,omitempty"`
+	Decision           string         `json:"decision,omitempty"`
+	SystemMessage      string         `json:"systemMessage,omitempty"`
+	Reason             string         `json:"reason,omitempty"`
+	HookSpecific       map[string]any `json:"hookSpecificOutput,omitempty"`
+
+	// For async hooks
+	Async        bool `json:"async,omitempty"`
+	AsyncTimeout *int `json:"asyncTimeout,omitempty"`
+}
+
+// PreToolUseHookSpecificOutput is the hook-specific output for PreToolUse.
+type PreToolUseHookSpecificOutput struct {
+	HookEventName            string         `json:"hookEventName"` // "PreToolUse"
+	PermissionDecision       string         `json:"permissionDecision,omitempty"`
+	PermissionDecisionReason string         `json:"permissionDecisionReason,omitempty"`
+	UpdatedInput             map[string]any `json:"updatedInput,omitempty"`
 }
 
 // HookCallback is the signature for hook callback functions.
-type HookCallback func(input any, toolUseID *string) (*HookOutput, error)
+type HookCallback func(input any, toolUseID *string, ctx *HookContext) (*HookOutput, error)
 
 // HookMatcher configures which hooks to run for an event.
 type HookMatcher struct {
-	Matcher  string         `json:"matcher,omitempty"` // e.g., "Bash" or "Write|Edit"
+	Matcher  *string        `json:"matcher,omitempty"` // e.g., "Bash" or "Write|Edit"
 	Hooks    []HookCallback `json:"-"`                 // Callbacks (not serialized)
-	Timeout  float64        `json:"timeout,omitempty"` // Timeout in seconds
+	Timeout  *float64       `json:"timeout,omitempty"` // Timeout in seconds
 }
 ```
 
 **Step 4: Run tests**
 
 ```bash
-go test -run "TestHookEvent|TestHookInput" -v
+go test -run "TestHookEvent|TestHookInput|TestHookOutput|TestAsyncHookOutput" -v
 ```
 
 Expected: PASS
@@ -993,12 +1521,12 @@ Expected: PASS
 
 ```bash
 git add types.go types_test.go
-git commit -m "feat: add hook types"
+git commit -m "feat: add complete hook types with async support"
 ```
 
 ---
 
-## Task 7: Define Control Protocol Types
+## Task 7: Define Control Protocol Types (Complete)
 
 **Files:**
 - Modify: `types.go`
@@ -1058,6 +1586,22 @@ func TestPermissionResult(t *testing.T) {
 		t.Errorf("got %q, want %q", deny.Behavior, "deny")
 	}
 }
+
+func TestControlRequestSubtypes(t *testing.T) {
+	subtypes := []string{
+		"initialize",
+		"interrupt",
+		"set_permission_mode",
+		"set_model",
+		"rewind_files",
+		"can_use_tool",
+		"hook_callback",
+		"mcp_message",
+	}
+	if len(subtypes) != 8 {
+		t.Errorf("expected 8 control request subtypes")
+	}
+}
 ```
 
 **Step 2: Run test to verify it fails**
@@ -1094,12 +1638,81 @@ type ControlResponse struct {
 	Response ControlResponseData `json:"response"`
 }
 
+// ControlErrorResponse is an error response from control operations.
+type ControlErrorResponse struct {
+	Subtype   string `json:"subtype"` // "error"
+	RequestID string `json:"request_id"`
+	Error     string `json:"error"`
+}
+
+// Specific control request types
+
+// ControlInitializeRequest initializes the session.
+type ControlInitializeRequest struct {
+	Subtype string         `json:"subtype"` // "initialize"
+	Hooks   map[string]any `json:"hooks,omitempty"`
+}
+
+// ControlInterruptRequest interrupts the current operation.
+type ControlInterruptRequest struct {
+	Subtype string `json:"subtype"` // "interrupt"
+}
+
+// ControlSetPermissionModeRequest changes the permission mode.
+type ControlSetPermissionModeRequest struct {
+	Subtype string `json:"subtype"` // "set_permission_mode"
+	Mode    string `json:"mode"`
+}
+
+// ControlSetModelRequest changes the AI model.
+type ControlSetModelRequest struct {
+	Subtype string  `json:"subtype"` // "set_model"
+	Model   *string `json:"model"`   // nil to reset
+}
+
+// ControlRewindFilesRequest rewinds files to a checkpoint.
+type ControlRewindFilesRequest struct {
+	Subtype       string `json:"subtype"` // "rewind_files"
+	UserMessageID string `json:"user_message_id"`
+}
+
+// ControlCanUseToolRequest asks for tool permission.
+type ControlCanUseToolRequest struct {
+	Subtype               string             `json:"subtype"` // "can_use_tool"
+	ToolName              string             `json:"tool_name"`
+	Input                 map[string]any     `json:"input"`
+	PermissionSuggestions []PermissionUpdate `json:"permission_suggestions,omitempty"`
+	BlockedPath           *string            `json:"blocked_path,omitempty"`
+}
+
+// ControlHookCallbackRequest invokes a hook callback.
+type ControlHookCallbackRequest struct {
+	Subtype    string `json:"subtype"` // "hook_callback"
+	CallbackID string `json:"callback_id"`
+	Input      any    `json:"input"`
+	ToolUseID  string `json:"tool_use_id,omitempty"`
+}
+
+// ControlMCPMessageRequest routes an MCP message.
+type ControlMCPMessageRequest struct {
+	Subtype    string         `json:"subtype"` // "mcp_message"
+	ServerName string         `json:"server_name"`
+	Message    map[string]any `json:"message"` // JSONRPC message
+}
+
+// PermissionResult is the interface for permission results.
+type PermissionResult interface {
+	isPermissionResult()
+}
+
 // PermissionResultAllow allows a tool to run.
 type PermissionResultAllow struct {
-	Behavior           string           `json:"behavior"` // "allow"
-	UpdatedInput       map[string]any   `json:"updatedInput,omitempty"`
+	Behavior           string             `json:"behavior"` // "allow"
+	UpdatedInput       map[string]any     `json:"updatedInput,omitempty"`
 	UpdatedPermissions []PermissionUpdate `json:"updatedPermissions,omitempty"`
 }
+
+func (r *PermissionResultAllow) isPermissionResult() {}
 
 // PermissionResultDeny denies a tool from running.
 type PermissionResultDeny struct {
@@ -1108,14 +1721,68 @@ type PermissionResultDeny struct {
 	Interrupt bool   `json:"interrupt,omitempty"`
 }
 
+func (r *PermissionResultDeny) isPermissionResult() {}
+
+// PermissionUpdateType represents the type of permission update.
+type PermissionUpdateType string
+
+const (
+	PermissionAddRules         PermissionUpdateType = "addRules"
+	PermissionReplaceRules     PermissionUpdateType = "replaceRules"
+	PermissionRemoveRules      PermissionUpdateType = "removeRules"
+	PermissionSetMode          PermissionUpdateType = "setMode"
+	PermissionAddDirectories   PermissionUpdateType = "addDirectories"
+	PermissionRemoveDirectories PermissionUpdateType = "removeDirectories"
+)
+
+// PermissionUpdateDestination represents where to apply the update.
+type PermissionUpdateDestination string
+
+const (
+	DestinationUserSettings    PermissionUpdateDestination = "userSettings"
+	DestinationProjectSettings PermissionUpdateDestination = "projectSettings"
+	DestinationLocalSettings   PermissionUpdateDestination = "localSettings"
+	DestinationSession         PermissionUpdateDestination = "session"
+)
+
 // PermissionUpdate describes a permission change.
 type PermissionUpdate struct {
-	Type        string   `json:"type"` // "addRules", "replaceRules", etc.
-	Rules       []PermissionRule `json:"rules,omitempty"`
-	Behavior    string   `json:"behavior,omitempty"` // "allow", "deny", "ask"
-	Mode        string   `json:"mode,omitempty"`
-	Directories []string `json:"directories,omitempty"`
-	Destination string   `json:"destination,omitempty"` // "userSettings", "projectSettings", etc.
+	Type        PermissionUpdateType        `json:"type"`
+	Rules       []PermissionRule            `json:"rules,omitempty"`
+	Behavior    string                      `json:"behavior,omitempty"` // "allow", "deny", "ask"
+	Mode        string                      `json:"mode,omitempty"`
+	Directories []string                    `json:"directories,omitempty"`
+	Destination PermissionUpdateDestination `json:"destination,omitempty"`
+}
+
+// ToDict converts PermissionUpdate to a map for control protocol.
+func (p *PermissionUpdate) ToDict() map[string]any {
+	result := map[string]any{
+		"type": p.Type,
+	}
+	if len(p.Rules) > 0 {
+		rules := make([]map[string]any, len(p.Rules))
+		for i, r := range p.Rules {
+			rules[i] = map[string]any{"toolName": r.ToolName}
+			if r.RuleContent != nil {
+				rules[i]["ruleContent"] = *r.RuleContent
+			}
+		}
+		result["rules"] = rules
+	}
+	if p.Behavior != "" {
+		result["behavior"] = p.Behavior
+	}
+	if p.Mode != "" {
+		result["mode"] = p.Mode
+	}
+	if len(p.Directories) > 0 {
+		result["directories"] = p.Directories
+	}
+	if p.Destination != "" {
+		result["destination"] = p.Destination
+	}
+	return result
 }
 
 // PermissionRule defines a permission rule.
@@ -1128,6 +1795,7 @@ type PermissionRule struct {
 type ToolPermissionContext struct {
 	Signal      any                `json:"-"` // Future: abort signal
 	Suggestions []PermissionUpdate `json:"suggestions,omitempty"`
+	BlockedPath *string            `json:"blocked_path,omitempty"`
 }
 
 // CanUseToolCallback is called when a tool needs permission.
@@ -1135,13 +1803,13 @@ type CanUseToolCallback func(
 	toolName string,
 	input map[string]any,
 	ctx *ToolPermissionContext,
-) (any, error) // Returns PermissionResultAllow or PermissionResultDeny
+) (PermissionResult, error)
 ```
 
 **Step 4: Run tests**
 
 ```bash
-go test -run "TestControlRequest|TestControlResponse|TestPermissionResult" -v
+go test -run "TestControlRequest|TestControlResponse|TestPermissionResult|TestControlRequestSubtypes" -v
 ```
 
 Expected: PASS
@@ -1150,7 +1818,7 @@ Expected: PASS
 
 ```bash
 git add types.go types_test.go
-git commit -m "feat: add control protocol types"
+git commit -m "feat: add complete control protocol types"
 ```
 
 ---
@@ -1300,12 +1968,26 @@ git commit -m "feat: add Transport interface"
 After completing Plan 01, you have:
 
 - [x] Go module initialized
-- [x] Error types with sentinel errors
+- [x] Error types with sentinel errors (SDKError, CLINotFoundError, ConnectionError, ProcessError, JSONDecodeError, MessageParseError)
 - [x] Content block types (Text, Thinking, ToolUse, ToolResult)
-- [x] Message types (User, Assistant, System, Result, StreamEvent)
-- [x] Options with functional options pattern
-- [x] Hook types
-- [x] Control protocol types
+- [x] Message types (User, Assistant, System, Result, StreamEvent) with AssistantMessageError enum
+- [x] Complete Options with:
+  - All 50+ configuration fields matching Python
+  - Functional options pattern
+  - Sandbox configuration
+  - Agent definitions
+  - Plugin configuration
+  - MCP server configuration
+- [x] Complete Hook types:
+  - All 6 hook events
+  - Async and sync hook outputs
+  - Hook-specific outputs
+  - HookContext with abort signal support
+- [x] Complete Control protocol types:
+  - All 8 control request subtypes
+  - Permission results (Allow/Deny)
+  - Permission updates with ToDict()
+  - Tool permission context
 - [x] Transport interface
 
 **Next:** Plan 02 - Transport Layer (subprocess implementation)
