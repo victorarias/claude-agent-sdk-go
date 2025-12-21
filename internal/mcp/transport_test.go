@@ -12,10 +12,10 @@ import (
 )
 
 func TestMCPServerTransport_ProcessOne(t *testing.T) {
-	server := NewMCPServerBuilder("test").
-		WithTool("add", "Add numbers", nil, func(input map[string]any) (*MCPToolResult, error) {
-			return &MCPToolResult{
-				Content: []MCPContent{{Type: "text", Text: "result"}},
+	server := types.NewMCPServerBuilder("test").
+		WithTool("add", "Add numbers", nil, func(input map[string]any) (*types.MCPToolResult, error) {
+			return &types.MCPToolResult{
+				Content: []types.MCPContent{{Type: "text", Text: "result"}},
 			}, nil
 		}).
 		Build()
@@ -57,11 +57,11 @@ func TestMCPServerTransport_ProcessOne(t *testing.T) {
 }
 
 func TestMCPServerTransport_ToolsCall(t *testing.T) {
-	server := NewMCPServerBuilder("test").
-		WithTool("greet", "Greet someone", nil, func(input map[string]any) (*MCPToolResult, error) {
+	server := types.NewMCPServerBuilder("test").
+		WithTool("greet", "Greet someone", nil, func(input map[string]any) (*types.MCPToolResult, error) {
 			name := input["name"].(string)
-			return &MCPToolResult{
-				Content: []MCPContent{{Type: "text", Text: "Hello, " + name + "!"}},
+			return &types.MCPToolResult{
+				Content: []types.MCPContent{{Type: "text", Text: "Hello, " + name + "!"}},
 			}, nil
 		}).
 		Build()
@@ -98,11 +98,11 @@ func TestMCPServerTransport_ToolsCall(t *testing.T) {
 }
 
 func TestMCPServerTransport_MultipleRequests(t *testing.T) {
-	server := NewMCPServerBuilder("test").
-		WithTool("echo", "Echo input", nil, func(input map[string]any) (*MCPToolResult, error) {
+	server := types.NewMCPServerBuilder("test").
+		WithTool("echo", "Echo input", nil, func(input map[string]any) (*types.MCPToolResult, error) {
 			text := input["text"].(string)
-			return &MCPToolResult{
-				Content: []MCPContent{{Type: "text", Text: text}},
+			return &types.MCPToolResult{
+				Content: []types.MCPContent{{Type: "text", Text: text}},
 			}, nil
 		}).
 		Build()
@@ -143,7 +143,7 @@ func TestMCPServerTransport_MultipleRequests(t *testing.T) {
 }
 
 func TestMCPServerTransport_Run(t *testing.T) {
-	server := NewMCPServerBuilder("test").Build()
+	server := types.NewMCPServerBuilder("test").Build()
 
 	// Create a reader that will return EOF
 	input := bytes.NewBufferString("")
@@ -162,7 +162,7 @@ func TestMCPServerTransport_Run(t *testing.T) {
 }
 
 func TestMCPServerTransport_RunContextCancel(t *testing.T) {
-	server := NewMCPServerBuilder("test").Build()
+	server := types.NewMCPServerBuilder("test").Build()
 
 	// Create a pipe so we can control the input
 	pr, _ := io.Pipe()
@@ -191,7 +191,7 @@ func TestMCPServerTransport_RunContextCancel(t *testing.T) {
 }
 
 func TestMCPServerTransport_EmptyLines(t *testing.T) {
-	server := NewMCPServerBuilder("test").Build()
+	server := types.NewMCPServerBuilder("test").Build()
 
 	clientToServer := bytes.NewBufferString("\n\n\n")
 	serverToClient := &bytes.Buffer{}
@@ -212,7 +212,7 @@ func TestMCPServerTransport_EmptyLines(t *testing.T) {
 }
 
 func TestMCPServerTransport_InvalidJSON(t *testing.T) {
-	server := NewMCPServerBuilder("test").Build()
+	server := types.NewMCPServerBuilder("test").Build()
 
 	clientToServer := bytes.NewBufferString("not valid json\n")
 	serverToClient := &bytes.Buffer{}

@@ -47,10 +47,10 @@ func TestMCPHandler_Initialize(t *testing.T) {
 func TestMCPHandler_ToolsList(t *testing.T) {
 	server := types.NewMCPServerBuilder("test").
 		WithTool("greet", "Greet someone", nil, func(args map[string]any) (*types.MCPToolResult, error) {
-			return &MCPToolResult{Content: []types.MCPContent{{Type: "text", Text: "hello"}}}, nil
+			return &types.MCPToolResult{Content: []types.MCPContent{{Type: "text", Text: "hello"}}}, nil
 		}).
 		WithTool("calculate", "Do math", nil, func(args map[string]any) (*types.MCPToolResult, error) {
-			return &MCPToolResult{Content: []types.MCPContent{{Type: "text", Text: "4"}}}, nil
+			return &types.MCPToolResult{Content: []types.MCPContent{{Type: "text", Text: "4"}}}, nil
 		}).
 		Build()
 	handler := NewMCPHandler(server)
@@ -85,7 +85,7 @@ func TestMCPHandler_ToolsCall(t *testing.T) {
 			},
 		}, func(args map[string]any) (*types.MCPToolResult, error) {
 			name := args["name"].(string)
-			return &MCPToolResult{
+			return &types.MCPToolResult{
 				Content: []types.MCPContent{{Type: "text", Text: "Hello, " + name + "!"}},
 			}, nil
 		}).
@@ -178,7 +178,7 @@ func TestMCPHandler_HandleBytes(t *testing.T) {
 	server := types.NewMCPServerBuilder("test").
 		WithTool("echo", "Echo input", nil, func(args map[string]any) (*types.MCPToolResult, error) {
 			text, _ := args["text"].(string)
-			return &MCPToolResult{
+			return &types.MCPToolResult{
 				Content: []types.MCPContent{{Type: "text", Text: text}},
 			}, nil
 		}).
