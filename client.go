@@ -497,3 +497,73 @@ func (c *Client) SetModel(model string) error {
 
 	return q.SetModel(model)
 }
+
+// RewindFiles rewinds tracked files to a specific user message.
+func (c *Client) RewindFiles(userMessageID string) error {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		return &ConnectionError{Message: "not connected"}
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	return q.RewindFiles(userMessageID)
+}
+
+// ServerInfo returns the initialization info.
+func (c *Client) ServerInfo() map[string]any {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.query != nil {
+		return c.query.InitResult()
+	}
+	return nil
+}
+
+// ResultReceived returns true if a result has been received.
+func (c *Client) ResultReceived() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.query != nil {
+		return c.query.ResultReceived()
+	}
+	return false
+}
+
+// LastResult returns the last result message.
+func (c *Client) LastResult() *ResultMessage {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.query != nil {
+		return c.query.LastResult()
+	}
+	return nil
+}
+
+// ClientFunc is a function that uses a client.
+type ClientFunc func(*Client) error
+
+// WithClient creates a client, connects, runs the function, and ensures cleanup.
+func WithClient(ctx context.Context, opts []Option, fn ClientFunc) error {
+	client := NewClient(opts...)
+
+	if err := client.Connect(ctx); err != nil {
+		return err
+	}
+	defer client.Close()
+
+	return fn(client)
+}
+
+// Run connects and runs a function with the client.
+func (c *Client) Run(ctx context.Context, fn func() error) error {
+	if err := c.Connect(ctx); err != nil {
+		return err
+	}
+	defer c.Close()
+	return fn()
+}
