@@ -619,6 +619,16 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 	// Build command
 	args := buildCommand(cliPath, t.prompt, t.options, t.streaming)
 
+	// Track temp files created during command optimization
+	// If --agents arg starts with @, it's a temp file reference
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == "--agents" && strings.HasPrefix(args[i+1], "@") {
+			tempFilePath := strings.TrimPrefix(args[i+1], "@")
+			t.AddTempFile(tempFilePath)
+			break
+		}
+	}
+
 	// Check command length on Windows
 	if err := checkCommandLength(args); err != nil {
 		return &types.ConnectionError{Message: err.Error()}
