@@ -563,6 +563,153 @@ func (q *Query) handleMCPToolCall(request map[string]any) (map[string]any, error
 	return map[string]any{"result": result}, nil
 }
 
+// handleMCPMessage handles MCP JSONRPC messages for SDK-hosted MCP servers.
+// This bridges JSONRPC messages from the CLI to the in-process MCP server.
+func (q *Query) handleMCPMessage(serverName string, message map[string]any) (any, error) {
+	q.mcpServersMu.RLock()
+	server, exists := q.mcpServers[serverName]
+	q.mcpServersMu.RUnlock()
+
+	if !exists {
+		// Return JSONRPC error response for server not found
+		return map[string]any{
+			"jsonrpc": "2.0",
+			"id":      message["id"],
+			"error": map[string]any{
+				"code":    -32601,
+				"message": fmt.Sprintf("Server '%s' not found", serverName),
+			},
+		}, nil
+	}
+
+	method, _ := message["method"].(string)
+	params, _ := message["params"].(map[string]any)
+	if params == nil {
+		params = make(map[string]any)
+	}
+	msgID := message["id"]
+
+	// Handle notifications (no ID)
+	if msgID == nil {
+		switch method {
+		case "notifications/initialized":
+			// Acknowledged, no response needed
+			return nil, nil
+		case "notifications/cancelled":
+			// TODO: Implement cancellation
+			return nil, nil
+		}
+		return nil, nil
+	}
+
+	// Handle requests
+	switch method {
+	case "initialize":
+		return map[string]any{
+			"jsonrpc": "2.0",
+			"id":      msgID,
+			"result": map[string]any{
+				"protocolVersion": "2024-11-05",
+				"capabilities": map[string]any{
+					"tools": map[string]any{},
+				},
+				"serverInfo": map[string]any{
+					"name":    server.Name,
+					"version": server.Version,
+				},
+			},
+		}, nil
+
+	case "tools/list":
+		tools := make([]any, 0, len(server.Tools))
+		for _, tool := range server.Tools {
+			schema := tool.Schema
+			if schema == nil {
+				schema = map[string]any{"type": "object"}
+			}
+			tools = append(tools, map[string]any{
+				"name":        tool.Name,
+				"description": tool.Description,
+				"inputSchema": schema,
+			})
+		}
+		return map[string]any{
+			"jsonrpc": "2.0",
+			"id":      msgID,
+			"result": map[string]any{
+				"tools": tools,
+			},
+		}, nil
+
+	case "tools/call":
+		toolName, _ := params["name"].(string)
+		args, _ := params["arguments"].(map[string]any)
+		if args == nil {
+			args = make(map[string]any)
+		}
+
+		result, err := server.CallTool(toolName, args)
+		if err != nil {
+			return map[string]any{
+				"jsonrpc": "2.0",
+				"id":      msgID,
+				"error": map[string]any{
+					"code":    -32603,
+					"message": err.Error(),
+				},
+			}, nil
+		}
+
+		// Convert result to response format
+		content := make([]any, len(result.Content))
+		for i, item := range result.Content {
+			contentItem := map[string]any{
+				"type": item.Type,
+			}
+			if item.Text != "" {
+				contentItem["text"] = item.Text
+			}
+			if item.Data != "" {
+				contentItem["data"] = item.Data
+			}
+			if item.MimeType != "" {
+				contentItem["mimeType"] = item.MimeType
+			}
+			content[i] = contentItem
+		}
+
+		responseData := map[string]any{
+			"content": content,
+		}
+		if result.IsError {
+			responseData["isError"] = true
+		}
+
+		return map[string]any{
+			"jsonrpc": "2.0",
+			"id":      msgID,
+			"result":  responseData,
+		}, nil
+
+	case "ping":
+		return map[string]any{
+			"jsonrpc": "2.0",
+			"id":      msgID,
+			"result":  map[string]any{},
+		}, nil
+
+	default:
+		return map[string]any{
+			"jsonrpc": "2.0",
+			"id":      msgID,
+			"error": map[string]any{
+				"code":    -32601,
+				"message": fmt.Sprintf("Method '%s' not found", method),
+			},
+		}, nil
+	}
+}
+
 // handleCancelRequest handles a request cancellation.
 func (q *Query) handleCancelRequest(raw map[string]any) {
 	requestID, _ := raw["request_id"].(string)
