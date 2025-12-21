@@ -169,7 +169,7 @@ func (m *AssistantMessage) Text() string {
 	var result string
 	for _, block := range m.Content {
 		if textBlock, ok := block.(*TextBlock); ok {
-			result += textBlock.Text
+			result += textBlock.TextContent
 		}
 	}
 	return result
@@ -186,11 +186,11 @@ func (m *AssistantMessage) ToolCalls() []*ToolUseBlock {
 	return tools
 }
 
-// Thinking returns the thinking content if present.
-func (m *AssistantMessage) Thinking() string {
+// GetThinking returns the thinking content if present.
+func (m *AssistantMessage) GetThinking() string {
 	for _, block := range m.Content {
 		if thinkingBlock, ok := block.(*ThinkingBlock); ok {
-			return thinkingBlock.Thinking
+			return thinkingBlock.ThinkingContent
 		}
 	}
 	return ""
