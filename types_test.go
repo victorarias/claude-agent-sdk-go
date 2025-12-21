@@ -25,8 +25,8 @@ func TestToolUseBlock(t *testing.T) {
 
 func TestThinkingBlock(t *testing.T) {
 	block := ThinkingBlock{
-		Thinking:  "Let me think...",
-		Signature: "sig123",
+		ThinkingContent: "Let me think...",
+		Signature:       "sig123",
 	}
 	if block.BlockType() != "thinking" {
 		t.Errorf("got %q, want %q", block.BlockType(), "thinking")
@@ -35,9 +35,9 @@ func TestThinkingBlock(t *testing.T) {
 
 func TestToolResultBlock(t *testing.T) {
 	block := ToolResultBlock{
-		ToolUseID: "tool_123",
-		Content:   "output",
-		IsError:   false,
+		ToolUseID:     "tool_123",
+		ResultContent: "output",
+		IsError:       false,
 	}
 	if block.BlockType() != "tool_result" {
 		t.Errorf("got %q, want %q", block.BlockType(), "tool_result")
@@ -60,8 +60,8 @@ func TestContentBlockJSON(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *TextBlock, got %T", block)
 	}
-	if textBlock.Text != "hello" {
-		t.Errorf("got %q, want %q", textBlock.Text, "hello")
+	if textBlock.TextContent != "hello" {
+		t.Errorf("got %q, want %q", textBlock.TextContent, "hello")
 	}
 }
 
