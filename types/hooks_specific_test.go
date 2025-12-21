@@ -384,6 +384,98 @@ func TestNewPostToolUseOutput(t *testing.T) {
 	}
 }
 
+// TestNewSessionStartOutput tests the helper function for creating SessionStart hook outputs.
+func TestNewSessionStartOutput(t *testing.T) {
+	tests := []struct {
+		name               string
+		additionalContext  string
+		wantContext        bool
+	}{
+		{
+			name:        "with additional context",
+			additionalContext: "Session initialized with custom settings",
+			wantContext: true,
+		},
+		{
+			name:        "without additional context",
+			additionalContext: "",
+			wantContext: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output := NewSessionStartOutput(tt.additionalContext)
+
+			if output.HookSpecific == nil {
+				t.Fatal("HookSpecific is nil")
+			}
+
+			if output.HookSpecific["hookEventName"] != "SessionStart" {
+				t.Errorf("hookEventName: got %v, want 'SessionStart'", output.HookSpecific["hookEventName"])
+			}
+
+			if tt.wantContext {
+				if _, ok := output.HookSpecific["additionalContext"]; !ok {
+					t.Error("expected additionalContext to be present")
+				}
+				if output.HookSpecific["additionalContext"] != tt.additionalContext {
+					t.Errorf("additionalContext: got %v, want %v", output.HookSpecific["additionalContext"], tt.additionalContext)
+				}
+			} else {
+				if _, ok := output.HookSpecific["additionalContext"]; ok {
+					t.Error("expected additionalContext to be absent")
+				}
+			}
+		})
+	}
+}
+
+// TestNewSessionStartOutputJSON tests that NewSessionStartOutput produces correct JSON serialization.
+func TestNewSessionStartOutputJSON(t *testing.T) {
+	tests := []struct {
+		name               string
+		additionalContext  string
+		expected           string
+	}{
+		{
+			name:        "with additional context",
+			additionalContext: "Session context",
+			expected: `{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"Session context"}}`,
+		},
+		{
+			name:        "without additional context",
+			additionalContext: "",
+			expected: `{"hookSpecificOutput":{"hookEventName":"SessionStart"}}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output := NewSessionStartOutput(tt.additionalContext)
+
+			data, err := json.Marshal(output)
+			if err != nil {
+				t.Fatalf("failed to marshal HookOutput: %v", err)
+			}
+
+			// Parse both to compare as maps to avoid field ordering issues
+			var got, want map[string]any
+			if err := json.Unmarshal(data, &got); err != nil {
+				t.Fatalf("failed to unmarshal result: %v", err)
+			}
+			if err := json.Unmarshal([]byte(tt.expected), &want); err != nil {
+				t.Fatalf("failed to unmarshal expected: %v", err)
+			}
+
+			// Compare nested structures
+			if !deepMapsEqual(got, want) {
+				t.Errorf("JSON mismatch:\ngot:  %s\nwant: %s", string(data), tt.expected)
+			}
+		})
+	}
+}
+
 // Helper function for deep map comparison including nested maps
 func deepMapsEqual(a, b map[string]any) bool {
 	if len(a) != len(b) {

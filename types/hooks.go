@@ -54,3 +54,19 @@ func NewUserPromptSubmitOutput(additionalContext string) *HookOutput {
 		HookSpecific: hookSpecific,
 	}
 }
+
+// NewSessionStartOutput creates a HookOutput for SessionStart events with hook-specific fields.
+// The additionalContext parameter is optional and provides context about the session start.
+func NewSessionStartOutput(additionalContext string) *HookOutput {
+	hookSpecific := map[string]any{
+		"hookEventName": "SessionStart",
+	}
+
+	if additionalContext != "" {
+		hookSpecific["additionalContext"] = additionalContext
+	}
+
+	return &HookOutput{
+		HookSpecific: hookSpecific,
+	}
+}
