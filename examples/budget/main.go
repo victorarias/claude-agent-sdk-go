@@ -13,7 +13,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	sdk "github.com/victorarias/claude-agent-sdk-go"
