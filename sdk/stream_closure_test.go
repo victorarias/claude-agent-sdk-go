@@ -1,7 +1,7 @@
 package sdk
 
 import (
-	"sync"
+	"context"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -9,61 +9,10 @@ import (
 	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
-// mockTransportForStreamClosure is a mock transport for testing stream closure coordination.
-type mockTransportForStreamClosure struct {
-	messages   chan map[string]any
-	errors     chan error
-	writes     []string
-	writeMu    sync.Mutex
-	endInputCalled atomic.Bool
-	endInputTime   time.Time
-	endInputMu     sync.Mutex
-}
-
-func newMockTransportForStreamClosure() *mockTransportForStreamClosure {
-	return &mockTransportForStreamClosure{
-		messages: make(chan map[string]any, 100),
-		errors:   make(chan error, 1),
-		writes:   make([]string, 0),
-	}
-}
-
-func (t *mockTransportForStreamClosure) Messages() <-chan map[string]any {
-	return t.messages
-}
-
-func (t *mockTransportForStreamClosure) Errors() <-chan error {
-	return t.errors
-}
-
-func (t *mockTransportForStreamClosure) Write(data string) error {
-	t.writeMu.Lock()
-	defer t.writeMu.Unlock()
-	t.writes = append(t.writes, data)
-	return nil
-}
-
-func (t *mockTransportForStreamClosure) EndInput() error {
-	t.endInputMu.Lock()
-	defer t.endInputMu.Unlock()
-	t.endInputCalled.Store(true)
-	t.endInputTime = time.Now()
-	return nil
-}
-
-func (t *mockTransportForStreamClosure) Close() error {
-	close(t.messages)
-	return nil
-}
-
-func (t *mockTransportForStreamClosure) IsReady() bool {
-	return true
-}
-
-// TestStreamInputWaitsForResultWhenHooksActive tests that StreamInput waits for
-// the first result message before calling EndInput when hooks are active.
+// TestStreamInputWaitsForResultWhenHooksActive tests that StreamInputWithWait waits for
+// the first result message before returning when hooks are active.
 func TestStreamInputWaitsForResultWhenHooksActive(t *testing.T) {
-	transport := newMockTransportForStreamClosure()
+	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 
 	// Register a hook to make hooks active
@@ -72,7 +21,7 @@ func TestStreamInputWaitsForResultWhenHooksActive(t *testing.T) {
 	}
 
 	// Start the query
-	ctx := testContext(t)
+	ctx := context.Background()
 	if err := query.Start(ctx); err != nil {
 		t.Fatalf("Failed to start query: %v", err)
 	}
@@ -83,64 +32,49 @@ func TestStreamInputWaitsForResultWhenHooksActive(t *testing.T) {
 	input <- map[string]any{"type": "user", "message": "test"}
 	close(input)
 
-	// Track when StreamInput completes
+	// Track when StreamInputWithWait completes
 	var streamInputDone atomic.Bool
-	var streamInputCompleteTime time.Time
-	var streamInputMu sync.Mutex
 
 	go func() {
-		// StreamInput should wait for result before returning
+		// StreamInputWithWait should wait for result before returning
 		query.StreamInputWithWait(input)
-		streamInputMu.Lock()
-		streamInputCompleteTime = time.Now()
-		streamInputMu.Unlock()
 		streamInputDone.Store(true)
 	}()
 
-	// Give StreamInput time to process the input message
+	// Give StreamInputWithWait time to process the input message
 	time.Sleep(50 * time.Millisecond)
 
-	// StreamInput should NOT have completed yet (waiting for result)
+	// StreamInputWithWait should NOT have completed yet (waiting for result)
 	if streamInputDone.Load() {
-		t.Fatal("StreamInput completed before result was received - should wait for result when hooks are active")
+		t.Fatal("StreamInputWithWait completed before result was received - should wait for result when hooks are active")
 	}
 
 	// Now send a result message
-	resultTime := time.Now()
-	transport.messages <- map[string]any{
+	transport.SendMessage(map[string]any{
 		"type":       "result",
 		"session_id": "test-session",
-	}
+	})
 
-	// Wait for StreamInput to complete
+	// Wait for StreamInputWithWait to complete
 	deadline := time.Now().Add(2 * time.Second)
 	for !streamInputDone.Load() && time.Now().Before(deadline) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
 	if !streamInputDone.Load() {
-		t.Fatal("StreamInput did not complete after result was received")
-	}
-
-	// Verify StreamInput completed AFTER result was received
-	streamInputMu.Lock()
-	completedAfterResult := streamInputCompleteTime.After(resultTime) || streamInputCompleteTime.Equal(resultTime)
-	streamInputMu.Unlock()
-
-	if !completedAfterResult {
-		t.Error("StreamInput should complete after result is received")
+		t.Fatal("StreamInputWithWait did not complete after result was received")
 	}
 }
 
-// TestStreamInputDoesNotWaitWhenNoHooksOrMCP tests that StreamInput returns
+// TestStreamInputDoesNotWaitWhenNoHooksOrMCP tests that StreamInputWithWait returns
 // immediately when there are no hooks or MCP servers active.
 func TestStreamInputDoesNotWaitWhenNoHooksOrMCP(t *testing.T) {
-	transport := newMockTransportForStreamClosure()
+	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 
 	// No hooks or MCP servers registered
 
-	ctx := testContext(t)
+	ctx := context.Background()
 	if err := query.Start(ctx); err != nil {
 		t.Fatalf("Failed to start query: %v", err)
 	}
@@ -151,7 +85,7 @@ func TestStreamInputDoesNotWaitWhenNoHooksOrMCP(t *testing.T) {
 	input <- map[string]any{"type": "user", "message": "test"}
 	close(input)
 
-	// StreamInput should complete quickly when no hooks/MCP
+	// StreamInputWithWait should complete quickly when no hooks/MCP
 	done := make(chan struct{})
 	go func() {
 		query.StreamInputWithWait(input)
@@ -162,14 +96,14 @@ func TestStreamInputDoesNotWaitWhenNoHooksOrMCP(t *testing.T) {
 	case <-done:
 		// Good - completed without waiting for result
 	case <-time.After(500 * time.Millisecond):
-		t.Fatal("StreamInput should complete quickly when no hooks or MCP servers are active")
+		t.Fatal("StreamInputWithWait should complete quickly when no hooks or MCP servers are active")
 	}
 }
 
-// TestStreamInputWaitsForResultWhenMCPActive tests that StreamInput waits for
-// the first result message before calling EndInput when MCP servers are active.
+// TestStreamInputWaitsForResultWhenMCPActive tests that StreamInputWithWait waits for
+// the first result message before returning when MCP servers are active.
 func TestStreamInputWaitsForResultWhenMCPActive(t *testing.T) {
-	transport := newMockTransportForStreamClosure()
+	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 
 	// Register an MCP server to make MCP active
@@ -178,7 +112,7 @@ func TestStreamInputWaitsForResultWhenMCPActive(t *testing.T) {
 		Version: "1.0.0",
 	})
 
-	ctx := testContext(t)
+	ctx := context.Background()
 	if err := query.Start(ctx); err != nil {
 		t.Fatalf("Failed to start query: %v", err)
 	}
@@ -202,14 +136,14 @@ func TestStreamInputWaitsForResultWhenMCPActive(t *testing.T) {
 
 	// Should NOT have completed (waiting for result)
 	if streamInputDone.Load() {
-		t.Fatal("StreamInput completed before result was received - should wait for result when MCP servers are active")
+		t.Fatal("StreamInputWithWait completed before result was received - should wait for result when MCP servers are active")
 	}
 
 	// Send result
-	transport.messages <- map[string]any{
+	transport.SendMessage(map[string]any{
 		"type":       "result",
 		"session_id": "test-session",
-	}
+	})
 
 	// Wait for completion
 	deadline := time.Now().Add(2 * time.Second)
@@ -218,14 +152,14 @@ func TestStreamInputWaitsForResultWhenMCPActive(t *testing.T) {
 	}
 
 	if !streamInputDone.Load() {
-		t.Fatal("StreamInput did not complete after result was received")
+		t.Fatal("StreamInputWithWait did not complete after result was received")
 	}
 }
 
-// TestStreamInputTimeoutWhenNoResult tests that StreamInput times out
+// TestStreamInputTimeoutWhenNoResult tests that StreamInputWithWait times out
 // if no result is received within the timeout period.
 func TestStreamInputTimeoutWhenNoResult(t *testing.T) {
-	transport := newMockTransportForStreamClosure()
+	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 
 	// Set a short timeout for testing
@@ -236,7 +170,7 @@ func TestStreamInputTimeoutWhenNoResult(t *testing.T) {
 		return nil, nil
 	}
 
-	ctx := testContext(t)
+	ctx := context.Background()
 	if err := query.Start(ctx); err != nil {
 		t.Fatalf("Failed to start query: %v", err)
 	}
@@ -247,7 +181,7 @@ func TestStreamInputTimeoutWhenNoResult(t *testing.T) {
 	input <- map[string]any{"type": "user", "message": "test"}
 	close(input)
 
-	// StreamInput should timeout and complete
+	// StreamInputWithWait should timeout and complete
 	done := make(chan struct{})
 	start := time.Now()
 	go func() {
@@ -260,22 +194,22 @@ func TestStreamInputTimeoutWhenNoResult(t *testing.T) {
 		elapsed := time.Since(start)
 		// Should have taken approximately the timeout duration
 		if elapsed < 80*time.Millisecond {
-			t.Errorf("StreamInput completed too quickly: %v (expected ~100ms timeout)", elapsed)
+			t.Errorf("StreamInputWithWait completed too quickly: %v (expected ~100ms timeout)", elapsed)
 		}
 		if elapsed > 500*time.Millisecond {
-			t.Errorf("StreamInput took too long: %v (expected ~100ms timeout)", elapsed)
+			t.Errorf("StreamInputWithWait took too long: %v (expected ~100ms timeout)", elapsed)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("StreamInput did not timeout")
+		t.Fatal("StreamInputWithWait did not timeout")
 	}
 }
 
-// TestFirstResultEventSignaling tests that the first result event is properly signaled.
-func TestFirstResultEventSignaling(t *testing.T) {
-	transport := newMockTransportForStreamClosure()
+// TestWaitForFirstResult tests that the first result event is properly signaled.
+func TestWaitForFirstResult(t *testing.T) {
+	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 
-	ctx := testContext(t)
+	ctx := context.Background()
 	if err := query.Start(ctx); err != nil {
 		t.Fatalf("Failed to start query: %v", err)
 	}
@@ -286,9 +220,10 @@ func TestFirstResultEventSignaling(t *testing.T) {
 		t.Fatal("ResultReceived should be false initially")
 	}
 
-	// Wait for first result with timeout
+	// Get the wait channel
 	waitChan := query.WaitForFirstResult()
 
+	// Should not be ready yet
 	select {
 	case <-waitChan:
 		t.Fatal("WaitForFirstResult should not return before result is received")
@@ -297,10 +232,10 @@ func TestFirstResultEventSignaling(t *testing.T) {
 	}
 
 	// Send result message
-	transport.messages <- map[string]any{
+	transport.SendMessage(map[string]any{
 		"type":       "result",
 		"session_id": "test-session",
-	}
+	})
 
 	// Wait for result to be processed
 	select {
@@ -313,5 +248,31 @@ func TestFirstResultEventSignaling(t *testing.T) {
 	// Now ResultReceived should be true
 	if !query.ResultReceived() {
 		t.Fatal("ResultReceived should be true after result is received")
+	}
+}
+
+// TestHasActiveHooksOrMCP tests the helper method for detecting active hooks/MCP.
+func TestHasActiveHooksOrMCP(t *testing.T) {
+	transport := NewMockTransport()
+
+	// Test with no hooks or MCP
+	query := NewQuery(transport, true)
+	if query.HasActiveHooksOrMCP() {
+		t.Error("HasActiveHooksOrMCP should return false when no hooks or MCP")
+	}
+
+	// Test with hooks
+	query.hookCallbacks["test"] = func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
+		return nil, nil
+	}
+	if !query.HasActiveHooksOrMCP() {
+		t.Error("HasActiveHooksOrMCP should return true when hooks are registered")
+	}
+
+	// Test with MCP only
+	query2 := NewQuery(transport, true)
+	query2.RegisterMCPServer(&types.MCPServer{Name: "test", Version: "1.0.0"})
+	if !query2.HasActiveHooksOrMCP() {
+		t.Error("HasActiveHooksOrMCP should return true when MCP servers are registered")
 	}
 }

@@ -12,6 +12,10 @@ import (
 	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
+// DefaultStreamCloseTimeout is the default timeout for waiting for first result
+// before closing stdin when hooks or MCP servers are active.
+const DefaultStreamCloseTimeout = 60 * time.Second
+
 // Query handles the bidirectional control protocol.
 type Query struct {
 	transport types.Transport
@@ -40,9 +44,14 @@ type Query struct {
 	errors      chan error
 
 	// Result tracking
-	resultReceived atomic.Bool
-	lastResult     *types.ResultMessage
-	resultMu       sync.RWMutex
+	resultReceived  atomic.Bool
+	lastResult      *types.ResultMessage
+	resultMu        sync.RWMutex
+	firstResultChan chan struct{} // Closed when first result is received
+	firstResultOnce sync.Once     // Ensures channel is closed only once
+
+	// Stream close timeout for waiting for first result
+	streamCloseTimeout time.Duration
 
 	// Lifecycle
 	ctx    context.Context
@@ -58,14 +67,16 @@ type Query struct {
 // NewQuery creates a new Query.
 func NewQuery(transport types.Transport, streaming bool) *Query {
 	return &Query{
-		transport:       transport,
-		streaming:       streaming,
-		pendingRequests: make(map[string]chan map[string]any),
-		hookCallbacks:   make(map[string]types.HookCallback),
-		mcpServers:      make(map[string]*types.MCPServer),
-		messages:        make(chan types.Message, 100),
-		rawMessages:     make(chan map[string]any, 100),
-		errors:          make(chan error, 1),
+		transport:          transport,
+		streaming:          streaming,
+		pendingRequests:    make(map[string]chan map[string]any),
+		hookCallbacks:      make(map[string]types.HookCallback),
+		mcpServers:         make(map[string]*types.MCPServer),
+		messages:           make(chan types.Message, 100),
+		rawMessages:        make(chan map[string]any, 100),
+		errors:             make(chan error, 1),
+		firstResultChan:    make(chan struct{}),
+		streamCloseTimeout: DefaultStreamCloseTimeout,
 	}
 }
 
@@ -182,6 +193,10 @@ func (q *Query) handleSDKMessage(raw map[string]any) {
 		q.lastResult = result
 		q.resultMu.Unlock()
 		q.resultReceived.Store(true)
+		// Signal first result received (only closes once)
+		q.firstResultOnce.Do(func() {
+			close(q.firstResultChan)
+		})
 	}
 
 	// Send parsed message
@@ -460,6 +475,56 @@ func (q *Query) StreamInput(input <-chan map[string]any) error {
 			}
 		}
 	}
+}
+
+// StreamInputWithWait streams messages and waits for first result if hooks/MCP are active.
+// This implements the stream closure coordination from the Python SDK - when hooks or MCP
+// servers are active, we must wait for the first result before allowing stdin to be closed,
+// otherwise bidirectional control protocol communication may be interrupted.
+func (q *Query) StreamInputWithWait(input <-chan map[string]any) error {
+	// Stream all messages from input
+	if err := q.StreamInput(input); err != nil {
+		return err
+	}
+
+	// If hooks or MCP servers are active, wait for first result before returning
+	// This allows the control protocol to continue functioning
+	if q.HasActiveHooksOrMCP() {
+		select {
+		case <-q.firstResultChan:
+			// First result received, safe to proceed
+		case <-time.After(q.streamCloseTimeout):
+			// Timeout - proceed anyway to avoid hanging forever
+		case <-q.ctx.Done():
+			return q.ctx.Err()
+		}
+	}
+
+	return nil
+}
+
+// SetStreamCloseTimeout sets the timeout for waiting for first result
+// before closing stdin when hooks or MCP servers are active.
+func (q *Query) SetStreamCloseTimeout(timeout time.Duration) {
+	q.streamCloseTimeout = timeout
+}
+
+// WaitForFirstResult returns a channel that is closed when the first result is received.
+func (q *Query) WaitForFirstResult() <-chan struct{} {
+	return q.firstResultChan
+}
+
+// HasActiveHooksOrMCP returns true if there are any registered hook callbacks or MCP servers.
+func (q *Query) HasActiveHooksOrMCP() bool {
+	q.hookMu.RLock()
+	hasHooks := len(q.hookCallbacks) > 0
+	q.hookMu.RUnlock()
+
+	q.mcpServersMu.RLock()
+	hasMCP := len(q.mcpServers) > 0
+	q.mcpServersMu.RUnlock()
+
+	return hasHooks || hasMCP
 }
 
 // RegisterMCPServer registers an MCP server with the query.
