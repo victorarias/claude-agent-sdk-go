@@ -26,7 +26,7 @@ func TestPermissionValidation(t *testing.T) {
 				},
 			},
 			expectError: true,
-			errorMsg:    "can_use_tool callback cannot be used with permission_prompt_tool_name",
+			errorMsg:    "sdk: can_use_tool callback cannot be used with permission_prompt_tool_name",
 		},
 		{
 			name: "only CanUseTool set - should succeed",
