@@ -3,6 +3,10 @@ package sdk
 import (
 	"context"
 	"sync"
+
+	"github.com/victorarias/claude-agent-sdk-go/internal/parser"
+	"github.com/victorarias/claude-agent-sdk-go/internal/subprocess"
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 // Client is the high-level interface for Claude Agent SDK.
