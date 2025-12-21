@@ -509,7 +509,7 @@ func TestQuery_RewindFiles(t *testing.T) {
 	}
 }
 
-func TestQuery_Handletypes.HookCallback(t *testing.T) {
+func TestQuery_HandleHookCallback(t *testing.T) {
 	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 
