@@ -4,16 +4,18 @@
 // via JSON streaming for bidirectional control protocol.
 package sdk
 
-// Version is the SDK version.
-const Version = "0.1.0"
-
-// MinimumCLIVersion is the minimum supported CLI version.
-const MinimumCLIVersion = "2.0.0"
-
 import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/victorarias/claude-agent-sdk-go/types"
+)
+
+// Re-export version constants for convenience
+const (
+	Version           = types.Version
+	MinimumCLIVersion = types.MinimumCLIVersion
 )
 
 // parseVersion parses a semantic version string.
@@ -61,7 +63,7 @@ func compareVersions(a, b string) int {
 // checkMinimumVersion validates that the CLI version meets minimum requirements.
 func checkMinimumVersion(version string) error {
 	if compareVersions(version, MinimumCLIVersion) < 0 {
-		return &CLIVersionError{
+		return &types.CLIVersionError{
 			InstalledVersion: version,
 			MinimumVersion:   MinimumCLIVersion,
 		}
