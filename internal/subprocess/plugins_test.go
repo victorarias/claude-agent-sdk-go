@@ -112,3 +112,24 @@ func TestBuildCommand_SinglePlugin(t *testing.T) {
 		t.Error("Expected --plugin-dir /custom/plugin/path not found")
 	}
 }
+
+// TestWithPlugins_FunctionalOption tests that WithPlugins functional option works.
+func TestWithPlugins_FunctionalOption(t *testing.T) {
+	opts := types.DefaultOptions()
+	types.ApplyOptions(opts, types.WithPlugins(
+		types.PluginConfig{Type: "local", Path: "/plugin/one"},
+		types.PluginConfig{Type: "local", Path: "/plugin/two"},
+	))
+
+	if len(opts.Plugins) != 2 {
+		t.Fatalf("Expected 2 plugins, got %d", len(opts.Plugins))
+	}
+
+	if opts.Plugins[0].Path != "/plugin/one" {
+		t.Errorf("Expected /plugin/one, got %s", opts.Plugins[0].Path)
+	}
+
+	if opts.Plugins[1].Path != "/plugin/two" {
+		t.Errorf("Expected /plugin/two, got %s", opts.Plugins[1].Path)
+	}
+}
