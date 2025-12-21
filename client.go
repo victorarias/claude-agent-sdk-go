@@ -339,3 +339,57 @@ func RunQuery(ctx context.Context, prompt string, opts ...Option) ([]Message, er
 
 	return messages, nil
 }
+
+// QueryStream performs a query and streams messages back.
+func QueryStream(ctx context.Context, prompt string, opts ...Option) (<-chan Message, <-chan error) {
+	msgChan := make(chan Message, 100)
+	errChan := make(chan error, 1)
+
+	go func() {
+		defer close(msgChan)
+		defer close(errChan)
+
+		options := DefaultOptions()
+		ApplyOptions(options, opts...)
+
+		var transport Transport
+		if options.customTransport != nil {
+			transport = options.customTransport
+		} else {
+			transport = NewSubprocessTransport(prompt, options)
+		}
+
+		if err := transport.Connect(ctx); err != nil {
+			errChan <- err
+			return
+		}
+		defer transport.Close()
+
+		for msg := range transport.Messages() {
+			select {
+			case <-ctx.Done():
+				errChan <- ctx.Err()
+				return
+			default:
+			}
+
+			parsed, err := ParseMessage(msg)
+			if err != nil {
+				continue
+			}
+
+			select {
+			case msgChan <- parsed:
+			case <-ctx.Done():
+				errChan <- ctx.Err()
+				return
+			}
+
+			if _, ok := parsed.(*ResultMessage); ok {
+				return
+			}
+		}
+	}()
+
+	return msgChan, errChan
+}

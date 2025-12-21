@@ -334,3 +334,88 @@ func TestQuery_OneShot(t *testing.T) {
 		t.Errorf("expected ResultMessage, got %T", messages[1])
 	}
 }
+
+func TestQueryStream(t *testing.T) {
+	transport := NewMockTransport()
+	go func() {
+		transport.SendMessage(map[string]any{
+			"type": "assistant",
+			"message": map[string]any{
+				"content": []any{
+					map[string]any{"type": "text", "text": "Hello!"},
+				},
+				"model": "claude-test",
+			},
+		})
+		transport.SendMessage(map[string]any{
+			"type":        "result",
+			"subtype":     "success",
+			"duration_ms": float64(100),
+			"is_error":    false,
+			"num_turns":   float64(1),
+			"session_id":  "test_123",
+		})
+	}()
+
+	ctx := context.Background()
+	msgChan, errChan := QueryStream(ctx, "Hello", WithTransport(transport))
+
+	var messages []Message
+	for msg := range msgChan {
+		messages = append(messages, msg)
+	}
+
+	select {
+	case err := <-errChan:
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	default:
+	}
+
+	if len(messages) != 2 {
+		t.Errorf("expected 2 messages, got %d", len(messages))
+	}
+}
+
+func TestQueryStream_Cancellation(t *testing.T) {
+	transport := NewMockTransport()
+	go func() {
+		// Send a message but no result - let context cancel
+		transport.SendMessage(map[string]any{
+			"type": "assistant",
+			"message": map[string]any{
+				"content": []any{
+					map[string]any{"type": "text", "text": "Hello!"},
+				},
+			},
+		})
+		// Wait then close to simulate connection dropping
+		time.Sleep(100 * time.Millisecond)
+		transport.Close()
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	msgChan, errChan := QueryStream(ctx, "Hello", WithTransport(transport))
+
+	// Drain messages (should get at least one before timeout)
+	var count int
+	for range msgChan {
+		count++
+	}
+
+	// Should get context error or nil (if channel closed first)
+	select {
+	case err := <-errChan:
+		if err != nil && err != context.DeadlineExceeded {
+			t.Errorf("expected nil or DeadlineExceeded, got %v", err)
+		}
+	default:
+	}
+
+	if count < 1 {
+		t.Errorf("expected at least 1 message, got %d", count)
+	}
+}

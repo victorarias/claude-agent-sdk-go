@@ -55,6 +55,9 @@ func (m *MockTransport) Close() error {
 	if m.closeErr != nil {
 		return m.closeErr
 	}
+	if m.closed {
+		return nil // Already closed
+	}
 	m.closed = true
 	m.connected = false
 	close(m.messageChan)
