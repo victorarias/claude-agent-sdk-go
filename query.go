@@ -247,3 +247,58 @@ func (q *Query) handleCancelRequest(raw map[string]any) {
 	}
 	q.pendingMu.Unlock()
 }
+
+// sendControlRequest sends a control request and waits for response.
+func (q *Query) sendControlRequest(request map[string]any, timeout time.Duration) (map[string]any, error) {
+	if !q.streaming {
+		return nil, fmt.Errorf("control requests require streaming mode")
+	}
+
+	// Generate request ID
+	id := q.requestCounter.Add(1)
+	requestID := fmt.Sprintf("req_%d", id)
+
+	// Create response channel
+	respChan := make(chan map[string]any, 1)
+	q.pendingMu.Lock()
+	q.pendingRequests[requestID] = respChan
+	q.pendingMu.Unlock()
+
+	defer func() {
+		q.pendingMu.Lock()
+		delete(q.pendingRequests, requestID)
+		q.pendingMu.Unlock()
+	}()
+
+	// Build and send request
+	controlReq := map[string]any{
+		"type":       "control_request",
+		"request_id": requestID,
+		"request":    request,
+	}
+
+	data, err := json.Marshal(controlReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	if err := q.transport.Write(string(data)); err != nil {
+		return nil, fmt.Errorf("failed to write request: %w", err)
+	}
+
+	// Wait for response
+	select {
+	case resp := <-respChan:
+		if errMsg, ok := resp["error"].(string); ok {
+			return nil, fmt.Errorf("control request error: %s", errMsg)
+		}
+		if resp["cancelled"] == true {
+			return nil, fmt.Errorf("control request cancelled")
+		}
+		return resp, nil
+	case <-time.After(timeout):
+		return nil, fmt.Errorf("control request timeout: %v", request["subtype"])
+	case <-q.ctx.Done():
+		return nil, q.ctx.Err()
+	}
+}
