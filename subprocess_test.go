@@ -179,7 +179,7 @@ func TestBuildCommand_MCPServers(t *testing.T) {
 func TestBuildCommand_SandboxConfig(t *testing.T) {
 	opts := DefaultOptions()
 	opts.Sandbox = &SandboxSettings{
-		Permissions: []string{"read", "write"},
+		Enabled: true,
 	}
 
 	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
