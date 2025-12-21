@@ -654,11 +654,33 @@ func buildCommand(cliPath, prompt string, opts *Options, streaming bool) []strin
 		cmd = append(cmd, "--add-dir", dir)
 	}
 
-	// MCP servers
-	if len(opts.MCPServers) > 0 {
-		config := map[string]any{"mcpServers": opts.MCPServers}
-		if data, err := json.Marshal(config); err == nil {
-			cmd = append(cmd, "--mcp-config", string(data))
+	// MCP servers - filter out SDK-hosted servers (type: "sdk")
+	// SDK MCP servers are handled internally via control protocol, not via CLI config
+	if opts.MCPServers != nil {
+		filteredServers := make(map[string]any)
+		switch servers := opts.MCPServers.(type) {
+		case map[string]MCPServerConfig:
+			for name, server := range servers {
+				if server.Type != "sdk" {
+					filteredServers[name] = server
+				}
+			}
+		case map[string]any:
+			for name, server := range servers {
+				if serverMap, ok := server.(map[string]any); ok {
+					if serverType, _ := serverMap["type"].(string); serverType != "sdk" {
+						filteredServers[name] = server
+					}
+				} else {
+					filteredServers[name] = server
+				}
+			}
+		}
+		if len(filteredServers) > 0 {
+			config := map[string]any{"mcpServers": filteredServers}
+			if data, err := json.Marshal(config); err == nil {
+				cmd = append(cmd, "--mcp-config", string(data))
+			}
 		}
 	}
 
