@@ -230,20 +230,27 @@ func TestSettingsMerge_NestedSandboxSettings(t *testing.T) {
 	if sandboxMap["enabled"] != true {
 		t.Errorf("sandbox.enabled: got %v, want true", sandboxMap["enabled"])
 	}
-	if sandboxMap["type"] != "docker" {
-		t.Errorf("sandbox.type: got %v, want docker", sandboxMap["type"])
-	}
-	if sandboxMap["image"] != "custom-image:latest" {
-		t.Errorf("sandbox.image: got %v, want custom-image:latest", sandboxMap["image"])
+	if sandboxMap["autoAllowBashIfSandboxed"] != true {
+		t.Errorf("sandbox.autoAllowBashIfSandboxed: got %v, want true", sandboxMap["autoAllowBashIfSandboxed"])
 	}
 
-	// Verify env map is preserved
-	envMap, ok := sandboxMap["env"].(map[string]any)
+	// Verify excluded commands array is preserved
+	excludedCmds, ok := sandboxMap["excludedCommands"].([]any)
 	if !ok {
-		t.Fatalf("sandbox.env is not a map: %T", sandboxMap["env"])
+		t.Fatalf("sandbox.excludedCommands is not an array: %T", sandboxMap["excludedCommands"])
 	}
-	if envMap["FOO"] != "bar" || envMap["BAZ"] != "qux" {
-		t.Errorf("sandbox.env not preserved: got %v", envMap)
+	if len(excludedCmds) != 2 {
+		t.Errorf("sandbox.excludedCommands: expected 2 items, got %d", len(excludedCmds))
+	}
+
+	// Verify network config is preserved
+	networkMap, ok := sandboxMap["network"].(map[string]any)
+	if !ok {
+		t.Fatalf("sandbox.network is not a map: %T", sandboxMap["network"])
+	}
+	allowedDomains, ok := networkMap["allowedDomains"].([]any)
+	if !ok || len(allowedDomains) != 2 {
+		t.Errorf("sandbox.network.allowedDomains not preserved: got %v", networkMap["allowedDomains"])
 	}
 }
 
