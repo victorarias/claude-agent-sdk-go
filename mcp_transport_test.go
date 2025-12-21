@@ -12,12 +12,9 @@ import (
 func TestMCPServerTransport_ProcessOne(t *testing.T) {
 	server := NewMCPServerBuilder("test").
 		WithTool("add", "Add numbers", nil, func(input map[string]any) (*MCPToolResult, error) {
-			a := input["a"].(float64)
-			b := input["b"].(float64)
 			return &MCPToolResult{
 				Content: []MCPContent{{Type: "text", Text: "result"}},
 			}, nil
-			_ = a + b // silence unused warning
 		}).
 		Build()
 
