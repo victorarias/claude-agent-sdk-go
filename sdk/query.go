@@ -417,7 +417,7 @@ func (q *Query) sendControlResponse(requestID string, data map[string]any, err e
 }
 
 // SetCanUseTool sets the tool permission callback.
-func (q *Query) SetCanUseTool(callback CanUseToolCallback) {
+func (q *Query) SetCanUseTool(callback types.CanUseToolCallback) {
 	q.canUseTool = callback
 }
 
@@ -463,7 +463,7 @@ func (q *Query) StreamInput(input <-chan map[string]any) error {
 }
 
 // RegisterMCPServer registers an MCP server with the query.
-func (q *Query) RegisterMCPServer(server *MCPServer) {
+func (q *Query) RegisterMCPServer(server *types.MCPServer) {
 	q.mcpServersMu.Lock()
 	defer q.mcpServersMu.Unlock()
 	q.mcpServers[server.Name] = server
