@@ -34,7 +34,7 @@ func TestQuery_Start(t *testing.T) {
 	}
 
 	// Should be able to receive messages
-	transport.messages <- map[string]any{"type": "system", "subtype": "init"}
+	transport.SendMessage(map[string]any{"type": "system", "subtype": "init"})
 
 	select {
 	case msg := <-query.Messages():
@@ -58,7 +58,7 @@ func TestQuery_RawMessages(t *testing.T) {
 	}
 	defer query.Close()
 
-	transport.messages <- map[string]any{"type": "test", "custom": true}
+	transport.SendMessage(map[string]any{"type": "test", "custom": true})
 
 	select {
 	case msg := <-query.RawMessages():
