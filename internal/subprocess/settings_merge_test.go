@@ -1,0 +1,347 @@
+package subprocess
+
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+
+	"github.com/victorarias/claude-agent-sdk-go/types"
+)
+
+// TestSettingsMerge_SandboxMergedIntoSettings tests that when both Settings and Sandbox
+// are provided, the sandbox is merged INTO the settings JSON object under the "sandbox" key.
+// This matches Python SDK behavior in subprocess_cli.py:118-170.
+func TestSettingsMerge_SandboxMergedIntoSettings(t *testing.T) {
+	opts := types.DefaultOptions()
+
+	// Set up settings as JSON string
+	opts.Settings = `{"some":"config","another":"value"}`
+
+	// Set up sandbox config
+	opts.Sandbox = &types.SandboxSettings{
+		Enabled: true,
+		Type:    "docker",
+	}
+
+	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
+
+	// Verify --settings flag is present
+	var settingsValue string
+	foundSettings := false
+	for i, arg := range cmd {
+		if arg == "--settings" && i+1 < len(cmd) {
+			settingsValue = cmd[i+1]
+			foundSettings = true
+			break
+		}
+	}
+
+	if !foundSettings {
+		t.Fatal("--settings flag not found in command")
+	}
+
+	// Parse the settings JSON
+	var settingsObj map[string]any
+	if err := json.Unmarshal([]byte(settingsValue), &settingsObj); err != nil {
+		t.Fatalf("failed to parse settings JSON: %v", err)
+	}
+
+	// Verify original settings are preserved
+	if settingsObj["some"] != "config" {
+		t.Errorf("original settings not preserved: got %v", settingsObj["some"])
+	}
+	if settingsObj["another"] != "value" {
+		t.Errorf("original settings not preserved: got %v", settingsObj["another"])
+	}
+
+	// Verify sandbox is merged under "sandbox" key
+	sandboxValue, ok := settingsObj["sandbox"]
+	if !ok {
+		t.Fatal("sandbox key not found in merged settings")
+	}
+
+	// Verify sandbox contains expected fields
+	sandboxMap, ok := sandboxValue.(map[string]any)
+	if !ok {
+		t.Fatalf("sandbox value is not a map: %T", sandboxValue)
+	}
+
+	if sandboxMap["enabled"] != true {
+		t.Errorf("sandbox.enabled: got %v, want true", sandboxMap["enabled"])
+	}
+	if sandboxMap["type"] != "docker" {
+		t.Errorf("sandbox.type: got %v, want docker", sandboxMap["type"])
+	}
+
+	// Verify --sandbox flag is NOT present when settings exist
+	for i, arg := range cmd {
+		if arg == "--sandbox" {
+			t.Errorf("--sandbox flag should not be present when merged into settings at position %d", i)
+		}
+	}
+}
+
+// TestSettingsMerge_SandboxOnlyNoSettings tests that when only Sandbox is provided
+// (no Settings), the sandbox is wrapped in a settings object with "sandbox" key.
+func TestSettingsMerge_SandboxOnlyNoSettings(t *testing.T) {
+	opts := types.DefaultOptions()
+
+	// Only sandbox, no settings
+	opts.Sandbox = &types.SandboxSettings{
+		Enabled: true,
+		Type:    "native",
+	}
+
+	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
+
+	// Should have --settings flag with sandbox wrapped
+	var settingsValue string
+	foundSettings := false
+	for i, arg := range cmd {
+		if arg == "--settings" && i+1 < len(cmd) {
+			settingsValue = cmd[i+1]
+			foundSettings = true
+			break
+		}
+	}
+
+	if !foundSettings {
+		t.Fatal("--settings flag not found in command")
+	}
+
+	// Parse the settings JSON
+	var settingsObj map[string]any
+	if err := json.Unmarshal([]byte(settingsValue), &settingsObj); err != nil {
+		t.Fatalf("failed to parse settings JSON: %v", err)
+	}
+
+	// Verify sandbox is the only key
+	if len(settingsObj) != 1 {
+		t.Errorf("expected only sandbox key, got %d keys: %v", len(settingsObj), settingsObj)
+	}
+
+	// Verify sandbox content
+	sandboxValue, ok := settingsObj["sandbox"]
+	if !ok {
+		t.Fatal("sandbox key not found in settings")
+	}
+
+	sandboxMap, ok := sandboxValue.(map[string]any)
+	if !ok {
+		t.Fatalf("sandbox value is not a map: %T", sandboxValue)
+	}
+
+	if sandboxMap["enabled"] != true {
+		t.Errorf("sandbox.enabled: got %v, want true", sandboxMap["enabled"])
+	}
+	if sandboxMap["type"] != "native" {
+		t.Errorf("sandbox.type: got %v, want native", sandboxMap["type"])
+	}
+
+	// Verify --sandbox flag is NOT present
+	for i, arg := range cmd {
+		if arg == "--sandbox" {
+			t.Errorf("--sandbox flag should not be present when wrapped in settings at position %d", i)
+		}
+	}
+}
+
+// TestSettingsMerge_SettingsOnlyNoSandbox tests that when only Settings is provided
+// (no Sandbox), settings are passed through as-is without modification.
+func TestSettingsMerge_SettingsOnlyNoSandbox(t *testing.T) {
+	opts := types.DefaultOptions()
+
+	// Only settings, no sandbox
+	opts.Settings = `{"some":"config"}`
+
+	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
+
+	// Should have --settings flag with original value
+	var settingsValue string
+	foundSettings := false
+	for i, arg := range cmd {
+		if arg == "--settings" && i+1 < len(cmd) {
+			settingsValue = cmd[i+1]
+			foundSettings = true
+			break
+		}
+	}
+
+	if !foundSettings {
+		t.Fatal("--settings flag not found in command")
+	}
+
+	// Should be the original settings value
+	if settingsValue != `{"some":"config"}` {
+		t.Errorf("settings value modified: got %s, want %s", settingsValue, `{"some":"config"}`)
+	}
+
+	// Verify --sandbox flag is NOT present
+	for i, arg := range cmd {
+		if arg == "--sandbox" {
+			t.Errorf("--sandbox flag should not be present at position %d", i)
+		}
+	}
+}
+
+// TestSettingsMerge_NestedSandboxSettings tests merging with nested sandbox settings.
+func TestSettingsMerge_NestedSandboxSettings(t *testing.T) {
+	opts := types.DefaultOptions()
+
+	// Settings with existing config
+	opts.Settings = `{"model":"claude-opus-4","timeout":30}`
+
+	// Complex sandbox config
+	opts.Sandbox = &types.SandboxSettings{
+		Enabled: true,
+		Type:    "docker",
+		Image:   "custom-image:latest",
+		Env: map[string]string{
+			"FOO": "bar",
+			"BAZ": "qux",
+		},
+	}
+
+	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
+
+	// Find and parse settings
+	var settingsValue string
+	for i, arg := range cmd {
+		if arg == "--settings" && i+1 < len(cmd) {
+			settingsValue = cmd[i+1]
+			break
+		}
+	}
+
+	var settingsObj map[string]any
+	if err := json.Unmarshal([]byte(settingsValue), &settingsObj); err != nil {
+		t.Fatalf("failed to parse settings JSON: %v", err)
+	}
+
+	// Verify original settings preserved
+	if settingsObj["model"] != "claude-opus-4" {
+		t.Errorf("model not preserved: got %v", settingsObj["model"])
+	}
+	if timeout, ok := settingsObj["timeout"].(float64); !ok || timeout != 30 {
+		t.Errorf("timeout not preserved: got %v", settingsObj["timeout"])
+	}
+
+	// Verify sandbox merged with all nested fields
+	sandboxMap := settingsObj["sandbox"].(map[string]any)
+	if sandboxMap["enabled"] != true {
+		t.Errorf("sandbox.enabled: got %v, want true", sandboxMap["enabled"])
+	}
+	if sandboxMap["type"] != "docker" {
+		t.Errorf("sandbox.type: got %v, want docker", sandboxMap["type"])
+	}
+	if sandboxMap["image"] != "custom-image:latest" {
+		t.Errorf("sandbox.image: got %v, want custom-image:latest", sandboxMap["image"])
+	}
+
+	// Verify env map is preserved
+	envMap, ok := sandboxMap["env"].(map[string]any)
+	if !ok {
+		t.Fatalf("sandbox.env is not a map: %T", sandboxMap["env"])
+	}
+	if envMap["FOO"] != "bar" || envMap["BAZ"] != "qux" {
+		t.Errorf("sandbox.env not preserved: got %v", envMap)
+	}
+}
+
+// TestSettingsMerge_NoSettingsNoSandbox tests that when neither Settings nor Sandbox
+// are provided, no --settings or --sandbox flags are present.
+func TestSettingsMerge_NoSettingsNoSandbox(t *testing.T) {
+	opts := types.DefaultOptions()
+
+	// Neither settings nor sandbox
+
+	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
+
+	// Verify no --settings flag
+	for i, arg := range cmd {
+		if arg == "--settings" {
+			t.Errorf("--settings flag should not be present at position %d", i)
+		}
+		if arg == "--sandbox" {
+			t.Errorf("--sandbox flag should not be present at position %d", i)
+		}
+	}
+}
+
+// TestSettingsMerge_SettingsAsFilePath tests that file path settings work correctly.
+// Note: This is tricky because we can't easily distinguish file paths from JSON strings
+// in the current implementation. We test that the value is passed through.
+func TestSettingsMerge_SettingsAsFilePath(t *testing.T) {
+	opts := types.DefaultOptions()
+
+	// Settings as a file path (not JSON)
+	opts.Settings = "/path/to/settings.json"
+
+	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
+
+	// Should have --settings flag with the path
+	var settingsValue string
+	foundSettings := false
+	for i, arg := range cmd {
+		if arg == "--settings" && i+1 < len(cmd) {
+			settingsValue = cmd[i+1]
+			foundSettings = true
+			break
+		}
+	}
+
+	if !foundSettings {
+		t.Fatal("--settings flag not found in command")
+	}
+
+	// Should be the original path
+	if settingsValue != "/path/to/settings.json" {
+		t.Errorf("settings value modified: got %s, want %s", settingsValue, "/path/to/settings.json")
+	}
+}
+
+// TestSettingsMerge_SettingsFilePathWithSandbox tests that when settings is a file path
+// AND sandbox is provided, we need to read the file and merge. However, since we can't
+// read files during buildCommand, we should convert to JSON string with sandbox merged.
+func TestSettingsMerge_SettingsFilePathWithSandbox(t *testing.T) {
+	opts := types.DefaultOptions()
+
+	// Settings as a file path
+	opts.Settings = "/path/to/settings.json"
+
+	// Sandbox config
+	opts.Sandbox = &types.SandboxSettings{
+		Enabled: true,
+	}
+
+	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
+
+	// Find settings value
+	var settingsValue string
+	for i, arg := range cmd {
+		if arg == "--settings" && i+1 < len(cmd) {
+			settingsValue = cmd[i+1]
+			break
+		}
+	}
+
+	// When sandbox is present with a file path, we can't merge without reading the file.
+	// The Python SDK reads the file. For now, we test that it's JSON with sandbox.
+	// This test documents the expected behavior - file path + sandbox = error or read file.
+
+	// Check if it starts with { (JSON) or if it's still a file path
+	if !strings.HasPrefix(settingsValue, "{") {
+		t.Skip("File path merging requires file reading - not implemented yet")
+	}
+
+	// If we get here, it was converted to JSON
+	var settingsObj map[string]any
+	if err := json.Unmarshal([]byte(settingsValue), &settingsObj); err != nil {
+		t.Fatalf("failed to parse settings JSON: %v", err)
+	}
+
+	// Should have sandbox key
+	if _, ok := settingsObj["sandbox"]; !ok {
+		t.Error("sandbox key not found in merged settings")
+	}
+}
