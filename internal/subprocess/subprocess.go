@@ -460,7 +460,7 @@ func buildEnvironment(opts *types.Options) []string {
 
 	// Add SDK-specific vars
 	env = append(env, "CLAUDE_CODE_ENTRYPOINT=sdk-go")
-	env = append(env, "CLAUDE_AGENT_SDK_VERSION="+Version)
+	env = append(env, "CLAUDE_AGENT_SDK_VERSION="+types.Version)
 
 	// Add user-provided vars
 	for k, v := range opts.Env {

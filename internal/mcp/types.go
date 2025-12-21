@@ -99,7 +99,7 @@ type MCPToolsListResult struct {
 
 // MCPToolCallResult is the result of tools/call request.
 type MCPToolCallResult struct {
-	Content []MCPContent `json:"content"`
+	Content []types.MCPContent `json:"content"`
 	IsError bool         `json:"isError,omitempty"`
 }
 

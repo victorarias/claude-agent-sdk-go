@@ -163,7 +163,7 @@ func (h *MCPHandler) handleToolsCall(params map[string]any) (*MCPToolCallResult,
 	result, err := tool.Handler(args)
 	if err != nil {
 		return &MCPToolCallResult{
-			Content: []MCPContent{{Type: "text", Text: "Error: " + err.Error()}},
+			Content: []types.types.MCPContent{{Type: "text", Text: "Error: " + err.Error()}},
 			IsError: true,
 		}, nil
 	}
@@ -175,20 +175,20 @@ func (h *MCPHandler) handleToolsCall(params map[string]any) (*MCPToolCallResult,
 }
 
 // resultToContent converts a handler result to MCP content.
-func resultToContent(result any) []MCPContent {
+func resultToContent(result any) []types.MCPContent {
 	switch v := result.(type) {
 	case string:
-		return []MCPContent{NewMCPTextContent(v)}
-	case []MCPContent:
+		return []types.types.MCPContent{NewMCPTextContent(v)}
+	case []types.MCPContent:
 		return v
-	case MCPContent:
-		return []MCPContent{v}
+	case types.MCPContent:
+		return []types.types.MCPContent{v}
 	default:
 		// Marshal to JSON
 		data, err := json.Marshal(v)
 		if err != nil {
-			return []MCPContent{NewMCPTextContent(fmt.Sprintf("%v", v))}
+			return []types.types.MCPContent{NewMCPTextContent(fmt.Sprintf("%v", v))}
 		}
-		return []MCPContent{NewMCPTextContent(string(data))}
+		return []types.types.MCPContent{NewMCPTextContent(string(data))}
 	}
 }
