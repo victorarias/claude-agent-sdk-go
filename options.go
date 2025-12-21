@@ -171,6 +171,10 @@ type Options struct {
 	MCPServers    any                   `json:"mcp_servers,omitempty"`
 	SDKMCPServers map[string]*MCPServer `json:"-"`
 
+	// Hooks for client
+	Hooks      map[HookEvent][]HookMatcher `json:"-"`
+	CanUseTool CanUseToolCallback          `json:"-"`
+
 	// Streaming
 	IncludePartialMessages bool `json:"include_partial_messages,omitempty"`
 
