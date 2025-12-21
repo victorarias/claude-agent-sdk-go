@@ -18,6 +18,93 @@ import (
 	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
+// versionCheckTimeout is the timeout for checking CLI version.
+const versionCheckTimeout = 2 * time.Second
+
+// parseVersionOutput extracts a semver version from CLI output.
+func parseVersionOutput(output string) (string, error) {
+	output = strings.TrimSpace(output)
+	if output == "" {
+		return "", fmt.Errorf("empty version output")
+	}
+
+	// Try to find a semver pattern (X.Y.Z)
+	// Handle various formats: "1.0.50", "v1.0.50", "Claude Code version 1.0.50"
+	parts := strings.Fields(output)
+	for _, part := range parts {
+		// Remove 'v' prefix if present
+		part = strings.TrimPrefix(part, "v")
+
+		// Check if it looks like a version (contains dots and starts with digit)
+		if len(part) > 0 && part[0] >= '0' && part[0] <= '9' && strings.Contains(part, ".") {
+			// Validate it has at least X.Y format
+			versionParts := strings.Split(part, ".")
+			if len(versionParts) >= 2 {
+				// Check first two parts are numeric
+				if _, err := strconv.Atoi(versionParts[0]); err == nil {
+					if _, err := strconv.Atoi(versionParts[1]); err == nil {
+						return part, nil
+					}
+				}
+			}
+		}
+	}
+
+	// Try the whole output if it's just a version string
+	output = strings.TrimPrefix(output, "v")
+	if len(output) > 0 && output[0] >= '0' && output[0] <= '9' {
+		versionParts := strings.Split(output, ".")
+		if len(versionParts) >= 2 {
+			if _, err := strconv.Atoi(versionParts[0]); err == nil {
+				if _, err := strconv.Atoi(versionParts[1]); err == nil {
+					return output, nil
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("no version found in output: %s", output)
+}
+
+// checkCLIVersion runs the CLI to get its version.
+func checkCLIVersion(cliPath string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), versionCheckTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, cliPath, "-v")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get CLI version: %w", err)
+	}
+
+	return parseVersionOutput(string(output))
+}
+
+// isVersionAtLeast checks if version a is >= version b.
+func isVersionAtLeast(a, b string) bool {
+	aParts := strings.Split(a, ".")
+	bParts := strings.Split(b, ".")
+
+	for i := 0; i < len(bParts) && i < len(aParts); i++ {
+		aNum, aErr := strconv.Atoi(aParts[i])
+		bNum, bErr := strconv.Atoi(bParts[i])
+
+		if aErr != nil || bErr != nil {
+			return false
+		}
+
+		if aNum > bNum {
+			return true
+		}
+		if aNum < bNum {
+			return false
+		}
+	}
+
+	// If we get here, versions are equal up to the shorter one's length
+	return len(aParts) >= len(bParts)
+}
+
 // findCLI locates the Claude CLI binary.
 // Priority: explicitPath > bundledPath > PATH > common locations
 func findCLI(explicitPath, bundledPath string) (string, error) {
@@ -393,6 +480,21 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 		return err
 	}
 	t.cliPath = cliPath
+
+	// Check CLI version unless skipped via environment variable
+	if os.Getenv("CLAUDE_AGENT_SDK_SKIP_VERSION_CHECK") == "" {
+		if version, err := checkCLIVersion(cliPath); err == nil {
+			// Check if version meets minimum requirements
+			if !isVersionAtLeast(version, types.MinimumCLIVersion) {
+				return &types.CLIVersionError{
+					InstalledVersion: version,
+					MinimumVersion:   types.MinimumCLIVersion,
+				}
+			}
+		}
+		// If version check fails (e.g., timeout), log warning but continue
+		// matching Python SDK behavior
+	}
 
 	// Build command
 	args := buildCommand(cliPath, t.prompt, t.options, t.streaming)
