@@ -1,7 +1,6 @@
 package sdk
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -399,12 +398,3 @@ func (t *SubprocessTransport) EndInput() error {
 	// Implemented in Task 6
 	return nil
 }
-
-// Suppress unused variable warnings
-var (
-	_ = (*SubprocessTransport)(nil).stdin
-	_ = (*SubprocessTransport)(nil).stdout
-	_ = (*SubprocessTransport)(nil).stderr
-	_ = bufio.Scanner{}
-	_ io.Reader = nil
-)
