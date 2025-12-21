@@ -297,9 +297,9 @@ func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) [
 		cmd = append(cmd, "--resume", opts.Resume)
 	}
 
-	// Settings
-	if opts.Settings != "" {
-		cmd = append(cmd, "--settings", opts.Settings)
+	// Settings - merge sandbox into settings if both are provided
+	if settingsValue, err := buildSettingsValue(opts); err == nil && settingsValue != "" {
+		cmd = append(cmd, "--settings", settingsValue)
 	}
 
 	if len(opts.SettingSources) > 0 {
@@ -311,12 +311,6 @@ func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) [
 	} else {
 		// Empty setting sources to avoid loading default settings
 		cmd = append(cmd, "--setting-sources", "")
-	}
-
-	// Sandbox configuration
-	if opts.Sandbox != nil {
-		sandboxJSON, _ := json.Marshal(opts.Sandbox)
-		cmd = append(cmd, "--sandbox", string(sandboxJSON))
 	}
 
 	// Directories
@@ -374,6 +368,13 @@ func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) [
 			if data, err := json.Marshal(schema); err == nil {
 				cmd = append(cmd, "--json-schema", string(data))
 			}
+		}
+	}
+
+	// Agents - custom agent definitions
+	if len(opts.Agents) > 0 {
+		if agentsJSON, err := json.Marshal(opts.Agents); err == nil {
+			cmd = append(cmd, "--agents", string(agentsJSON))
 		}
 	}
 
