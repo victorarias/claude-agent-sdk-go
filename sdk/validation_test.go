@@ -72,3 +72,24 @@ func TestPermissionValidation(t *testing.T) {
 		})
 	}
 }
+
+// TestPermissionValidationOnConnect tests that validation is enforced during Connect().
+func TestPermissionValidationOnConnect(t *testing.T) {
+	// Test that connecting with both options fails
+	client := NewClient(
+		WithCanUseTool(func(toolName string, input map[string]any, ctx *types.ToolPermissionContext) (types.PermissionResult, error) {
+			return &types.PermissionResultAllow{Behavior: "allow"}, nil
+		}),
+		func(o *types.Options) {
+			o.PermissionPromptToolName = "stdio"
+		},
+	)
+
+	err := client.Connect(nil)
+	if err == nil {
+		t.Error("expected error during Connect but got nil")
+	}
+	if err.Error() != "sdk: can_use_tool callback cannot be used with permission_prompt_tool_name" {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}

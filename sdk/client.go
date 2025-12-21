@@ -230,6 +230,11 @@ func (c *Client) connect(ctx context.Context, prompt string, streaming bool) err
 		return nil
 	}
 
+	// Validate options before connecting
+	if err := c.validateOptions(); err != nil {
+		return err
+	}
+
 	// Create transport if not provided (for testing)
 	if c.transport == nil {
 		if streaming {
