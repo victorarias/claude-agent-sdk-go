@@ -302,3 +302,77 @@ func (q *Query) sendControlRequest(request map[string]any, timeout time.Duration
 		return nil, q.ctx.Err()
 	}
 }
+
+// Initialize sends the initialization request to the CLI.
+func (q *Query) Initialize(hooks map[HookEvent][]HookMatcher) (map[string]any, error) {
+	if !q.streaming {
+		return nil, nil
+	}
+
+	// Build hooks configuration
+	hooksConfig := q.buildHooksConfig(hooks)
+
+	request := map[string]any{
+		"subtype": "initialize",
+	}
+	if len(hooksConfig) > 0 {
+		request["hooks"] = hooksConfig
+	}
+
+	result, err := q.sendControlRequest(request, 60*time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	q.initMu.Lock()
+	q.initResult = result
+	q.initMu.Unlock()
+
+	return result, nil
+}
+
+// buildHooksConfig builds the hooks configuration for initialization.
+func (q *Query) buildHooksConfig(hooks map[HookEvent][]HookMatcher) map[string]any {
+	if hooks == nil {
+		return nil
+	}
+
+	config := make(map[string]any)
+
+	for event, matchers := range hooks {
+		if len(matchers) == 0 {
+			continue
+		}
+
+		var matcherConfigs []map[string]any
+		for _, matcher := range matchers {
+			callbackIDs := make([]string, len(matcher.Hooks))
+			for i, callback := range matcher.Hooks {
+				callbackID := fmt.Sprintf("hook_%d", q.nextCallbackID.Add(1))
+				q.hookMu.Lock()
+				q.hookCallbacks[callbackID] = callback
+				q.hookMu.Unlock()
+				callbackIDs[i] = callbackID
+			}
+
+			matcherConfig := map[string]any{
+				"matcher":         matcher.Matcher,
+				"hookCallbackIds": callbackIDs,
+			}
+			if matcher.Timeout != nil && *matcher.Timeout > 0 {
+				matcherConfig["timeout"] = *matcher.Timeout
+			}
+			matcherConfigs = append(matcherConfigs, matcherConfig)
+		}
+		config[string(event)] = matcherConfigs
+	}
+
+	return config
+}
+
+// InitResult returns the initialization result.
+func (q *Query) InitResult() map[string]any {
+	q.initMu.RLock()
+	defer q.initMu.RUnlock()
+	return q.initResult
+}
