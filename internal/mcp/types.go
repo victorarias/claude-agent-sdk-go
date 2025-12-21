@@ -149,8 +149,8 @@ func MarshalMCPResponse(resp *MCPResponse) ([]byte, error) {
 }
 
 // NewMCPTextContent creates a text content item.
-func NewMCPTextContent(text string) MCPContent {
-	return MCPContent{
+func NewMCPTextContent(text string) types.MCPContent {
+	return types.MCPContent{
 		Type: "text",
 		Text: text,
 	}
