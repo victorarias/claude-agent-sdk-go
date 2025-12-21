@@ -83,9 +83,18 @@ func buildCommand(cliPath, prompt string, opts *Options, streaming bool) []strin
 	cmd := []string{cliPath, "--output-format", "stream-json", "--verbose"}
 
 	// System prompt (always include, even if empty)
-	if opts.SystemPrompt != "" {
-		cmd = append(cmd, "--system-prompt", opts.SystemPrompt)
-	} else {
+	switch sp := opts.SystemPrompt.(type) {
+	case string:
+		if sp != "" {
+			cmd = append(cmd, "--system-prompt", sp)
+		} else {
+			cmd = append(cmd, "--system-prompt", "")
+		}
+	case SystemPromptPreset:
+		if data, err := json.Marshal(sp); err == nil {
+			cmd = append(cmd, "--system-prompt", string(data))
+		}
+	default:
 		cmd = append(cmd, "--system-prompt", "")
 	}
 
