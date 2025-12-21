@@ -393,3 +393,107 @@ func QueryStream(ctx context.Context, prompt string, opts ...Option) (<-chan Mes
 
 	return msgChan, errChan
 }
+
+// SendQuery sends a query in streaming mode.
+func (c *Client) SendQuery(prompt string, sessionID ...string) error {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		return &ConnectionError{Message: "not connected"}
+	}
+	q := c.query
+	sid := c.sessionID
+	c.mu.Unlock()
+
+	if len(sessionID) > 0 {
+		sid = sessionID[0]
+	}
+	if sid == "" {
+		sid = "default"
+	}
+
+	return q.SendUserMessage(prompt, sid)
+}
+
+// ReceiveMessage receives the next message.
+func (c *Client) ReceiveMessage() (Message, error) {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		return nil, &ConnectionError{Message: "not connected"}
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	select {
+	case msg, ok := <-q.Messages():
+		if !ok {
+			return nil, &ConnectionError{Message: "channel closed"}
+		}
+		return msg, nil
+	case err := <-q.Errors():
+		return nil, err
+	}
+}
+
+// ReceiveAll receives all messages until result.
+func (c *Client) ReceiveAll() ([]Message, error) {
+	var messages []Message
+	for {
+		msg, err := c.ReceiveMessage()
+		if err != nil {
+			return messages, err
+		}
+		messages = append(messages, msg)
+		if _, ok := msg.(*ResultMessage); ok {
+			return messages, nil
+		}
+	}
+}
+
+// ReceiveResponse sends a query and receives all response messages.
+func (c *Client) ReceiveResponse(prompt string) ([]Message, error) {
+	if err := c.SendQuery(prompt); err != nil {
+		return nil, err
+	}
+	return c.ReceiveAll()
+}
+
+// Interrupt sends an interrupt signal.
+func (c *Client) Interrupt() error {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		return &ConnectionError{Message: "not connected"}
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	return q.Interrupt()
+}
+
+// SetPermissionMode changes the permission mode.
+func (c *Client) SetPermissionMode(mode PermissionMode) error {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		return &ConnectionError{Message: "not connected"}
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	return q.SetPermissionMode(mode)
+}
+
+// SetModel changes the AI model.
+func (c *Client) SetModel(model string) error {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		return &ConnectionError{Message: "not connected"}
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	return q.SetModel(model)
+}
