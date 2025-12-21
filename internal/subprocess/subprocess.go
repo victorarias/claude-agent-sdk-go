@@ -97,7 +97,7 @@ func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) [
 		} else {
 			cmd = append(cmd, "--system-prompt", "")
 		}
-	case SystemPromptPreset:
+	case types.SystemPromptPreset:
 		if data, err := json.Marshal(sp); err == nil {
 			cmd = append(cmd, "--system-prompt", string(data))
 		}
@@ -399,7 +399,7 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 
 	// Check command length on Windows
 	if err := checkCommandLength(args); err != nil {
-		return &ConnectionError{Message: err.Error()}
+		return &types.ConnectionError{Message: err.Error()}
 	}
 
 	// Create context for cancellation
@@ -419,22 +419,22 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 	// Setup pipes
 	t.stdin, err = t.cmd.StdinPipe()
 	if err != nil {
-		return &ConnectionError{Message: "failed to create stdin pipe", Cause: err}
+		return &types.ConnectionError{Message: "failed to create stdin pipe", Cause: err}
 	}
 
 	t.stdout, err = t.cmd.StdoutPipe()
 	if err != nil {
-		return &ConnectionError{Message: "failed to create stdout pipe", Cause: err}
+		return &types.ConnectionError{Message: "failed to create stdout pipe", Cause: err}
 	}
 
 	t.stderr, err = t.cmd.StderrPipe()
 	if err != nil {
-		return &ConnectionError{Message: "failed to create stderr pipe", Cause: err}
+		return &types.ConnectionError{Message: "failed to create stderr pipe", Cause: err}
 	}
 
 	// Start process
 	if err := t.cmd.Start(); err != nil {
-		return &ConnectionError{Message: "failed to start CLI", Cause: err}
+		return &types.ConnectionError{Message: "failed to start CLI", Cause: err}
 	}
 
 	// Start reading stdout (to be implemented in Task 5)
@@ -693,10 +693,10 @@ func (t *SubprocessTransport) Write(data string) error {
 	t.closeMu.Unlock()
 
 	if !ready || closed {
-		return &ConnectionError{Message: "transport not ready for writing"}
+		return &types.ConnectionError{Message: "transport not ready for writing"}
 	}
 	if stdin == nil {
-		return &ConnectionError{Message: "stdin is nil"}
+		return &types.ConnectionError{Message: "stdin is nil"}
 	}
 
 	// Ensure data ends with newline
@@ -706,7 +706,7 @@ func (t *SubprocessTransport) Write(data string) error {
 
 	_, err := io.WriteString(stdin, data)
 	if err != nil {
-		return &ConnectionError{Message: "failed to write to stdin", Cause: err}
+		return &types.ConnectionError{Message: "failed to write to stdin", Cause: err}
 	}
 
 	return nil
