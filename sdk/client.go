@@ -11,16 +11,16 @@ import (
 
 // Client is the high-level interface for Claude Agent SDK.
 type Client struct {
-	options *Options
+	options *types.Options
 
 	// MCP servers hosted by this client
-	mcpServers map[string]*MCPServer
+	mcpServers map[string]*types.MCPServer
 
 	// Hooks registered for this client
-	hooks map[HookEvent][]HookMatcher
+	hooks map[types.HookEvent][]types.HookMatcher
 
 	// Permission callback
-	canUseTool CanUseToolCallback
+	canUseTool types.CanUseToolCallback
 
 	// Transport and query
 	transport Transport
@@ -36,13 +36,13 @@ type Client struct {
 
 // NewClient creates a new SDK client.
 func NewClient(opts ...Option) *Client {
-	options := DefaultOptions()
-	ApplyOptions(options, opts...)
+	options := types.DefaultOptions()
+	types.ApplyOptions(options, opts...)
 
 	client := &Client{
 		options:    options,
-		mcpServers: make(map[string]*MCPServer),
-		hooks:      make(map[HookEvent][]HookMatcher),
+		mcpServers: make(map[string]*types.MCPServer),
+		hooks:      make(map[types.HookEvent][]types.HookMatcher),
 	}
 
 	// Copy SDK MCP servers from options
@@ -73,7 +73,7 @@ func NewClient(opts ...Option) *Client {
 }
 
 // Options returns the client's options.
-func (c *Client) Options() *Options {
+func (c *Client) Options() *types.Options {
 	return c.options
 }
 
@@ -92,110 +92,110 @@ func (c *Client) SessionID() string {
 }
 
 // WithClientMCPServer adds an MCP server to the client.
-func WithClientMCPServer(server *MCPServer) Option {
-	return func(o *Options) {
+func WithClientMCPServer(server *types.MCPServer) Option {
+	return func(o *types.Options) {
 		if o.SDKMCPServers == nil {
-			o.SDKMCPServers = make(map[string]*MCPServer)
+			o.SDKMCPServers = make(map[string]*types.MCPServer)
 		}
 		o.SDKMCPServers[server.Name] = server
 	}
 }
 
 // WithPreToolUseHook adds a pre-tool-use hook.
-func WithPreToolUseHook(matcher map[string]any, callback HookCallback) Option {
-	return func(o *Options) {
+func WithPreToolUseHook(matcher map[string]any, callback types.HookCallback) Option {
+	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[HookEvent][]HookMatcher)
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
 		}
 		o.Hooks[HookPreToolUse] = append(o.Hooks[HookPreToolUse], HookMatcher{
 			Matcher: matcher,
-			Hooks:   []HookCallback{callback},
+			Hooks:   []types.HookCallback{callback},
 		})
 	}
 }
 
 // WithPostToolUseHook adds a post-tool-use hook.
-func WithPostToolUseHook(matcher map[string]any, callback HookCallback) Option {
-	return func(o *Options) {
+func WithPostToolUseHook(matcher map[string]any, callback types.HookCallback) Option {
+	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[HookEvent][]HookMatcher)
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
 		}
 		o.Hooks[HookPostToolUse] = append(o.Hooks[HookPostToolUse], HookMatcher{
 			Matcher: matcher,
-			Hooks:   []HookCallback{callback},
+			Hooks:   []types.HookCallback{callback},
 		})
 	}
 }
 
 // WithStopHook adds a stop hook.
-func WithStopHook(matcher map[string]any, callback HookCallback) Option {
-	return func(o *Options) {
+func WithStopHook(matcher map[string]any, callback types.HookCallback) Option {
+	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[HookEvent][]HookMatcher)
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
 		}
 		o.Hooks[HookStop] = append(o.Hooks[HookStop], HookMatcher{
 			Matcher: matcher,
-			Hooks:   []HookCallback{callback},
+			Hooks:   []types.HookCallback{callback},
 		})
 	}
 }
 
 // WithUserPromptSubmitHook adds a user prompt submit hook.
-func WithUserPromptSubmitHook(callback HookCallback) Option {
-	return func(o *Options) {
+func WithUserPromptSubmitHook(callback types.HookCallback) Option {
+	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[HookEvent][]HookMatcher)
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
 		}
 		o.Hooks[HookUserPromptSubmit] = append(o.Hooks[HookUserPromptSubmit], HookMatcher{
 			Matcher: nil,
-			Hooks:   []HookCallback{callback},
+			Hooks:   []types.HookCallback{callback},
 		})
 	}
 }
 
 // WithSubagentStopHook adds a subagent stop hook.
-func WithSubagentStopHook(callback HookCallback) Option {
-	return func(o *Options) {
+func WithSubagentStopHook(callback types.HookCallback) Option {
+	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[HookEvent][]HookMatcher)
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
 		}
 		o.Hooks[HookSubagentStop] = append(o.Hooks[HookSubagentStop], HookMatcher{
 			Matcher: nil,
-			Hooks:   []HookCallback{callback},
+			Hooks:   []types.HookCallback{callback},
 		})
 	}
 }
 
 // WithPreCompactHook adds a pre-compact hook.
-func WithPreCompactHook(callback HookCallback) Option {
-	return func(o *Options) {
+func WithPreCompactHook(callback types.HookCallback) Option {
+	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[HookEvent][]HookMatcher)
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
 		}
 		o.Hooks[HookPreCompact] = append(o.Hooks[HookPreCompact], HookMatcher{
 			Matcher: nil,
-			Hooks:   []HookCallback{callback},
+			Hooks:   []types.HookCallback{callback},
 		})
 	}
 }
 
 // WithHookTimeout adds a hook with a timeout.
-func WithHookTimeout(event HookEvent, matcher map[string]any, timeout float64, callback HookCallback) Option {
-	return func(o *Options) {
+func WithHookTimeout(event HookEvent, matcher map[string]any, timeout float64, callback types.HookCallback) Option {
+	return func(o *types.Options) {
 		if o.Hooks == nil {
-			o.Hooks = make(map[HookEvent][]HookMatcher)
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
 		}
 		o.Hooks[event] = append(o.Hooks[event], HookMatcher{
 			Matcher: matcher,
-			Hooks:   []HookCallback{callback},
+			Hooks:   []types.HookCallback{callback},
 			Timeout: &timeout,
 		})
 	}
 }
 
 // WithCanUseTool sets the tool permission callback.
-func WithCanUseTool(callback CanUseToolCallback) Option {
-	return func(o *Options) {
+func WithCanUseTool(callback types.CanUseToolCallback) Option {
+	return func(o *types.Options) {
 		o.CanUseTool = callback
 	}
 }
@@ -222,9 +222,9 @@ func (c *Client) connect(ctx context.Context, prompt string, streaming bool) err
 	// Create transport if not provided (for testing)
 	if c.transport == nil {
 		if streaming {
-			c.transport = NewStreamingTransport(c.options)
+			c.transport = subprocess.NewStreamingTransport(c.options)
 		} else {
-			c.transport = NewSubprocessTransport(prompt, c.options)
+			c.transport = subprocess.NewSubprocessTransport(prompt, c.options)
 		}
 	}
 
@@ -307,15 +307,15 @@ func (c *Client) Close() error {
 
 // RunQuery performs a one-shot query and returns all messages.
 func RunQuery(ctx context.Context, prompt string, opts ...Option) ([]Message, error) {
-	options := DefaultOptions()
-	ApplyOptions(options, opts...)
+	options := types.DefaultOptions()
+	types.ApplyOptions(options, opts...)
 
 	// Extract transport if provided
 	var transport Transport
 	if options.customTransport != nil {
 		transport = options.customTransport
 	} else {
-		transport = NewSubprocessTransport(prompt, options)
+		transport = subprocess.NewSubprocessTransport(prompt, options)
 	}
 
 	// Connect
@@ -328,7 +328,7 @@ func RunQuery(ctx context.Context, prompt string, opts ...Option) ([]Message, er
 	var messages []Message
 
 	for msg := range transport.Messages() {
-		parsed, err := ParseMessage(msg)
+		parsed, err := parser.ParseMessage(msg)
 		if err != nil {
 			// Skip unparseable messages
 			continue
@@ -353,14 +353,14 @@ func QueryStream(ctx context.Context, prompt string, opts ...Option) (<-chan Mes
 		defer close(msgChan)
 		defer close(errChan)
 
-		options := DefaultOptions()
-		ApplyOptions(options, opts...)
+		options := types.DefaultOptions()
+		types.ApplyOptions(options, opts...)
 
 		var transport Transport
 		if options.customTransport != nil {
 			transport = options.customTransport
 		} else {
-			transport = NewSubprocessTransport(prompt, options)
+			transport = subprocess.NewSubprocessTransport(prompt, options)
 		}
 
 		if err := transport.Connect(ctx); err != nil {
@@ -377,7 +377,7 @@ func QueryStream(ctx context.Context, prompt string, opts ...Option) (<-chan Mes
 			default:
 			}
 
-			parsed, err := ParseMessage(msg)
+			parsed, err := parser.ParseMessage(msg)
 			if err != nil {
 				continue
 			}
