@@ -568,3 +568,95 @@ done
 		t.Errorf("Total errors: %d", errCount)
 	}
 }
+
+func TestSubprocessTransport_Integration_MockCLI(t *testing.T) {
+	tmpDir := t.TempDir()
+	mockCLI := filepath.Join(tmpDir, "claude")
+
+	mockScript := `#!/bin/bash
+echo '{"type":"system","subtype":"init","data":{"version":"2.0.0"}}'
+echo '{"type":"assistant","message":{"content":[{"type":"text","text":"Hello!"}],"model":"claude-test"}}'
+echo '{"type":"result","subtype":"success","duration_ms":100,"is_error":false}'
+`
+	if err := os.WriteFile(mockCLI, []byte(mockScript), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	opts := DefaultOptions()
+	opts.CLIPath = mockCLI
+
+	transport := NewSubprocessTransport("Hello", opts)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := transport.Connect(ctx); err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+	defer transport.Close()
+
+	// Collect messages
+	var messages []map[string]any
+	for msg := range transport.Messages() {
+		messages = append(messages, msg)
+	}
+
+	// Verify messages
+	if len(messages) != 3 {
+		t.Fatalf("expected 3 messages, got %d", len(messages))
+	}
+
+	expectedTypes := []string{"system", "assistant", "result"}
+	for i, expected := range expectedTypes {
+		if messages[i]["type"] != expected {
+			t.Errorf("message %d: got type %v, want %s", i, messages[i]["type"], expected)
+		}
+	}
+}
+
+func TestSubprocessTransport_Integration_StreamingMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	mockCLI := filepath.Join(tmpDir, "claude")
+
+	mockScript := `#!/bin/bash
+echo '{"type":"system","subtype":"init"}'
+while read -r line; do
+    if [[ -n "$line" ]]; then
+        echo '{"type":"assistant","message":{"content":[{"type":"text","text":"Echo"}]}}'
+        echo '{"type":"result","subtype":"success"}'
+        exit 0
+    fi
+done
+`
+	if err := os.WriteFile(mockCLI, []byte(mockScript), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	opts := DefaultOptions()
+	opts.CLIPath = mockCLI
+
+	transport := NewStreamingTransport(opts)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := transport.Connect(ctx); err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+	defer transport.Close()
+
+	// Send a message
+	if err := transport.Write(`{"type":"user","message":{"content":"test"}}`); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	// Collect messages
+	var messages []map[string]any
+	for msg := range transport.Messages() {
+		messages = append(messages, msg)
+	}
+
+	if len(messages) < 2 {
+		t.Errorf("expected at least 2 messages, got %d", len(messages))
+	}
+}
