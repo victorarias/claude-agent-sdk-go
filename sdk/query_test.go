@@ -319,7 +319,7 @@ func TestQuery_Initialize_WithHooks(t *testing.T) {
 		types.HookPreToolUse: {
 			{
 				Matcher: map[string]any{"tool_name": "Bash"},
-				Hooks: []HookCallback{
+				Hooks: []types.HookCallback{
 					func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
 						cont := true
 						return &types.HookOutput{Continue: &cont}, nil
@@ -509,7 +509,7 @@ func TestQuery_RewindFiles(t *testing.T) {
 	}
 }
 
-func TestQuery_HandleHookCallback(t *testing.T) {
+func TestQuery_Handletypes.HookCallback(t *testing.T) {
 	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 
@@ -556,7 +556,7 @@ func TestQuery_HandleHookCallback(t *testing.T) {
 	}
 }
 
-func TestQuery_HandleHookCallback_Error(t *testing.T) {
+func TestQuery_Handletypes.HookCallback_Error(t *testing.T) {
 	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 
@@ -603,9 +603,9 @@ func TestQuery_HandleCanUseTool(t *testing.T) {
 	query := NewQuery(transport, true)
 
 	called := false
-	query.SetCanUseTool(func(toolName string, input map[string]any, ctx *types.ToolPermissionContext) (PermissionResult, error) {
+	query.SetCanUseTool(func(toolName string, input map[string]any, ctx *types.ToolPermissionContext) (types.PermissionResult, error) {
 		called = true
-		return &PermissionResultAllow{Behavior: "allow"}, nil
+		return &types.PermissionResultAllow{Behavior: "allow"}, nil
 	})
 
 	ctx := context.Background()
@@ -642,8 +642,8 @@ func TestQuery_HandleCanUseTool_Deny(t *testing.T) {
 	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 
-	query.SetCanUseTool(func(toolName string, input map[string]any, ctx *types.ToolPermissionContext) (PermissionResult, error) {
-		return &PermissionResultDeny{Behavior: "deny", Message: "not allowed"}, nil
+	query.SetCanUseTool(func(toolName string, input map[string]any, ctx *types.ToolPermissionContext) (types.PermissionResult, error) {
+		return &types.PermissionResultDeny{Behavior: "deny", Message: "not allowed"}, nil
 	})
 
 	ctx := context.Background()
@@ -810,12 +810,12 @@ func TestQuery_RegisterMCPServer(t *testing.T) {
 	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 
-	server := NewMCPServerBuilder("test-server").
+	server := types.NewMCPServerBuilder("test-server").
 		WithTool("echo", "Echoes input", map[string]any{
 			"type": "object",
-		}, func(args map[string]any) (*MCPToolResult, error) {
-			return &MCPToolResult{
-				Content: []MCPContent{{Type: "text", Text: "hello"}},
+		}, func(args map[string]any) (*types.MCPToolResult, error) {
+			return &types.MCPToolResult{
+				Content: []types.MCPContent{{Type: "text", Text: "hello"}},
 			}, nil
 		}).
 		Build()
@@ -832,7 +832,7 @@ func TestQuery_UnregisterMCPServer(t *testing.T) {
 	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 
-	server := NewMCPServerBuilder("test-server").Build()
+	server := types.NewMCPServerBuilder("test-server").Build()
 	query.RegisterMCPServer(server)
 	query.UnregisterMCPServer("test-server")
 
@@ -846,16 +846,16 @@ func TestQuery_MCPToolCall(t *testing.T) {
 	query := NewQuery(transport, true)
 
 	// Register an MCP server
-	server := NewMCPServerBuilder("test-server").
+	server := types.NewMCPServerBuilder("test-server").
 		WithTool("echo", "Echoes input", map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"message": map[string]any{"type": "string"},
 			},
-		}, func(args map[string]any) (*MCPToolResult, error) {
+		}, func(args map[string]any) (*types.MCPToolResult, error) {
 			msg := args["message"].(string)
-			return &MCPToolResult{
-				Content: []MCPContent{{Type: "text", Text: msg}},
+			return &types.MCPToolResult{
+				Content: []types.MCPContent{{Type: "text", Text: msg}},
 			}, nil
 		}).
 		Build()
@@ -937,7 +937,7 @@ func TestQuery_MCPToolCall_ToolNotFound(t *testing.T) {
 	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 
-	server := NewMCPServerBuilder("test-server").Build()
+	server := types.NewMCPServerBuilder("test-server").Build()
 	query.RegisterMCPServer(server)
 
 	ctx := context.Background()
