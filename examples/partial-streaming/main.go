@@ -32,8 +32,8 @@ func main() {
 
 	// Enable partial message streaming for real-time updates
 	client := sdk.NewClient(
-		sdk.WithModel("claude-sonnet-4-5"),
-		sdk.WithPartialMessages(), // Enable streaming deltas
+		types.WithModel("claude-sonnet-4-5"),
+		types.WithPartialMessages(), // Enable streaming deltas
 	)
 
 	if err := client.Connect(ctx); err != nil {
@@ -60,7 +60,7 @@ func main() {
 		}
 
 		switch m := msg.(type) {
-		case *sdk.StreamEvent:
+		case *types.StreamEvent:
 			// Handle partial updates - text arrives incrementally
 			if m.EventType == "content_block_delta" {
 				if delta := m.Delta; delta != nil {
@@ -71,11 +71,11 @@ func main() {
 				}
 			}
 
-		case *sdk.AssistantMessage:
+		case *types.AssistantMessage:
 			// Full message - confirms the complete response
 			// Already printed via stream events above
 
-		case *sdk.ResultMessage:
+		case *types.ResultMessage:
 			elapsed := time.Since(startTime)
 			fmt.Println()
 			fmt.Println()
