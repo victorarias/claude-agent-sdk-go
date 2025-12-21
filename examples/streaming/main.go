@@ -17,7 +17,8 @@ import (
 	"strings"
 	"syscall"
 
-	sdk "github.com/victorarias/claude-agent-sdk-go"
+	"github.com/victorarias/claude-agent-sdk-go/sdk"
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 func main() {
