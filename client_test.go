@@ -419,3 +419,178 @@ func TestQueryStream_Cancellation(t *testing.T) {
 		t.Errorf("expected at least 1 message, got %d", count)
 	}
 }
+
+func TestClient_SendQuery(t *testing.T) {
+	transport := NewMockTransport()
+	client := NewClient(WithTransport(transport))
+
+	// Respond to initialize
+	go func() {
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			reqID, ok := req["request_id"].(string)
+			if !ok {
+				continue
+			}
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{"session_id": "test_session"},
+				},
+			})
+			return
+		}
+	}()
+
+	ctx := context.Background()
+	if err := client.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	// Send query
+	err := client.SendQuery("Hello")
+	if err != nil {
+		t.Errorf("SendQuery failed: %v", err)
+	}
+}
+
+func TestClient_ReceiveMessage(t *testing.T) {
+	transport := NewMockTransport()
+	client := NewClient(WithTransport(transport))
+
+	// Respond to initialize and send assistant message
+	go func() {
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			reqID, ok := req["request_id"].(string)
+			if !ok {
+				continue
+			}
+
+			// Send init response
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{"session_id": "test_session"},
+				},
+			})
+
+			// Then send assistant message
+			time.Sleep(10 * time.Millisecond)
+			transport.SendMessage(map[string]any{
+				"type": "assistant",
+				"message": map[string]any{
+					"content": []any{
+						map[string]any{"type": "text", "text": "Hello!"},
+					},
+				},
+			})
+			return
+		}
+	}()
+
+	ctx := context.Background()
+	if err := client.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	msg, err := client.ReceiveMessage()
+	if err != nil {
+		t.Errorf("ReceiveMessage failed: %v", err)
+	}
+
+	if _, ok := msg.(*AssistantMessage); !ok {
+		t.Errorf("expected AssistantMessage, got %T", msg)
+	}
+}
+
+func TestClient_ReceiveAll(t *testing.T) {
+	transport := NewMockTransport()
+	client := NewClient(WithTransport(transport))
+
+	// Respond to initialize and send messages
+	go func() {
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			reqID, ok := req["request_id"].(string)
+			if !ok {
+				continue
+			}
+
+			// Send init response
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{"session_id": "test_session"},
+				},
+			})
+
+			// Then send assistant and result messages
+			time.Sleep(10 * time.Millisecond)
+			transport.SendMessage(map[string]any{
+				"type": "assistant",
+				"message": map[string]any{
+					"content": []any{
+						map[string]any{"type": "text", "text": "Hello!"},
+					},
+				},
+			})
+			transport.SendMessage(map[string]any{
+				"type":    "result",
+				"subtype": "success",
+			})
+			return
+		}
+	}()
+
+	ctx := context.Background()
+	if err := client.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	messages, err := client.ReceiveAll()
+	if err != nil {
+		t.Errorf("ReceiveAll failed: %v", err)
+	}
+
+	if len(messages) != 2 { // assistant + result
+		t.Errorf("expected 2 messages, got %d", len(messages))
+	}
+}
