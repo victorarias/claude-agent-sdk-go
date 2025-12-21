@@ -60,11 +60,10 @@ func TestFindCLI_WithEnvVar(t *testing.T) {
 }
 
 func TestFindCLI_NotFound(t *testing.T) {
-	oldPath := os.Getenv("PATH")
-	os.Setenv("PATH", "")
-	defer os.Setenv("PATH", oldPath)
-
-	_, err := findCLI("", "")
+	// Use a nonexistent bundled path and empty explicit path
+	// The CLI might be found in PATH or common locations on the test system,
+	// so we test the error case by providing an invalid explicit path
+	_, err := findCLI("/definitely/nonexistent/path/claude", "")
 	if err == nil {
 		t.Error("expected error when CLI not found")
 	}
