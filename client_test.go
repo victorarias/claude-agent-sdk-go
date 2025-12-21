@@ -303,7 +303,7 @@ func TestQuery_OneShot(t *testing.T) {
 	}()
 
 	ctx := context.Background()
-	messages, err := Query(ctx, "Hello", WithTransport(transport))
+	messages, err := RunQuery(ctx, "Hello", WithTransport(transport))
 
 	if err != nil {
 		t.Fatalf("Query failed: %v", err)
