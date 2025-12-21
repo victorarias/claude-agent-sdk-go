@@ -12,32 +12,27 @@ Implementation plans are in `docs/plans/`:
 - `05-integration.md` - Examples and integration tests
 - `06-mcp-servers.md` - MCP server support
 
-## Beads
+## Task Tracking (Beads)
 
-Use beads to track progress. Run `bd prime` to learn the CLI.
+Use `bd` (beads) for tracking work, not TodoWrite. Run `bd prime` to learn commands.
 
-Rules:
+### Quick Reference
 
-1. **One epic per plan** - Create todos for each task in the current plan
-2. **Add reference** - Include plan name and task number (e.g., "Plan01/Task3: Content blocks")
-3. **Create upfront** - Set up todos before starting a batch
-4. **Add as you go** - Discover bugs or subtasks? Add them immediately
-5. **Mark in_progress** - Only one task at a time
-6. **Mark completed** - Immediately when done, don't batch
-
-Example:
-```
-[in_progress] Plan01/Task3: Define content block types
-[pending] Plan01/Task4: Define message types
-[pending] Plan01/Task5: Define options types
+```bash
+bd ready                    # Show unblocked work
+bd create --title="..." --type=task --priority=2  # Create (priority 0-4)
+bd update <id> --status=in_progress               # Claim work
+bd close <id>               # Complete
+bd dep add <child> <parent> # child depends on parent
+bd sync                     # Sync with git (run at session end)
 ```
 
-When bugs are found:
-```
-[in_progress] Plan01/Task3: Define content block types
-[pending] BUG: Fix circular reference in TextBlock
-[pending] Plan01/Task4: Define message types
-```
+### Workflow
+
+1. **Epics:** Create for features requiring 3+ tasks
+2. **Plan references:** Link via `--description "docs/plans/foo.md#section"`
+3. **Dependencies:** Use `bd dep add` when order matters
+4. **Discovery:** Add tasks as you find bugs or new work
 
 ## Reference
 
