@@ -181,7 +181,7 @@ func TestWithClient_ConnectError(t *testing.T) {
 		connectErr: connectErr,
 	}
 	opts := []types.Option{
-		types.WithCustomTransport(mock),
+		types.WithTransport(mock),
 	}
 
 	functionCalled := false
@@ -208,7 +208,7 @@ func TestWithClient_DisconnectError(t *testing.T) {
 		closeShouldErr: true,
 	}
 	opts := []types.Option{
-		types.WithCustomTransport(mock),
+		types.WithTransport(mock),
 	}
 
 	functionErr := errors.New("function error")
@@ -235,7 +235,7 @@ func TestWithClient_DisconnectErrorOnly(t *testing.T) {
 		closeShouldErr: true,
 	}
 	opts := []types.Option{
-		types.WithCustomTransport(mock),
+		types.WithTransport(mock),
 	}
 
 	err := WithClient(context.Background(), opts, func(c *Client) error {
