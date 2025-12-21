@@ -76,7 +76,7 @@ func handleError(err error) {
 		fmt.Fprintln(os.Stderr, "Error: Claude CLI not found")
 		fmt.Fprintln(os.Stderr, "Install with: npm install -g @anthropic-ai/claude-code")
 
-	case errors.Is(err, sdk.ErrVersionMismatch):
+	case errors.Is(err, sdk.ErrCLIVersion):
 		fmt.Fprintln(os.Stderr, "Error: Claude CLI version too old")
 		fmt.Fprintln(os.Stderr, "Update with: npm update -g @anthropic-ai/claude-code")
 
