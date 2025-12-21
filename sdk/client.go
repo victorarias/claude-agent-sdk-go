@@ -72,6 +72,17 @@ func NewClient(opts ...types.Option) *Client {
 	return client
 }
 
+// validateOptions validates that options are not mutually exclusive.
+func (c *Client) validateOptions() error {
+	// CanUseTool and PermissionPromptToolName are mutually exclusive
+	if c.canUseTool != nil && c.options.PermissionPromptToolName != "" {
+		return &types.ValidationError{
+			Message: "can_use_tool callback cannot be used with permission_prompt_tool_name",
+		}
+	}
+	return nil
+}
+
 // Options returns the client's options.
 func (c *Client) Options() *types.Options {
 	return c.options
