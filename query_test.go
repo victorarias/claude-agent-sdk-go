@@ -234,3 +234,122 @@ func TestQuery_SendControlRequest_NonStreaming(t *testing.T) {
 		t.Error("expected error for non-streaming mode")
 	}
 }
+
+func TestQuery_Initialize(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	// Simulate init response
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		written := transport.Written()
+		if len(written) > 0 {
+			var req map[string]any
+			json.Unmarshal([]byte(written[0]), &req)
+			reqID := req["request_id"].(string)
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response": map[string]any{
+						"commands": []any{"/help", "/clear"},
+					},
+				},
+			})
+		}
+	}()
+
+	result, err := query.Initialize(nil)
+	if err != nil {
+		t.Errorf("Initialize failed: %v", err)
+	}
+
+	if result == nil {
+		t.Error("expected initialization result")
+	}
+}
+
+func TestQuery_Initialize_WithHooks(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		written := transport.Written()
+		if len(written) > 0 {
+			var req map[string]any
+			json.Unmarshal([]byte(written[0]), &req)
+			reqID := req["request_id"].(string)
+
+			// Verify hooks are in request
+			request := req["request"].(map[string]any)
+			if request["hooks"] == nil {
+				t.Error("expected hooks in request")
+			}
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{},
+				},
+			})
+		}
+	}()
+
+	hooks := map[HookEvent][]HookMatcher{
+		HookPreToolUse: {
+			{
+				Matcher: strPtr("Bash"),
+				Hooks: []HookCallback{
+					func(input any, toolUseID *string, ctx *HookContext) (*HookOutput, error) {
+						cont := true
+						return &HookOutput{Continue: &cont}, nil
+					},
+				},
+			},
+		},
+	}
+
+	_, err := query.Initialize(hooks)
+	if err != nil {
+		t.Errorf("Initialize with hooks failed: %v", err)
+	}
+}
+
+func TestQuery_Initialize_NonStreaming(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, false) // non-streaming
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	// Non-streaming should return nil without error
+	result, err := query.Initialize(nil)
+	if err != nil {
+		t.Errorf("Initialize failed: %v", err)
+	}
+	if result != nil {
+		t.Error("expected nil result for non-streaming")
+	}
+}
+
+func strPtr(s string) *string { return &s }
