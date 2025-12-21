@@ -246,3 +246,51 @@ func TestNewStreamingTransport(t *testing.T) {
 func TestSubprocessTransportImplementsInterface(t *testing.T) {
 	var _ Transport = (*SubprocessTransport)(nil)
 }
+
+func TestSubprocessTransport_Connect_NotFound(t *testing.T) {
+	opts := DefaultOptions()
+	opts.CLIPath = "/nonexistent/path/to/claude"
+
+	transport := NewSubprocessTransport("Hello", opts)
+	err := transport.Connect(context.Background())
+
+	if err == nil {
+		t.Error("expected error for nonexistent CLI")
+	}
+
+	var notFoundErr *CLINotFoundError
+	if !errors.As(err, &notFoundErr) {
+		t.Errorf("expected CLINotFoundError, got %T: %v", err, err)
+	}
+}
+
+func TestSubprocessTransport_Connect_AlreadyConnected(t *testing.T) {
+	// Create mock CLI
+	tmpDir := t.TempDir()
+	mockCLI := filepath.Join(tmpDir, "claude")
+	mockScript := `#!/bin/bash
+echo '{"type":"system","subtype":"init"}'
+sleep 0.1
+`
+	if err := os.WriteFile(mockCLI, []byte(mockScript), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	opts := DefaultOptions()
+	opts.CLIPath = mockCLI
+
+	transport := NewSubprocessTransport("Hello", opts)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// First connect should succeed
+	if err := transport.Connect(ctx); err != nil {
+		t.Fatalf("first Connect failed: %v", err)
+	}
+	defer transport.Close()
+
+	// Second connect should return nil (already connected)
+	if err := transport.Connect(ctx); err != nil {
+		t.Errorf("second Connect should return nil: %v", err)
+	}
+}
