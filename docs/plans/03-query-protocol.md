@@ -216,11 +216,45 @@ func ParseMessage(raw map[string]any) (Message, error) {
 		return parseUserMessage(raw)
 	case "result":
 		return parseResultMessage(raw)
+	case "stream_event":
+		return parseStreamEvent(raw)
 	default:
 		return nil, &ParseError{
 			Message: fmt.Sprintf("unknown message type: %s", msgType),
 		}
 	}
+}
+
+// parseStreamEvent parses a StreamEvent for partial message updates.
+func parseStreamEvent(raw map[string]any) (*StreamEvent, error) {
+	event := &StreamEvent{
+		UUID:      getString(raw, "uuid"),
+		SessionID: getString(raw, "session_id"),
+	}
+
+	// Extract parent_tool_use_id if present
+	if parentID, ok := raw["parent_tool_use_id"].(string); ok {
+		event.ParentToolUseID = &parentID
+	}
+
+	// Parse the nested event data
+	if eventData, ok := raw["event"].(map[string]any); ok {
+		event.Event = eventData
+		event.EventType = getString(eventData, "type")
+
+		// Extract index if present (for content_block events)
+		if idx, ok := eventData["index"].(float64); ok {
+			idxInt := int(idx)
+			event.Index = &idxInt
+		}
+
+		// Extract delta if present
+		if delta, ok := eventData["delta"].(map[string]any); ok {
+			event.Delta = delta
+		}
+	}
+
+	return event, nil
 }
 
 func parseSystemMessage(raw map[string]any) (*SystemMessage, error) {
