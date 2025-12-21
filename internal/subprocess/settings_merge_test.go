@@ -19,8 +19,8 @@ func TestSettingsMerge_SandboxMergedIntoSettings(t *testing.T) {
 
 	// Set up sandbox config
 	opts.Sandbox = &types.SandboxSettings{
-		Enabled: true,
-		Type:    "docker",
+		Enabled:                  true,
+		AutoAllowBashIfSandboxed: true,
 	}
 
 	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
@@ -69,8 +69,8 @@ func TestSettingsMerge_SandboxMergedIntoSettings(t *testing.T) {
 	if sandboxMap["enabled"] != true {
 		t.Errorf("sandbox.enabled: got %v, want true", sandboxMap["enabled"])
 	}
-	if sandboxMap["type"] != "docker" {
-		t.Errorf("sandbox.type: got %v, want docker", sandboxMap["type"])
+	if sandboxMap["autoAllowBashIfSandboxed"] != true {
+		t.Errorf("sandbox.autoAllowBashIfSandboxed: got %v, want true", sandboxMap["autoAllowBashIfSandboxed"])
 	}
 
 	// Verify --sandbox flag is NOT present when settings exist
@@ -88,8 +88,8 @@ func TestSettingsMerge_SandboxOnlyNoSettings(t *testing.T) {
 
 	// Only sandbox, no settings
 	opts.Sandbox = &types.SandboxSettings{
-		Enabled: true,
-		Type:    "native",
+		Enabled:                   true,
+		EnableWeakerNestedSandbox: true,
 	}
 
 	cmd := buildCommand("/usr/bin/claude", "test", opts, false)

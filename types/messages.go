@@ -386,6 +386,161 @@ type ControlResponse struct {
 	Response ControlResponseData `json:"response"`
 }
 
+// SDKControlRequest is the interface for control request subtypes.
+// Each control request type implements this interface via ControlRequestType().
+type SDKControlRequest interface {
+	ControlRequestType() string
+}
+
+// SDKControlInterruptRequest requests an interrupt.
+type SDKControlInterruptRequest struct {
+	Subtype string `json:"subtype"`
+}
+
+// ControlRequestType returns the request subtype.
+func (r *SDKControlInterruptRequest) ControlRequestType() string {
+	return r.Subtype
+}
+
+// SDKControlPermissionRequest requests permission for a tool.
+type SDKControlPermissionRequest struct {
+	Subtype               string              `json:"subtype"`
+	ToolName              string              `json:"tool_name"`
+	Input                 map[string]any      `json:"input"`
+	PermissionSuggestions []PermissionUpdate  `json:"permission_suggestions,omitempty"`
+	BlockedPath           *string             `json:"blocked_path,omitempty"`
+}
+
+// ControlRequestType returns the request subtype.
+func (r *SDKControlPermissionRequest) ControlRequestType() string {
+	return r.Subtype
+}
+
+// SDKControlInitializeRequest initializes the SDK session.
+type SDKControlInitializeRequest struct {
+	Subtype string              `json:"subtype"`
+	Hooks   map[HookEvent]any   `json:"hooks,omitempty"`
+}
+
+// ControlRequestType returns the request subtype.
+func (r *SDKControlInitializeRequest) ControlRequestType() string {
+	return r.Subtype
+}
+
+// SDKControlSetPermissionModeRequest sets the permission mode.
+type SDKControlSetPermissionModeRequest struct {
+	Subtype string `json:"subtype"`
+	Mode    string `json:"mode"`
+}
+
+// ControlRequestType returns the request subtype.
+func (r *SDKControlSetPermissionModeRequest) ControlRequestType() string {
+	return r.Subtype
+}
+
+// SDKHookCallbackRequest invokes a hook callback.
+type SDKHookCallbackRequest struct {
+	Subtype    string  `json:"subtype"`
+	CallbackID string  `json:"callback_id"`
+	Input      any     `json:"input,omitempty"`
+	ToolUseID  *string `json:"tool_use_id,omitempty"`
+}
+
+// ControlRequestType returns the request subtype.
+func (r *SDKHookCallbackRequest) ControlRequestType() string {
+	return r.Subtype
+}
+
+// SDKControlMcpMessageRequest sends a message to an MCP server.
+type SDKControlMcpMessageRequest struct {
+	Subtype    string `json:"subtype"`
+	ServerName string `json:"server_name"`
+	Message    any    `json:"message,omitempty"`
+}
+
+// ControlRequestType returns the request subtype.
+func (r *SDKControlMcpMessageRequest) ControlRequestType() string {
+	return r.Subtype
+}
+
+// SDKControlRewindFilesRequest rewinds files to a previous message.
+type SDKControlRewindFilesRequest struct {
+	Subtype       string `json:"subtype"`
+	UserMessageID string `json:"user_message_id"`
+}
+
+// ControlRequestType returns the request subtype.
+func (r *SDKControlRewindFilesRequest) ControlRequestType() string {
+	return r.Subtype
+}
+
+// ParseSDKControlRequest parses a raw JSON map into a typed SDKControlRequest.
+func ParseSDKControlRequest(raw map[string]any) (SDKControlRequest, error) {
+	subtype, ok := raw["subtype"].(string)
+	if !ok {
+		return nil, fmt.Errorf("missing or invalid 'subtype' field")
+	}
+
+	data, err := json.Marshal(raw)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	switch subtype {
+	case "interrupt":
+		var req SDKControlInterruptRequest
+		if err := json.Unmarshal(data, &req); err != nil {
+			return nil, fmt.Errorf("failed to parse interrupt request: %w", err)
+		}
+		return &req, nil
+
+	case "can_use_tool":
+		var req SDKControlPermissionRequest
+		if err := json.Unmarshal(data, &req); err != nil {
+			return nil, fmt.Errorf("failed to parse permission request: %w", err)
+		}
+		return &req, nil
+
+	case "initialize":
+		var req SDKControlInitializeRequest
+		if err := json.Unmarshal(data, &req); err != nil {
+			return nil, fmt.Errorf("failed to parse initialize request: %w", err)
+		}
+		return &req, nil
+
+	case "set_permission_mode":
+		var req SDKControlSetPermissionModeRequest
+		if err := json.Unmarshal(data, &req); err != nil {
+			return nil, fmt.Errorf("failed to parse set permission mode request: %w", err)
+		}
+		return &req, nil
+
+	case "hook_callback":
+		var req SDKHookCallbackRequest
+		if err := json.Unmarshal(data, &req); err != nil {
+			return nil, fmt.Errorf("failed to parse hook callback request: %w", err)
+		}
+		return &req, nil
+
+	case "mcp_message":
+		var req SDKControlMcpMessageRequest
+		if err := json.Unmarshal(data, &req); err != nil {
+			return nil, fmt.Errorf("failed to parse mcp message request: %w", err)
+		}
+		return &req, nil
+
+	case "rewind_files":
+		var req SDKControlRewindFilesRequest
+		if err := json.Unmarshal(data, &req); err != nil {
+			return nil, fmt.Errorf("failed to parse rewind files request: %w", err)
+		}
+		return &req, nil
+
+	default:
+		return nil, fmt.Errorf("unknown control request subtype: %s", subtype)
+	}
+}
+
 // PermissionResult is the interface for permission results.
 type PermissionResult interface {
 	isPermissionResult()
