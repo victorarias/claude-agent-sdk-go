@@ -572,7 +572,7 @@ func (q *Query) sendControlRequest(request map[string]any, timeout time.Duration
 }
 
 // Initialize sends the initialization request to the CLI.
-func (q *Query) Initialize(hooks map[HookEvent][]HookMatcher) (map[string]any, error) {
+func (q *Query) Initialize(hooks map[types.HookEvent][]types.HookMatcher) (map[string]any, error) {
 	if !q.streaming {
 		return nil, nil
 	}
@@ -600,7 +600,7 @@ func (q *Query) Initialize(hooks map[HookEvent][]HookMatcher) (map[string]any, e
 }
 
 // buildHooksConfig builds the hooks configuration for initialization.
-func (q *Query) buildHooksConfig(hooks map[HookEvent][]HookMatcher) map[string]any {
+func (q *Query) buildHooksConfig(hooks map[types.HookEvent][]types.HookMatcher) map[string]any {
 	if hooks == nil {
 		return nil
 	}
@@ -654,7 +654,7 @@ func (q *Query) Interrupt() error {
 }
 
 // SetPermissionMode changes the permission mode.
-func (q *Query) SetPermissionMode(mode PermissionMode) error {
+func (q *Query) SetPermissionMode(mode types.PermissionMode) error {
 	_, err := q.sendControlRequest(map[string]any{
 		"subtype": "set_permission_mode",
 		"mode":    string(mode),
