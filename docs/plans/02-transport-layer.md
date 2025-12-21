@@ -1596,19 +1596,26 @@ import "time"
 const gracefulShutdownTimeout = 5 * time.Second
 
 // Close terminates the subprocess and cleans up resources.
+// CRITICAL: Uses TOCTOU-safe pattern - state changes inside lock.
 func (t *SubprocessTransport) Close() error {
+	// CRITICAL: Acquire write lock FIRST to prevent concurrent writes during close
+	t.writeMu.Lock()
+	defer t.writeMu.Unlock()
+
 	t.closeMu.Lock()
 	if t.closed {
 		t.closeMu.Unlock()
 		return nil
 	}
+	// CRITICAL: Set closed and ready inside the lock to prevent TOCTOU
 	t.closed = true
 	t.ready = false
+	cancel := t.cancel
 	t.closeMu.Unlock()
 
 	// Cancel context to stop goroutines
-	if t.cancel != nil {
-		t.cancel()
+	if cancel != nil {
+		cancel()
 	}
 
 	// Close stdin first to signal EOF
