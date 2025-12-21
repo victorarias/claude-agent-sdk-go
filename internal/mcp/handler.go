@@ -3,6 +3,8 @@ package mcp
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 // MCPHandler processes MCP protocol messages for a server.
