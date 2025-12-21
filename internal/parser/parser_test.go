@@ -21,7 +21,7 @@ func TestParseMessage_System(t *testing.T) {
 		t.Fatalf("ParseMessage failed: %v", err)
 	}
 
-	sys, ok := msg.(*SystemMessage)
+	sys, ok := msg.(*types.SystemMessage)
 	if !ok {
 		t.Fatalf("expected *SystemMessage, got %T", msg)
 	}
@@ -51,7 +51,7 @@ func TestParseMessage_Assistant(t *testing.T) {
 		t.Fatalf("ParseMessage failed: %v", err)
 	}
 
-	asst, ok := msg.(*AssistantMessage)
+	asst, ok := msg.(*types.AssistantMessage)
 	if !ok {
 		t.Fatalf("expected *AssistantMessage, got %T", msg)
 	}
@@ -80,7 +80,7 @@ func TestParseMessage_Result(t *testing.T) {
 		t.Fatalf("ParseMessage failed: %v", err)
 	}
 
-	result, ok := msg.(*ResultMessage)
+	result, ok := msg.(*types.ResultMessage)
 	if !ok {
 		t.Fatalf("expected *ResultMessage, got %T", msg)
 	}
@@ -108,7 +108,7 @@ func TestParseMessage_User(t *testing.T) {
 		t.Fatalf("ParseMessage failed: %v", err)
 	}
 
-	user, ok := msg.(*UserMessage)
+	user, ok := msg.(*types.UserMessage)
 	if !ok {
 		t.Fatalf("expected *UserMessage, got %T", msg)
 	}
@@ -138,7 +138,7 @@ func TestParseMessage_StreamEvent(t *testing.T) {
 		t.Fatalf("ParseMessage failed: %v", err)
 	}
 
-	event, ok := msg.(*StreamEvent)
+	event, ok := msg.(*types.StreamEvent)
 	if !ok {
 		t.Fatalf("expected *StreamEvent, got %T", msg)
 	}
@@ -173,7 +173,7 @@ func TestParseMessage_WithParentToolUseID(t *testing.T) {
 		t.Fatalf("ParseMessage failed: %v", err)
 	}
 
-	user, ok := msg.(*UserMessage)
+	user, ok := msg.(*types.UserMessage)
 	if !ok {
 		t.Fatalf("expected *UserMessage, got %T", msg)
 	}
