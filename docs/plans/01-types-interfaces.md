@@ -1498,6 +1498,40 @@ type PreToolUseHookSpecificOutput struct {
 	UpdatedInput             map[string]any `json:"updatedInput,omitempty"`
 }
 
+// PostToolUseHookSpecificOutput is the hook-specific output for PostToolUse.
+type PostToolUseHookSpecificOutput struct {
+	HookEventName    string `json:"hookEventName"` // "PostToolUse"
+	UpdatedResponse  any    `json:"updatedResponse,omitempty"`
+	SuppressResponse bool   `json:"suppressResponse,omitempty"`
+}
+
+// UserPromptSubmitHookSpecificOutput is the hook-specific output for UserPromptSubmit.
+type UserPromptSubmitHookSpecificOutput struct {
+	HookEventName string `json:"hookEventName"` // "UserPromptSubmit"
+	UpdatedPrompt string `json:"updatedPrompt,omitempty"`
+	AddMessages   []any  `json:"addMessages,omitempty"` // Inject additional context
+}
+
+// StopHookSpecificOutput is the hook-specific output for Stop hooks.
+type StopHookSpecificOutput struct {
+	HookEventName string `json:"hookEventName"` // "Stop"
+	PreventStop   bool   `json:"preventStop,omitempty"`
+	CustomReason  string `json:"customReason,omitempty"`
+}
+
+// SubagentStopHookSpecificOutput is the hook-specific output for SubagentStop hooks.
+type SubagentStopHookSpecificOutput struct {
+	HookEventName string `json:"hookEventName"` // "SubagentStop"
+	PreventStop   bool   `json:"preventStop,omitempty"`
+}
+
+// PreCompactHookSpecificOutput is the hook-specific output for PreCompact hooks.
+type PreCompactHookSpecificOutput struct {
+	HookEventName          string  `json:"hookEventName"` // "PreCompact"
+	CancelCompact          bool    `json:"cancelCompact,omitempty"`
+	CustomInstructions     *string `json:"customInstructions,omitempty"`
+}
+
 // HookCallback is the signature for hook callback functions.
 type HookCallback func(input any, toolUseID *string, ctx *HookContext) (*HookOutput, error)
 
