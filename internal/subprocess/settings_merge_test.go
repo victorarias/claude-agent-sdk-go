@@ -134,8 +134,8 @@ func TestSettingsMerge_SandboxOnlyNoSettings(t *testing.T) {
 	if sandboxMap["enabled"] != true {
 		t.Errorf("sandbox.enabled: got %v, want true", sandboxMap["enabled"])
 	}
-	if sandboxMap["type"] != "native" {
-		t.Errorf("sandbox.type: got %v, want native", sandboxMap["type"])
+	if sandboxMap["enableWeakerNestedSandbox"] != true {
+		t.Errorf("sandbox.enableWeakerNestedSandbox: got %v, want true", sandboxMap["enableWeakerNestedSandbox"])
 	}
 
 	// Verify --sandbox flag is NOT present
@@ -191,14 +191,13 @@ func TestSettingsMerge_NestedSandboxSettings(t *testing.T) {
 	// Settings with existing config
 	opts.Settings = `{"model":"claude-opus-4","timeout":30}`
 
-	// Complex sandbox config
+	// Complex sandbox config with network settings
 	opts.Sandbox = &types.SandboxSettings{
-		Enabled: true,
-		Type:    "docker",
-		Image:   "custom-image:latest",
-		Env: map[string]string{
-			"FOO": "bar",
-			"BAZ": "qux",
+		Enabled:                  true,
+		AutoAllowBashIfSandboxed: true,
+		ExcludedCommands:         []string{"rm", "mv"},
+		Network: &types.SandboxNetworkConfig{
+			AllowedDomains: []string{"example.com", "api.test.com"},
 		},
 	}
 
