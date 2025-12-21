@@ -1447,7 +1447,620 @@ git commit -m "docs: add error handling example"
 
 ---
 
-## Task 8: Integration Tests
+## Task 8: Budget Control Example
+
+**Files:**
+- Create: `examples/budget/main.go`
+
+**Step 1: Create example**
+
+Create `examples/budget/main.go`:
+
+```go
+// Example: Budget control with Claude Agent SDK.
+//
+// This demonstrates how to use budget limits to control costs:
+// - Set max_budget_usd to limit spending
+// - Track accumulated costs across turns
+// - Handle budget exceeded errors
+//
+// Usage:
+//
+//	go run examples/budget/main.go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"time"
+
+	sdk "github.com/victorarias/claude-agent-sdk-go"
+)
+
+func main() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	fmt.Println("Budget Control Example")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println()
+
+	// Example 1: Set a very low budget to demonstrate limits
+	fmt.Println("1. Low budget query (will likely succeed for short response)")
+	lowBudgetExample(ctx)
+
+	// Example 2: Track costs across multiple queries
+	fmt.Println("\n2. Cost tracking across queries")
+	costTrackingExample(ctx)
+
+	// Example 3: Budget callback for real-time monitoring
+	fmt.Println("\n3. Real-time budget monitoring")
+	budgetMonitoringExample(ctx)
+}
+
+func lowBudgetExample(ctx context.Context) {
+	// Set a low budget - query will fail if response would exceed this
+	messages, err := sdk.Query(ctx, "Say 'hi'",
+		sdk.WithMaxBudgetUSD(0.01), // $0.01 budget
+	)
+	if err != nil {
+		fmt.Printf("   Error: %v\n", err)
+		return
+	}
+
+	for _, msg := range messages {
+		switch m := msg.(type) {
+		case *sdk.AssistantMessage:
+			fmt.Printf("   Response: %s\n", m.Text())
+		case *sdk.ResultMessage:
+			if m.TotalCostUSD != nil {
+				fmt.Printf("   Cost: $%.6f\n", *m.TotalCostUSD)
+			}
+		}
+	}
+}
+
+func costTrackingExample(ctx context.Context) {
+	var totalCost float64
+	maxBudget := 0.05 // $0.05 total budget
+
+	queries := []string{
+		"Say 'one'",
+		"Say 'two'",
+		"Say 'three'",
+	}
+
+	for i, query := range queries {
+		// Check if we have budget remaining
+		remaining := maxBudget - totalCost
+		if remaining <= 0 {
+			fmt.Printf("   Query %d: Skipped - budget exhausted\n", i+1)
+			continue
+		}
+
+		fmt.Printf("   Query %d: %s (budget remaining: $%.4f)\n", i+1, query, remaining)
+
+		messages, err := sdk.Query(ctx, query,
+			sdk.WithMaxBudgetUSD(remaining),
+		)
+		if err != nil {
+			fmt.Printf("   Error: %v\n", err)
+			break
+		}
+
+		for _, msg := range messages {
+			if result, ok := msg.(*sdk.ResultMessage); ok {
+				if result.TotalCostUSD != nil {
+					queryCost := *result.TotalCostUSD
+					totalCost += queryCost
+					fmt.Printf("   -> Cost: $%.6f (total: $%.6f)\n", queryCost, totalCost)
+				}
+			}
+		}
+	}
+
+	fmt.Printf("   Final total cost: $%.6f\n", totalCost)
+}
+
+func budgetMonitoringExample(ctx context.Context) {
+	budget := 0.02 // $0.02 budget
+
+	client := sdk.NewClient(
+		sdk.WithMaxBudgetUSD(budget),
+		// Hook to monitor cost per tool call
+		sdk.WithPostToolUseHook(func(name string, input map[string]any, output *sdk.ToolOutput) *sdk.HookResult {
+			if output.Cost > 0 {
+				fmt.Printf("   [Tool %s cost: $%.6f]\n", name, output.Cost)
+			}
+			return nil
+		}),
+	)
+
+	if err := client.Connect(ctx); err != nil {
+		fmt.Printf("   Error: %v\n", err)
+		return
+	}
+	defer client.Close()
+
+	if err := client.SendQuery("What is 1+1?"); err != nil {
+		fmt.Printf("   Error: %v\n", err)
+		return
+	}
+
+	for msg := range client.Messages() {
+		switch m := msg.(type) {
+		case *sdk.AssistantMessage:
+			fmt.Printf("   Response: %s\n", m.Text())
+		case *sdk.ResultMessage:
+			if m.TotalCostUSD != nil {
+				fmt.Printf("   Total cost: $%.6f (budget: $%.4f)\n", *m.TotalCostUSD, budget)
+			}
+		}
+	}
+}
+```
+
+**Step 2: Verify it compiles**
+
+```bash
+go build ./examples/budget/
+```
+
+Expected: No errors
+
+**Step 3: Commit**
+
+```bash
+git add examples/budget/main.go
+git commit -m "docs: add budget control example"
+```
+
+---
+
+## Task 9: Partial Streaming Example
+
+**Files:**
+- Create: `examples/partial-streaming/main.go`
+
+**Step 1: Create example**
+
+Create `examples/partial-streaming/main.go`:
+
+```go
+// Example: Partial message streaming with Claude Agent SDK.
+//
+// This demonstrates real-time streaming with partial updates:
+// - Enable include_partial_messages for character-by-character output
+// - Handle StreamEvent messages for delta updates
+// - Build responsive UIs with immediate feedback
+//
+// Usage:
+//
+//	go run examples/partial-streaming/main.go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"time"
+
+	sdk "github.com/victorarias/claude-agent-sdk-go"
+)
+
+func main() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	fmt.Println("Partial Streaming Example")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println()
+	fmt.Println("Watch text appear character by character...")
+	fmt.Println()
+
+	// Enable partial message streaming for real-time updates
+	client := sdk.NewClient(
+		sdk.WithModel("claude-sonnet-4-5"),
+		sdk.WithIncludePartialMessages(true), // Enable streaming deltas
+	)
+
+	if err := client.Connect(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to connect: %v\n", err)
+		os.Exit(1)
+	}
+	defer client.Close()
+
+	if err := client.SendQuery("Write a short poem about Go programming (4 lines)."); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Print("Claude: ")
+
+	var charCount int
+	startTime := time.Now()
+
+	for msg := range client.Messages() {
+		switch m := msg.(type) {
+		case *sdk.StreamEvent:
+			// Handle partial updates - text arrives character by character
+			if m.EventType == "content_block_delta" {
+				if delta := m.Delta; delta != nil {
+					if text, ok := delta["text"].(string); ok {
+						fmt.Print(text)
+						charCount += len(text)
+					}
+				}
+			}
+
+		case *sdk.AssistantMessage:
+			// Full message - already printed via stream events
+			// This confirms the complete message
+
+		case *sdk.ResultMessage:
+			elapsed := time.Since(startTime)
+			fmt.Println()
+			fmt.Println()
+			fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━")
+			fmt.Printf("Characters streamed: %d\n", charCount)
+			fmt.Printf("Time elapsed: %.2fs\n", elapsed.Seconds())
+			if charCount > 0 && elapsed > 0 {
+				cps := float64(charCount) / elapsed.Seconds()
+				fmt.Printf("Streaming rate: %.1f chars/sec\n", cps)
+			}
+			if m.TotalCostUSD != nil {
+				fmt.Printf("Cost: $%.4f\n", *m.TotalCostUSD)
+			}
+		}
+	}
+}
+```
+
+**Step 2: Verify it compiles**
+
+```bash
+go build ./examples/partial-streaming/
+```
+
+Expected: No errors
+
+**Step 3: Commit**
+
+```bash
+git add examples/partial-streaming/main.go
+git commit -m "docs: add partial streaming example"
+```
+
+---
+
+## Task 10: Interrupt Example
+
+**Files:**
+- Create: `examples/interrupt/main.go`
+
+**Step 1: Create example**
+
+Create `examples/interrupt/main.go`:
+
+```go
+// Example: Interrupt capability with Claude Agent SDK.
+//
+// This demonstrates how to interrupt a running Claude operation:
+// - Send interrupt signal to stop long-running tasks
+// - Handle Ctrl+C gracefully
+// - Use context cancellation for timeouts
+//
+// Usage:
+//
+//	go run examples/interrupt/main.go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
+
+	sdk "github.com/victorarias/claude-agent-sdk-go"
+)
+
+func main() {
+	fmt.Println("Interrupt Example")
+	fmt.Println("━━━━━━━━━━━━━━━━━")
+	fmt.Println()
+	fmt.Println("This will start a long task. Press Ctrl+C to interrupt.")
+	fmt.Println()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Set up signal handling for Ctrl+C
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	client := sdk.NewClient(
+		sdk.WithModel("claude-sonnet-4-5"),
+		sdk.WithMaxTurns(10),
+	)
+
+	if err := client.Connect(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to connect: %v\n", err)
+		os.Exit(1)
+	}
+	defer client.Close()
+
+	// Start a long-running task
+	longTask := "Please count from 1 to 100, saying each number on a new line. Take your time."
+	fmt.Printf("Starting task: %s\n\n", longTask)
+
+	if err := client.SendQuery(longTask); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Handle messages in a goroutine
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for msg := range client.Messages() {
+			switch m := msg.(type) {
+			case *sdk.AssistantMessage:
+				fmt.Print(m.Text())
+			case *sdk.ResultMessage:
+				fmt.Println()
+				if m.IsSuccess() {
+					fmt.Println("\n[Task completed normally]")
+				} else {
+					fmt.Printf("\n[Task ended: %s]\n", m.Subtype)
+				}
+				return
+			}
+		}
+	}()
+
+	// Wait for signal or completion
+	select {
+	case <-sigChan:
+		fmt.Println("\n\n[Received interrupt signal, sending interrupt to Claude...]")
+
+		// Send interrupt to Claude
+		if err := client.Interrupt(); err != nil {
+			fmt.Printf("[Interrupt failed: %v]\n", err)
+		} else {
+			fmt.Println("[Interrupt sent successfully]")
+		}
+
+		// Give Claude time to respond to interrupt
+		time.Sleep(2 * time.Second)
+		cancel()
+
+	case <-ctx.Done():
+		fmt.Println("\n[Context cancelled]")
+	}
+
+	// Wait for message handler to finish
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		fmt.Println("[Cleanup complete]")
+	case <-time.After(5 * time.Second):
+		fmt.Println("[Timeout waiting for cleanup]")
+	}
+}
+```
+
+**Step 2: Verify it compiles**
+
+```bash
+go build ./examples/interrupt/
+```
+
+Expected: No errors
+
+**Step 3: Commit**
+
+```bash
+git add examples/interrupt/main.go
+git commit -m "docs: add interrupt example"
+```
+
+---
+
+## Task 11: Custom Agents Example
+
+**Files:**
+- Create: `examples/agents/main.go`
+
+**Step 1: Create example**
+
+Create `examples/agents/main.go`:
+
+```go
+// Example: Custom agent definitions with Claude Agent SDK.
+//
+// This demonstrates how to define specialized agents:
+// - Define agents with specific tools and prompts
+// - Configure agents for different use cases
+// - Use agent presets for common patterns
+//
+// Usage:
+//
+//	go run examples/agents/main.go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"time"
+
+	sdk "github.com/victorarias/claude-agent-sdk-go"
+)
+
+func main() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	fmt.Println("Custom Agents Example")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println()
+
+	// Example 1: Code reviewer agent
+	fmt.Println("1. Code Reviewer Agent")
+	codeReviewerExample(ctx)
+
+	// Example 2: Data analyst agent
+	fmt.Println("\n2. Data Analyst Agent")
+	dataAnalystExample(ctx)
+
+	// Example 3: Documentation agent
+	fmt.Println("\n3. Documentation Agent")
+	documentationExample(ctx)
+}
+
+func codeReviewerExample(ctx context.Context) {
+	// Define a code reviewer agent with specific tools and prompt
+	codeReviewer := &sdk.AgentDefinition{
+		Name: "code-reviewer",
+		SystemPrompt: `You are a code reviewer. Focus on:
+- Code quality and best practices
+- Potential bugs and security issues
+- Performance concerns
+- Readability and maintainability
+Be constructive and specific in your feedback.`,
+		AllowedTools: []string{"Read", "Glob", "Grep"},
+		MaxTurns:     5,
+	}
+
+	client := sdk.NewClient(
+		sdk.WithAgent(codeReviewer),
+	)
+
+	if err := client.Connect(ctx); err != nil {
+		fmt.Printf("   Error: %v\n", err)
+		return
+	}
+	defer client.Close()
+
+	if err := client.SendQuery("Review the go.mod file for any issues."); err != nil {
+		fmt.Printf("   Error: %v\n", err)
+		return
+	}
+
+	fmt.Print("   Review: ")
+	for msg := range client.Messages() {
+		if m, ok := msg.(*sdk.AssistantMessage); ok {
+			fmt.Print(m.Text())
+		}
+	}
+	fmt.Println()
+}
+
+func dataAnalystExample(ctx context.Context) {
+	// Define a data analyst agent
+	dataAnalyst := &sdk.AgentDefinition{
+		Name: "data-analyst",
+		SystemPrompt: `You are a data analyst. You help users:
+- Analyze data files (CSV, JSON)
+- Generate insights and summaries
+- Create simple visualizations (ASCII charts)
+- Explain statistical concepts
+Be precise with numbers and clear about methodology.`,
+		AllowedTools: []string{"Read", "Bash"},
+		MaxTurns:     10,
+	}
+
+	client := sdk.NewClient(
+		sdk.WithAgent(dataAnalyst),
+	)
+
+	if err := client.Connect(ctx); err != nil {
+		fmt.Printf("   Error: %v\n", err)
+		return
+	}
+	defer client.Close()
+
+	if err := client.SendQuery("What files are in the current directory?"); err != nil {
+		fmt.Printf("   Error: %v\n", err)
+		return
+	}
+
+	fmt.Print("   Analysis: ")
+	for msg := range client.Messages() {
+		if m, ok := msg.(*sdk.AssistantMessage); ok {
+			fmt.Print(m.Text())
+		}
+	}
+	fmt.Println()
+}
+
+func documentationExample(ctx context.Context) {
+	// Define a documentation agent
+	docWriter := &sdk.AgentDefinition{
+		Name: "doc-writer",
+		SystemPrompt: `You are a technical documentation writer. You:
+- Write clear, concise documentation
+- Follow standard documentation formats
+- Include examples where helpful
+- Use proper markdown formatting
+Focus on accuracy and clarity.`,
+		AllowedTools: []string{"Read", "Write", "Glob"},
+		MaxTurns:     5,
+	}
+
+	client := sdk.NewClient(
+		sdk.WithAgent(docWriter),
+	)
+
+	if err := client.Connect(ctx); err != nil {
+		fmt.Printf("   Error: %v\n", err)
+		return
+	}
+	defer client.Close()
+
+	if err := client.SendQuery("Summarize what this project is about based on go.mod."); err != nil {
+		fmt.Printf("   Error: %v\n", err)
+		return
+	}
+
+	fmt.Print("   Summary: ")
+	for msg := range client.Messages() {
+		if m, ok := msg.(*sdk.AssistantMessage); ok {
+			fmt.Print(m.Text())
+		}
+	}
+	fmt.Println()
+}
+```
+
+**Step 2: Verify it compiles**
+
+```bash
+go build ./examples/agents/
+```
+
+Expected: No errors
+
+**Step 3: Commit**
+
+```bash
+git add examples/agents/main.go
+git commit -m "docs: add custom agents example"
+```
+
+---
+
+## Task 12: Integration Tests
 
 **Files:**
 - Create: `integration_test.go`
@@ -2047,9 +2660,12 @@ After completing all plans, you have:
 - Message types (User, Assistant, System, Result, StreamEvent)
 - Options with functional pattern
 - Hook types (6 event types, callbacks, results)
+- Hook-specific output types (PreToolUse, PostToolUse, UserPromptSubmit, Stop, SubagentStop, PreCompact)
+- PermissionBehavior type
 - Control protocol types (requests, responses, acknowledgments)
 - File checkpointing types
 - Sandbox configuration types
+- AgentDefinition type
 - Transport interface
 
 **Plan 02: Transport Layer**
@@ -2057,14 +2673,17 @@ After completing all plans, you have:
 - CLI discovery (PATH, bundled, custom)
 - Command building with Windows support
 - SubprocessTransport with write mutex
-- TOCTOU-safe operations
+- **TOCTOU-safe operations (write lock acquired before close)**
 - Speculative JSON parsing
 - Graceful shutdown with timeout
 - Stderr callback support
 - Concurrent write tests
+- **SDK MCP server filtering**
 
 **Plan 03: Query Protocol**
 - Message parser with typed conversion
+- **StreamEvent parsing for partial updates**
+- **parent_tool_use_id and uuid fields for subagent tracking**
 - Mock transport for testing
 - Query structure with channels
 - Control request/response routing
@@ -2074,6 +2693,7 @@ After completing all plans, you have:
 - Stream input
 - MCP server integration
 - MCP tool call handling
+- **Full MCP JSONRPC bridge (initialize, tools/list, tools/call)**
 
 **Plan 04: Client API**
 - Client structure with full options
@@ -2084,6 +2704,8 @@ After completing all plans, you have:
 - Message helpers (Text, ToolCalls, HasToolCalls, etc.)
 - Async iterator pattern (Messages, Errors channels)
 - Session management (Resume, Continue)
+- **All 6 hook convenience methods**
+- **Hook timeout configuration**
 
 **Plan 05: Integration**
 - Examples README
@@ -2094,10 +2716,14 @@ After completing all plans, you have:
 - Permissions example
 - Session management example
 - Error handling example
+- **Budget control example**
+- **Partial streaming example**
+- **Interrupt example**
+- **Custom agents example**
 - Comprehensive integration tests
 - Package documentation
 
-**Total: ~2,500 lines of Go code across 46 tasks**
+**Total: ~3,600 lines of Go code across 56 tasks**
 
 ---
 
