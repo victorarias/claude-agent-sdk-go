@@ -29,7 +29,7 @@ func findCLI(explicitPath, bundledPath string) (string, error) {
 		if _, err := os.Stat(explicitPath); err == nil {
 			return explicitPath, nil
 		}
-		return "", &CLINotFoundError{SearchedPaths: searchedPaths, CLIPath: explicitPath}
+		return "", &types.CLINotFoundError{SearchedPaths: searchedPaths, CLIPath: explicitPath}
 	}
 
 	// 2. Bundled path (for packaged distributions)
@@ -79,14 +79,14 @@ func findCLI(explicitPath, bundledPath string) (string, error) {
 		}
 	}
 
-	return "", &CLINotFoundError{SearchedPaths: searchedPaths}
+	return "", &types.CLINotFoundError{SearchedPaths: searchedPaths}
 }
 
 // WindowsMaxCommandLength is the maximum command line length on Windows.
 const WindowsMaxCommandLength = 8191
 
 // buildCommand constructs the CLI command with arguments.
-func buildCommand(cliPath, prompt string, opts *Options, streaming bool) []string {
+func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) []string {
 	cmd := []string{cliPath, "--output-format", "stream-json", "--verbose"}
 
 	// System prompt (always include, even if empty)
@@ -194,7 +194,7 @@ func buildCommand(cliPath, prompt string, opts *Options, streaming bool) []strin
 	if opts.MCPServers != nil {
 		filteredServers := make(map[string]any)
 		switch servers := opts.MCPServers.(type) {
-		case map[string]MCPServerConfig:
+		case map[string]types.MCPServerConfig:
 			for name, server := range servers {
 				if server.Type != "sdk" {
 					filteredServers[name] = server
@@ -283,7 +283,7 @@ func checkCommandLength(cmd []string) error {
 // CRITICAL: This implements write serialization for concurrent MCP tool calls.
 type SubprocessTransport struct {
 	prompt    string
-	options   *Options
+	options   *types.Options
 	streaming bool
 
 	cliPath string
@@ -321,9 +321,9 @@ type SubprocessTransport struct {
 }
 
 // NewSubprocessTransport creates a new subprocess transport.
-func NewSubprocessTransport(prompt string, opts *Options) *SubprocessTransport {
+func NewSubprocessTransport(prompt string, opts *types.Options) *SubprocessTransport {
 	if opts == nil {
-		opts = DefaultOptions()
+		opts = types.DefaultOptions()
 	}
 
 	return &SubprocessTransport{
@@ -337,7 +337,7 @@ func NewSubprocessTransport(prompt string, opts *Options) *SubprocessTransport {
 }
 
 // NewStreamingTransport creates a transport for streaming mode.
-func NewStreamingTransport(opts *Options) *SubprocessTransport {
+func NewStreamingTransport(opts *types.Options) *SubprocessTransport {
 	return NewSubprocessTransport("", opts)
 }
 
@@ -455,7 +455,7 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 }
 
 // buildEnvironment creates the environment for the subprocess.
-func buildEnvironment(opts *Options) []string {
+func buildEnvironment(opts *types.Options) []string {
 	env := os.Environ()
 
 	// Add SDK-specific vars

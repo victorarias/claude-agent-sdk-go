@@ -2,6 +2,8 @@ package parser
 
 import (
 	"fmt"
+
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 // ParseMessage parses a raw message map into a typed Message.
