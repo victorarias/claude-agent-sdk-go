@@ -7,11 +7,14 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/victorarias/claude-agent-sdk-go/internal/parser"
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 // Query handles the bidirectional control protocol.
 type Query struct {
-	transport Transport
+	transport types.Transport
 	streaming bool
 
 	// Control protocol state
@@ -20,25 +23,25 @@ type Query struct {
 	requestCounter  atomic.Uint64
 
 	// Hook callbacks
-	hookCallbacks  map[string]HookCallback
+	hookCallbacks  map[string]types.HookCallback
 	nextCallbackID atomic.Uint64
 	hookMu         sync.RWMutex
 
 	// Permission callback
-	canUseTool CanUseToolCallback
+	canUseTool types.CanUseToolCallback
 
 	// MCP server registry
-	mcpServers   map[string]*MCPServer
+	mcpServers   map[string]*types.MCPServer
 	mcpServersMu sync.RWMutex
 
 	// Message channels
-	messages    chan Message        // Parsed messages
+	messages    chan types.Message  // Parsed messages
 	rawMessages chan map[string]any // Raw messages for custom handling
 	errors      chan error
 
 	// Result tracking
 	resultReceived atomic.Bool
-	lastResult     *ResultMessage
+	lastResult     *types.ResultMessage
 	resultMu       sync.RWMutex
 
 	// Lifecycle
@@ -53,14 +56,14 @@ type Query struct {
 }
 
 // NewQuery creates a new Query.
-func NewQuery(transport Transport, streaming bool) *Query {
+func NewQuery(transport types.Transport, streaming bool) *Query {
 	return &Query{
 		transport:       transport,
 		streaming:       streaming,
 		pendingRequests: make(map[string]chan map[string]any),
-		hookCallbacks:   make(map[string]HookCallback),
-		mcpServers:      make(map[string]*MCPServer),
-		messages:        make(chan Message, 100),
+		hookCallbacks:   make(map[string]types.HookCallback),
+		mcpServers:      make(map[string]*types.MCPServer),
+		messages:        make(chan types.Message, 100),
 		rawMessages:     make(chan map[string]any, 100),
 		errors:          make(chan error, 1),
 	}
@@ -78,7 +81,7 @@ func (q *Query) Start(ctx context.Context) error {
 }
 
 // Messages returns the channel of parsed SDK messages.
-func (q *Query) Messages() <-chan Message {
+func (q *Query) Messages() <-chan types.Message {
 	return q.messages
 }
 
@@ -98,7 +101,7 @@ func (q *Query) ResultReceived() bool {
 }
 
 // LastResult returns the last result message received.
-func (q *Query) LastResult() *ResultMessage {
+func (q *Query) LastResult() *types.ResultMessage {
 	q.resultMu.RLock()
 	defer q.resultMu.RUnlock()
 	return q.lastResult
@@ -163,7 +166,7 @@ func (q *Query) handleSDKMessage(raw map[string]any) {
 	}
 
 	// Parse message
-	msg, err := ParseMessage(raw)
+	msg, err := parser.ParseMessage(raw)
 	if err != nil {
 		// Still send to channel for unknown message types
 		select {
@@ -174,7 +177,7 @@ func (q *Query) handleSDKMessage(raw map[string]any) {
 	}
 
 	// Track result messages
-	if result, ok := msg.(*ResultMessage); ok {
+	if result, ok := msg.(*types.ResultMessage); ok {
 		q.resultMu.Lock()
 		q.lastResult = result
 		q.resultMu.Unlock()
@@ -276,7 +279,7 @@ func (q *Query) handleHookCallback(request map[string]any) (map[string]any, erro
 		return nil, fmt.Errorf("hook callback not found: %s", callbackID)
 	}
 
-	output, err := callback(input, toolUseID, &HookContext{})
+	output, err := callback(input, toolUseID, &types.HookContext{})
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +289,7 @@ func (q *Query) handleHookCallback(request map[string]any) (map[string]any, erro
 }
 
 // hookOutputToResponse converts a HookOutput to a response map.
-func (q *Query) hookOutputToResponse(output *HookOutput) map[string]any {
+func (q *Query) hookOutputToResponse(output *types.HookOutput) map[string]any {
 	if output == nil {
 		return make(map[string]any)
 	}
@@ -329,7 +332,7 @@ func (q *Query) handleCanUseTool(request map[string]any) (map[string]any, error)
 	input, _ := request["input"].(map[string]any)
 	suggestions, _ := request["permission_suggestions"].([]any)
 
-	ctx := &ToolPermissionContext{
+	ctx := &types.ToolPermissionContext{
 		Suggestions: q.parsePermissionSuggestions(suggestions),
 	}
 
@@ -342,16 +345,16 @@ func (q *Query) handleCanUseTool(request map[string]any) (map[string]any, error)
 }
 
 // parsePermissionSuggestions converts raw suggestions to PermissionUpdate slice.
-func (q *Query) parsePermissionSuggestions(raw []any) []PermissionUpdate {
+func (q *Query) parsePermissionSuggestions(raw []any) []types.PermissionUpdate {
 	if raw == nil {
 		return nil
 	}
 
-	var updates []PermissionUpdate
+	var updates []types.PermissionUpdate
 	for _, item := range raw {
 		if m, ok := item.(map[string]any); ok {
-			update := PermissionUpdate{
-				Type: PermissionUpdateType(getString(m, "type")),
+			update := types.PermissionUpdate{
+				Type: types.PermissionUpdateType(getString(m, "type")),
 			}
 			updates = append(updates, update)
 		}
@@ -360,9 +363,9 @@ func (q *Query) parsePermissionSuggestions(raw []any) []PermissionUpdate {
 }
 
 // permissionResultToResponse converts a permission result to a response map.
-func (q *Query) permissionResultToResponse(result PermissionResult) (map[string]any, error) {
+func (q *Query) permissionResultToResponse(result types.PermissionResult) (map[string]any, error) {
 	switch r := result.(type) {
-	case *PermissionResultAllow:
+	case *types.PermissionResultAllow:
 		resp := map[string]any{
 			"behavior": "allow",
 		}
@@ -374,7 +377,7 @@ func (q *Query) permissionResultToResponse(result PermissionResult) (map[string]
 		}
 		return resp, nil
 
-	case *PermissionResultDeny:
+	case *types.PermissionResultDeny:
 		resp := map[string]any{
 			"behavior": "deny",
 			"message":  r.Message,
