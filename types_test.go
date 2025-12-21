@@ -150,3 +150,52 @@ func TestAssistantMessageHelpers(t *testing.T) {
 }
 
 func floatPtr(f float64) *float64 { return &f }
+
+func TestHookEvent(t *testing.T) {
+	events := []HookEvent{
+		HookPreToolUse,
+		HookPostToolUse,
+		HookUserPromptSubmit,
+		HookStop,
+		HookSubagentStop,
+		HookPreCompact,
+	}
+
+	if len(events) != 6 {
+		t.Errorf("expected 6 hook events, got %d", len(events))
+	}
+}
+
+func TestHookInput(t *testing.T) {
+	input := &PreToolUseHookInput{
+		BaseHookInput: BaseHookInput{
+			SessionID:      "sess_123",
+			TranscriptPath: "/tmp/transcript.json",
+			Cwd:            "/home/user",
+			HookEventName:  "PreToolUse",
+		},
+		ToolName:  "Bash",
+		ToolInput: map[string]any{"command": "ls"},
+	}
+
+	if input.SessionID != "sess_123" {
+		t.Errorf("got %q, want %q", input.SessionID, "sess_123")
+	}
+	if input.HookEventName != "PreToolUse" {
+		t.Errorf("got %q, want %q", input.HookEventName, "PreToolUse")
+	}
+}
+
+func TestHookOutput(t *testing.T) {
+	cont := true
+	output := &HookOutput{
+		Continue:   &cont,
+		Decision:   "allow",
+	}
+	if output.Continue == nil || !*output.Continue {
+		t.Error("expected Continue to be true")
+	}
+}
+
+func boolPtr(b bool) *bool { return &b }
+func intPtr(i int) *int    { return &i }
