@@ -292,3 +292,129 @@ type HookMatcher struct {
 	Hooks   []HookCallback `json:"-"`
 	Timeout *float64       `json:"timeout,omitempty"`
 }
+
+// ControlRequest is sent to the CLI for control operations.
+type ControlRequest struct {
+	Type      string         `json:"type"`
+	RequestID string         `json:"request_id"`
+	Request   map[string]any `json:"request"`
+}
+
+// ControlResponseData contains the response data.
+type ControlResponseData struct {
+	Subtype   string         `json:"subtype"`
+	RequestID string         `json:"request_id"`
+	Response  map[string]any `json:"response,omitempty"`
+	Error     string         `json:"error,omitempty"`
+}
+
+// ControlResponse is received from the CLI for control operations.
+type ControlResponse struct {
+	Type     string              `json:"type"`
+	Response ControlResponseData `json:"response"`
+}
+
+// PermissionResult is the interface for permission results.
+type PermissionResult interface {
+	isPermissionResult()
+}
+
+// PermissionResultAllow allows a tool to run.
+type PermissionResultAllow struct {
+	Behavior           string             `json:"behavior"`
+	UpdatedInput       map[string]any     `json:"updatedInput,omitempty"`
+	UpdatedPermissions []PermissionUpdate `json:"updatedPermissions,omitempty"`
+}
+
+func (r *PermissionResultAllow) isPermissionResult() {}
+
+// PermissionResultDeny denies a tool from running.
+type PermissionResultDeny struct {
+	Behavior  string `json:"behavior"`
+	Message   string `json:"message,omitempty"`
+	Interrupt bool   `json:"interrupt,omitempty"`
+}
+
+func (r *PermissionResultDeny) isPermissionResult() {}
+
+// PermissionUpdateType represents the type of permission update.
+type PermissionUpdateType string
+
+const (
+	PermissionAddRules          PermissionUpdateType = "addRules"
+	PermissionReplaceRules      PermissionUpdateType = "replaceRules"
+	PermissionRemoveRules       PermissionUpdateType = "removeRules"
+	PermissionSetMode           PermissionUpdateType = "setMode"
+	PermissionAddDirectories    PermissionUpdateType = "addDirectories"
+	PermissionRemoveDirectories PermissionUpdateType = "removeDirectories"
+)
+
+// PermissionUpdateDestination represents where to apply the update.
+type PermissionUpdateDestination string
+
+const (
+	DestinationUserSettings    PermissionUpdateDestination = "userSettings"
+	DestinationProjectSettings PermissionUpdateDestination = "projectSettings"
+	DestinationLocalSettings   PermissionUpdateDestination = "localSettings"
+	DestinationSession         PermissionUpdateDestination = "session"
+)
+
+// PermissionRule defines a permission rule.
+type PermissionRule struct {
+	ToolName    string  `json:"toolName"`
+	RuleContent *string `json:"ruleContent,omitempty"`
+}
+
+// PermissionUpdate describes a permission change.
+type PermissionUpdate struct {
+	Type        PermissionUpdateType        `json:"type"`
+	Rules       []PermissionRule            `json:"rules,omitempty"`
+	Behavior    string                      `json:"behavior,omitempty"`
+	Mode        string                      `json:"mode,omitempty"`
+	Directories []string                    `json:"directories,omitempty"`
+	Destination PermissionUpdateDestination `json:"destination,omitempty"`
+}
+
+// ToDict converts PermissionUpdate to a map for control protocol.
+func (p *PermissionUpdate) ToDict() map[string]any {
+	result := map[string]any{
+		"type": p.Type,
+	}
+	if len(p.Rules) > 0 {
+		rules := make([]map[string]any, len(p.Rules))
+		for i, r := range p.Rules {
+			rules[i] = map[string]any{"toolName": r.ToolName}
+			if r.RuleContent != nil {
+				rules[i]["ruleContent"] = *r.RuleContent
+			}
+		}
+		result["rules"] = rules
+	}
+	if p.Behavior != "" {
+		result["behavior"] = p.Behavior
+	}
+	if p.Mode != "" {
+		result["mode"] = p.Mode
+	}
+	if len(p.Directories) > 0 {
+		result["directories"] = p.Directories
+	}
+	if p.Destination != "" {
+		result["destination"] = p.Destination
+	}
+	return result
+}
+
+// ToolPermissionContext provides context for permission callbacks.
+type ToolPermissionContext struct {
+	Signal      any                `json:"-"`
+	Suggestions []PermissionUpdate `json:"suggestions,omitempty"`
+	BlockedPath *string            `json:"blocked_path,omitempty"`
+}
+
+// CanUseToolCallback is called when a tool needs permission.
+type CanUseToolCallback func(
+	toolName string,
+	input map[string]any,
+	ctx *ToolPermissionContext,
+) (PermissionResult, error)
