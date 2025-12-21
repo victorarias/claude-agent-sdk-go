@@ -81,11 +81,11 @@ func TestQuery_ResultReceived(t *testing.T) {
 	defer query.Close()
 
 	// Send a result message
-	transport.messages <- map[string]any{
+	transport.SendMessage(map[string]any{
 		"type":       "result",
 		"subtype":    "success",
 		"session_id": "test_123",
-	}
+	})
 
 	// Wait for processing
 	time.Sleep(100 * time.Millisecond)
