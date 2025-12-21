@@ -1,5 +1,7 @@
 package sdk
 
+import "encoding/json"
+
 // MCP Protocol Version
 const MCPProtocolVersion = "2024-11-05"
 
@@ -125,5 +127,27 @@ func NewMCPErrorResponse(id any, err *MCPError) *MCPResponse {
 		JSONRPC: "2.0",
 		ID:      id,
 		Error:   err,
+	}
+}
+
+// ParseMCPRequest parses a JSON-RPC request from bytes.
+func ParseMCPRequest(data []byte) (*MCPRequest, error) {
+	var req MCPRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return nil, err
+	}
+	return &req, nil
+}
+
+// MarshalMCPResponse serializes a response to JSON.
+func MarshalMCPResponse(resp *MCPResponse) ([]byte, error) {
+	return json.Marshal(resp)
+}
+
+// NewMCPTextContent creates a text content item.
+func NewMCPTextContent(text string) MCPContent {
+	return MCPContent{
+		Type: "text",
+		Text: text,
 	}
 }
