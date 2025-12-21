@@ -172,6 +172,54 @@ func findCLI(explicitPath, bundledPath string) (string, error) {
 // WindowsMaxCommandLength is the maximum command line length on Windows.
 const WindowsMaxCommandLength = 8191
 
+// buildSettingsValue merges sandbox settings into settings JSON.
+// Matches Python SDK behavior in subprocess_cli.py:118-170.
+func buildSettingsValue(opts *types.Options) (string, error) {
+	hasSettings := opts.Settings != ""
+	hasSandbox := opts.Sandbox != nil
+
+	if !hasSettings && !hasSandbox {
+		return "", nil
+	}
+
+	// If only settings and no sandbox, pass through as-is
+	if hasSettings && !hasSandbox {
+		return opts.Settings, nil
+	}
+
+	// If we have sandbox settings, we need to merge into a JSON object
+	settingsObj := make(map[string]any)
+
+	if hasSettings {
+		settingsStr := strings.TrimSpace(opts.Settings)
+		// Check if settings is a JSON string or a file path
+		if strings.HasPrefix(settingsStr, "{") && strings.HasSuffix(settingsStr, "}") {
+			// Parse JSON string
+			if err := json.Unmarshal([]byte(settingsStr), &settingsObj); err != nil {
+				// If parsing fails, treat as file path
+				// Note: File reading would go here, but for now we only support JSON strings
+				return "", fmt.Errorf("failed to parse settings as JSON: %w", err)
+			}
+		} else {
+			// It's a file path - for now, we don't support reading files during command building
+			// This matches the skipped test case
+			return "", fmt.Errorf("file path settings with sandbox not yet supported")
+		}
+	}
+
+	// Merge sandbox settings
+	if hasSandbox {
+		settingsObj["sandbox"] = opts.Sandbox
+	}
+
+	data, err := json.Marshal(settingsObj)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal settings: %w", err)
+	}
+
+	return string(data), nil
+}
+
 // buildCommand constructs the CLI command with arguments.
 func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) []string {
 	cmd := []string{cliPath, "--output-format", "stream-json", "--verbose"}
