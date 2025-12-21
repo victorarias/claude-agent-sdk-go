@@ -353,3 +353,155 @@ func TestQuery_Initialize_NonStreaming(t *testing.T) {
 }
 
 func strPtr(s string) *string { return &s }
+
+func TestQuery_Interrupt(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		written := transport.Written()
+		if len(written) > 0 {
+			var req map[string]any
+			json.Unmarshal([]byte(written[0]), &req)
+			reqID := req["request_id"].(string)
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{},
+				},
+			})
+		}
+	}()
+
+	err := query.Interrupt()
+	if err != nil {
+		t.Errorf("Interrupt failed: %v", err)
+	}
+}
+
+func TestQuery_SetPermissionMode(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		written := transport.Written()
+		if len(written) > 0 {
+			var req map[string]any
+			json.Unmarshal([]byte(written[0]), &req)
+			reqID := req["request_id"].(string)
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{},
+				},
+			})
+		}
+	}()
+
+	err := query.SetPermissionMode(PermissionBypass)
+	if err != nil {
+		t.Errorf("SetPermissionMode failed: %v", err)
+	}
+}
+
+func TestQuery_SetModel(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		written := transport.Written()
+		if len(written) > 0 {
+			var req map[string]any
+			json.Unmarshal([]byte(written[0]), &req)
+			reqID := req["request_id"].(string)
+
+			// Verify model is in request
+			request := req["request"].(map[string]any)
+			if request["model"] != "claude-opus-4" {
+				t.Errorf("expected model claude-opus-4, got %v", request["model"])
+			}
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{},
+				},
+			})
+		}
+	}()
+
+	err := query.SetModel("claude-opus-4")
+	if err != nil {
+		t.Errorf("SetModel failed: %v", err)
+	}
+}
+
+func TestQuery_RewindFiles(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		written := transport.Written()
+		if len(written) > 0 {
+			var req map[string]any
+			json.Unmarshal([]byte(written[0]), &req)
+			reqID := req["request_id"].(string)
+
+			// Verify user_message_id is in request
+			request := req["request"].(map[string]any)
+			if request["user_message_id"] != "msg_123" {
+				t.Errorf("expected user_message_id msg_123, got %v", request["user_message_id"])
+			}
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{},
+				},
+			})
+		}
+	}()
+
+	err := query.RewindFiles("msg_123")
+	if err != nil {
+		t.Errorf("RewindFiles failed: %v", err)
+	}
+}
