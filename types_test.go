@@ -199,3 +199,66 @@ func TestHookOutput(t *testing.T) {
 
 func boolPtr(b bool) *bool { return &b }
 func intPtr(i int) *int    { return &i }
+
+func TestControlRequest(t *testing.T) {
+	req := &ControlRequest{
+		Type:      "control_request",
+		RequestID: "req_123",
+		Request: map[string]any{
+			"subtype": "interrupt",
+		},
+	}
+
+	if req.RequestID != "req_123" {
+		t.Errorf("got %q, want %q", req.RequestID, "req_123")
+	}
+}
+
+func TestControlResponse(t *testing.T) {
+	resp := &ControlResponse{
+		Type: "control_response",
+		Response: ControlResponseData{
+			Subtype:   "success",
+			RequestID: "req_123",
+			Response:  map[string]any{"status": "ok"},
+		},
+	}
+
+	if resp.Response.Subtype != "success" {
+		t.Errorf("got %q, want %q", resp.Response.Subtype, "success")
+	}
+}
+
+func TestPermissionResult(t *testing.T) {
+	allow := &PermissionResultAllow{
+		Behavior:     "allow",
+		UpdatedInput: map[string]any{"command": "ls -la"},
+	}
+
+	if allow.Behavior != "allow" {
+		t.Errorf("got %q, want %q", allow.Behavior, "allow")
+	}
+
+	deny := &PermissionResultDeny{
+		Behavior:  "deny",
+		Message:   "not allowed",
+		Interrupt: true,
+	}
+
+	if deny.Behavior != "deny" {
+		t.Errorf("got %q, want %q", deny.Behavior, "deny")
+	}
+}
+
+func TestPermissionUpdateToDict(t *testing.T) {
+	update := &PermissionUpdate{
+		Type:        PermissionAddRules,
+		Behavior:    "allow",
+		Destination: DestinationSession,
+	}
+
+	dict := update.ToDict()
+	if dict["type"] != PermissionAddRules {
+		t.Errorf("got %v, want %v", dict["type"], PermissionAddRules)
+	}
+}
