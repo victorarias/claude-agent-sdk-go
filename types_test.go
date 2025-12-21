@@ -6,7 +6,7 @@ import (
 )
 
 func TestTextBlock(t *testing.T) {
-	block := TextBlock{Text: "hello"}
+	block := TextBlock{TextContent: "hello"}
 	if block.BlockType() != "text" {
 		t.Errorf("got %q, want %q", block.BlockType(), "text")
 	}
@@ -14,9 +14,9 @@ func TestTextBlock(t *testing.T) {
 
 func TestToolUseBlock(t *testing.T) {
 	block := ToolUseBlock{
-		ID:    "tool_123",
-		Name:  "Bash",
-		Input: map[string]any{"command": "ls"},
+		ID:        "tool_123",
+		Name:      "Bash",
+		ToolInput: map[string]any{"command": "ls"},
 	}
 	if block.BlockType() != "tool_use" {
 		t.Errorf("got %q, want %q", block.BlockType(), "tool_use")
