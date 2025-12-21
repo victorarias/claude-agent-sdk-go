@@ -27,6 +27,10 @@ type Query struct {
 	// Permission callback
 	canUseTool CanUseToolCallback
 
+	// MCP server registry
+	mcpServers   map[string]*MCPServer
+	mcpServersMu sync.RWMutex
+
 	// Message channels
 	messages    chan Message        // Parsed messages
 	rawMessages chan map[string]any // Raw messages for custom handling
@@ -55,6 +59,7 @@ func NewQuery(transport Transport, streaming bool) *Query {
 		streaming:       streaming,
 		pendingRequests: make(map[string]chan map[string]any),
 		hookCallbacks:   make(map[string]HookCallback),
+		mcpServers:      make(map[string]*MCPServer),
 		messages:        make(chan Message, 100),
 		rawMessages:     make(chan map[string]any, 100),
 		errors:          make(chan error, 1),
