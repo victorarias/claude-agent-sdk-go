@@ -411,6 +411,47 @@ func (q *Query) SetCanUseTool(callback CanUseToolCallback) {
 	q.canUseTool = callback
 }
 
+// SendMessage sends a single message to the CLI.
+func (q *Query) SendMessage(msg map[string]any) error {
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal message: %w", err)
+	}
+
+	return q.transport.Write(string(data))
+}
+
+// SendUserMessage sends a user message.
+func (q *Query) SendUserMessage(content string, sessionID string) error {
+	msg := map[string]any{
+		"type": "user",
+		"message": map[string]any{
+			"role":    "user",
+			"content": content,
+		},
+		"parent_tool_use_id": nil,
+		"session_id":         sessionID,
+	}
+	return q.SendMessage(msg)
+}
+
+// StreamInput streams messages from a channel to the CLI.
+func (q *Query) StreamInput(input <-chan map[string]any) error {
+	for {
+		select {
+		case <-q.ctx.Done():
+			return q.ctx.Err()
+		case msg, ok := <-input:
+			if !ok {
+				return nil // Channel closed
+			}
+			if err := q.SendMessage(msg); err != nil {
+				return err
+			}
+		}
+	}
+}
+
 // handleCancelRequest handles a request cancellation.
 func (q *Query) handleCancelRequest(raw map[string]any) {
 	requestID, _ := raw["request_id"].(string)
