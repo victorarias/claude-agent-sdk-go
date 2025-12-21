@@ -1,4 +1,4 @@
-package sdk
+package parser
 
 import (
 	"fmt"
