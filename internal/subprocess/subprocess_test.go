@@ -9,6 +9,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 func TestFindCLI_WithExplicitPath(t *testing.T) {
