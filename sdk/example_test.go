@@ -5,6 +5,7 @@ package sdk_test
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/victorarias/claude-agent-sdk-go/sdk"
 	"github.com/victorarias/claude-agent-sdk-go/types"
@@ -64,9 +65,9 @@ func ExampleNewClient_withPermissionMode() {
 		types.WithPermissionMode(types.PermissionDefault),
 	)
 
-	// AcceptEdits mode - auto-approves file edits
-	clientAcceptEdits := sdk.NewClient(
-		types.WithPermissionMode(types.PermissionAcceptEdits),
+	// Accept mode - auto-approves file edits
+	clientAccept := sdk.NewClient(
+		types.WithPermissionMode(types.PermissionAccept),
 	)
 
 	// Bypass mode - auto-approves everything (use with caution)
@@ -75,51 +76,13 @@ func ExampleNewClient_withPermissionMode() {
 	)
 
 	fmt.Println("Default mode:", clientDefault.Options().PermissionMode)
-	fmt.Println("AcceptEdits mode:", clientAcceptEdits.Options().PermissionMode)
+	fmt.Println("Accept mode:", clientAccept.Options().PermissionMode)
 	fmt.Println("Bypass mode:", clientBypass.Options().PermissionMode)
 
 	// Output:
 	// Default mode: default
-	// AcceptEdits mode: acceptEdits
+	// Accept mode: acceptEdits
 	// Bypass mode: bypassPermissions
-}
-
-// ExampleWithToolUseHook demonstrates registering a tool use hook.
-func ExampleWithToolUseHook() {
-	toolCalls := 0
-
-	client := sdk.NewClient(
-		sdk.WithToolUseHook(func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
-			toolCalls++
-			// Allow all tool calls
-			return &types.HookOutput{
-				Decision: types.PermissionAllow{},
-			}, nil
-		}),
-	)
-
-	// Verify hook is registered
-	fmt.Println("Client created with hook:", client != nil)
-
-	// Output:
-	// Client created with hook: true
-}
-
-// ExampleWithStderrCallback demonstrates capturing stderr output.
-func ExampleWithStderrCallback() {
-	var stderrOutput string
-
-	client := sdk.NewClient(
-		sdk.WithStderrCallback(func(line string) {
-			stderrOutput += line + "\n"
-		}),
-	)
-
-	// Verify client is created
-	fmt.Println("Client created with stderr callback:", client != nil)
-
-	// Output:
-	// Client created with stderr callback: true
 }
 
 // ExampleOptions demonstrates creating options with multiple settings.
@@ -128,18 +91,15 @@ func ExampleOptions() {
 	types.WithModel("claude-sonnet-4-20250514")(opts)
 	types.WithMaxTurns(10)(opts)
 	types.WithCwd("/project")(opts)
-	types.WithAllowedTools([]string{"Read", "Write", "Bash"})(opts)
 
 	fmt.Println("Model:", opts.Model)
 	fmt.Println("MaxTurns:", opts.MaxTurns)
 	fmt.Println("Cwd:", opts.Cwd)
-	fmt.Println("AllowedTools count:", len(opts.AllowedTools))
 
 	// Output:
 	// Model: claude-sonnet-4-20250514
 	// MaxTurns: 10
 	// Cwd: /project
-	// AllowedTools count: 3
 }
 
 // Example_contentBlocks shows how to work with message content blocks.
@@ -173,7 +133,7 @@ func Example_contentBlocks() {
 // Example_errors shows how to handle SDK errors.
 func Example_errors() {
 	// Check error types
-	timeoutErr := &types.TimeoutError{Operation: "connect", Duration: "30s"}
+	timeoutErr := &types.TimeoutError{Operation: "connect", Duration: 30 * time.Second}
 	fmt.Println("Timeout error:", timeoutErr.Error())
 
 	closedErr := &types.ClosedError{Resource: "session"}
@@ -188,23 +148,51 @@ func Example_errors() {
 	// Process error: process exited with code 1: command failed
 }
 
-// Example_mcpServers shows how to configure MCP servers.
-func Example_mcpServers() {
-	opts := types.DefaultOptions()
-	types.WithMCPServers(map[string]types.MCPServerConfig{
-		"filesystem": {
-			Command: "npx",
-			Args:    []string{"-y", "@anthropic/mcp-filesystem"},
-			Env:     map[string]string{"HOME": "/home/user"},
-		},
-	})(opts)
-
-	fmt.Println("MCP servers configured:", len(opts.MCPServers))
-	if server, ok := opts.MCPServers["filesystem"]; ok {
-		fmt.Println("Filesystem server command:", server.Command)
+// Example_resultMessage shows how to work with result messages.
+func Example_resultMessage() {
+	cost := 0.05
+	result := &types.ResultMessage{
+		Subtype:      "success",
+		IsError:      false,
+		TotalCostUSD: &cost,
+		SessionID:    "session_123",
 	}
 
+	fmt.Println("Is success:", result.IsSuccess())
+	fmt.Println("Cost:", result.Cost())
+	fmt.Println("Session:", result.SessionID)
+
 	// Output:
-	// MCP servers configured: 1
-	// Filesystem server command: npx
+	// Is success: true
+	// Cost: 0.05
+	// Session: session_123
+}
+
+// Example_assistantMessage shows how to work with assistant messages.
+func Example_assistantMessage() {
+	msg := &types.AssistantMessage{
+		Model: "claude-sonnet-4-20250514",
+		Content: []types.ContentBlock{
+			&types.ThinkingBlock{ThinkingContent: "Let me analyze this..."},
+			&types.TextBlock{TextContent: "The answer is 42."},
+			&types.ToolUseBlock{
+				ID:        "tool_1",
+				Name:      "calculator",
+				ToolInput: map[string]any{"x": 40, "y": 2},
+			},
+		},
+	}
+
+	fmt.Println("Model:", msg.Model)
+	fmt.Println("Text:", msg.Text())
+	fmt.Println("Has thinking:", msg.GetThinking() != "")
+	fmt.Println("Has tool calls:", msg.HasToolCalls())
+	fmt.Println("Tool call count:", len(msg.ToolCalls()))
+
+	// Output:
+	// Model: claude-sonnet-4-20250514
+	// Text: The answer is 42.
+	// Has thinking: true
+	// Has tool calls: true
+	// Tool call count: 1
 }
