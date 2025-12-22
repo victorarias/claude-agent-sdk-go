@@ -429,7 +429,12 @@ func TestQuery_SetPermissionMode(t *testing.T) {
 	defer query.Close()
 
 	go func() {
-		time.Sleep(10 * time.Millisecond)
+		// Wait for the control request to be written
+		if !transport.WaitForWrite(time.Second) {
+			t.Error("timeout waiting for permission mode request write")
+			return
+		}
+
 		written := transport.Written()
 		if len(written) > 0 {
 			var req map[string]any
