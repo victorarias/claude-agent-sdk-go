@@ -87,7 +87,7 @@ func TestMCPHandler_ToolsCall(t *testing.T) {
 				"name": map[string]any{"type": "string"},
 			},
 		}, func(args map[string]any) (*types.MCPToolResult, error) {
-			name := args["name"].(string)
+			name, _ := args["name"].(string) //nolint:errcheck // Test code, type is guaranteed
 			return &types.MCPToolResult{
 				Content: []types.MCPContent{{Type: "text", Text: "Hello, " + name + "!"}},
 			}, nil
