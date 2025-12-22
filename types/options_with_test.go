@@ -217,8 +217,8 @@ func TestWithSandbox(t *testing.T) {
 
 func TestWithPlugins(t *testing.T) {
 	opts := DefaultOptions()
-	plugins := []PluginConfig{{Type: "local", Path: "/path/to/plugin"}}
-	WithPlugins(plugins)(opts)
+	plugin := PluginConfig{Type: "local", Path: "/path/to/plugin"}
+	WithPlugins(plugin)(opts)
 	if len(opts.Plugins) != 1 {
 		t.Errorf("expected 1 plugin, got %d", len(opts.Plugins))
 	}
