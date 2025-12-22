@@ -127,10 +127,6 @@ linters:
     - gosimple     # Simplification suggestions
     - ineffassign  # Detect ineffectual assignments
 
-    # Formatting
-    - gofmt        # Check formatting
-    - goimports    # Check imports
-
     # Quality
     - misspell     # Spelling mistakes
     - unconvert    # Unnecessary conversions
@@ -145,13 +141,17 @@ linters:
 
     # Style/Best practices
     - gocritic     # Comprehensive checks
-    - exportloopref # Exported loop vars (Go 1.22+)
     - noctx        # HTTP requests without context
     - nilerr       # Return nil instead of error
     - predeclared  # Shadowing predeclared identifiers
     - thelper      # Test helper detection
     - tparallel    # Parallel test detection
     - whitespace   # Whitespace issues
+
+formatters:
+  enable:
+    - gofmt        # Check formatting
+    - goimports    # Check imports
 
 issues:
   exclude-use-default: false
