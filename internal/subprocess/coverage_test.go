@@ -344,8 +344,8 @@ func TestOptimizeCommandLength_ShortCommand(t *testing.T) {
 
 // TestOptimizeCommandLength_LongCommand tests temp file fallback for long commands
 func TestOptimizeCommandLength_LongCommand(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("Skipping long command test on macOS - limit is too high")
+	if runtime.GOOS != "windows" {
+		t.Skip("Command length optimization only applies on Windows (8000 char limit)")
 	}
 
 	opts := types.DefaultOptions()
