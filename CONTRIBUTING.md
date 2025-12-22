@@ -67,17 +67,24 @@ Thank you for your interest in contributing to the Claude Agent SDK Go! This doc
 
 This project follows standard Go conventions and best practices:
 
-- **Formatting**: All code must be formatted with `gofmt`:
+- **Formatting**: All code must be formatted with `gofmt` and `goimports`:
   ```bash
-  gofmt -w .
+  make fmt
+  # or
+  go fmt ./...
+  goimports -w .
   ```
 
-- **Linting**: Code should pass `golint` checks:
+- **Linting**: Code must pass `golangci-lint` checks:
   ```bash
-  golint ./...
+  make lint
+  # or
+  golangci-lint run
   ```
 
-- **Go Vet**: Run `go vet` to catch common issues:
+  See [docs/LINTING.md](docs/LINTING.md) for detailed linting configuration and guidelines.
+
+- **Go Vet**: Run `go vet` to catch common issues (included in golangci-lint):
   ```bash
   go vet ./...
   ```

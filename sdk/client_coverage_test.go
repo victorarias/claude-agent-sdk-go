@@ -419,8 +419,10 @@ func TestClient_RewindFiles(t *testing.T) {
 	transport := NewMockTransport()
 	client := NewClient(types.WithTransport(transport))
 
+	done := make(chan bool)
 	// Respond to initialize and RewindFiles
 	go func() {
+		defer close(done)
 		for {
 			time.Sleep(10 * time.Millisecond)
 			written := transport.Written()
@@ -445,6 +447,13 @@ func TestClient_RewindFiles(t *testing.T) {
 					"response":   map[string]any{},
 				},
 			})
+
+			// If it's the rewind_files request, we're done
+			if requestData, ok := req["request"].(map[string]any); ok {
+				if requestData["subtype"] == "rewind_files" {
+					return
+				}
+			}
 		}
 	}()
 
@@ -458,6 +467,8 @@ func TestClient_RewindFiles(t *testing.T) {
 	if err != nil {
 		t.Errorf("RewindFiles failed: %v", err)
 	}
+
+	<-done
 }
 
 func TestClient_RewindFiles_NotConnected(t *testing.T) {
