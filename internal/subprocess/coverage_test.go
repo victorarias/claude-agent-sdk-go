@@ -153,8 +153,8 @@ func TestKill(t *testing.T) {
 	tmpDir := t.TempDir()
 	mockCLI := filepath.Join(tmpDir, "claude")
 
-	// Create a long-running script
-	script := "#!/bin/sh\nwhile true; do sleep 1; done\n"
+	// Create a long-running script that outputs to stdout periodically
+	script := "#!/bin/sh\nwhile true; do echo '{}'; sleep 0.1; done\n"
 	if err := os.WriteFile(mockCLI, []byte(script), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -163,12 +163,15 @@ func TestKill(t *testing.T) {
 	opts.CLIPath = mockCLI
 	transport := NewStreamingTransport(opts)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := transport.Connect(ctx); err != nil {
 		t.Fatalf("Connect failed: %v", err)
 	}
+
+	// Give the process a moment to start
+	time.Sleep(200 * time.Millisecond)
 
 	// Kill the process
 	if err := transport.Kill(); err != nil {

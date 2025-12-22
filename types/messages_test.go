@@ -405,11 +405,11 @@ func TestStreamEvent(t *testing.T) {
 
 // TestPermissionResult tests permission result types.
 func TestPermissionResult(t *testing.T) {
-	t.Run("PermissionAllow serialization", func(t *testing.T) {
-		result := PermissionAllow{}
+	t.Run("PermissionResultAllow serialization", func(t *testing.T) {
+		result := PermissionResultAllow{}
 		data, err := json.Marshal(result)
 		if err != nil {
-			t.Fatalf("Failed to marshal PermissionAllow: %v", err)
+			t.Fatalf("Failed to marshal PermissionResultAllow: %v", err)
 		}
 
 		var decoded map[string]any
@@ -422,11 +422,11 @@ func TestPermissionResult(t *testing.T) {
 		}
 	})
 
-	t.Run("PermissionDeny serialization", func(t *testing.T) {
-		result := PermissionDeny{Reason: "unauthorized"}
+	t.Run("PermissionResultDeny serialization", func(t *testing.T) {
+		result := PermissionResultDeny{Reason: "unauthorized"}
 		data, err := json.Marshal(result)
 		if err != nil {
-			t.Fatalf("Failed to marshal PermissionDeny: %v", err)
+			t.Fatalf("Failed to marshal PermissionResultDeny: %v", err)
 		}
 
 		var decoded map[string]any
@@ -443,16 +443,16 @@ func TestPermissionResult(t *testing.T) {
 	})
 }
 
-// TestMCPToolCall tests MCPToolCall ToDict method.
-func TestMCPToolCall(t *testing.T) {
+// TestSDKControlMcpToolCallRequest tests MCPToolCall ToDict method.
+func TestSDKControlMcpToolCallRequest(t *testing.T) {
 	t.Run("ToDict converts to dictionary", func(t *testing.T) {
 		params := map[string]any{"x": 5, "y": 10}
-		call := &MCPToolCall{
+		req := &SDKControlMcpToolCallRequest{
 			Name:   "calculator",
 			Params: params,
 		}
 
-		dict := call.ToDict()
+		dict := req.ToDict()
 		if dict["name"] != "calculator" {
 			t.Errorf("Expected name 'calculator', got %v", dict["name"])
 		}
