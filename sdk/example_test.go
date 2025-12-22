@@ -128,7 +128,7 @@ func ExampleOptions() {
 	types.WithModel("claude-sonnet-4-20250514")(opts)
 	types.WithMaxTurns(10)(opts)
 	types.WithCwd("/project")(opts)
-	types.WithAllowedTools([]string{"Read", "Write", "Bash"})(opts)
+	types.WithAllowedTools("Read", "Write", "Bash")(opts)
 
 	fmt.Println("Model:", opts.Model)
 	fmt.Println("MaxTurns:", opts.MaxTurns)
@@ -173,7 +173,7 @@ func Example_contentBlocks() {
 // Example_errors shows how to handle SDK errors.
 func Example_errors() {
 	// Check error types
-	timeoutErr := &types.TimeoutError{Operation: "connect", Duration: "30s"}
+	timeoutErr := &types.TimeoutError{Operation: "connect", Duration: 30 * time.Second}
 	fmt.Println("Timeout error:", timeoutErr.Error())
 
 	closedErr := &types.ClosedError{Resource: "session"}
