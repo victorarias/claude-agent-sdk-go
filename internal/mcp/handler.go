@@ -10,7 +10,6 @@
 package mcp
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/victorarias/claude-agent-sdk-go/types"
@@ -183,23 +182,4 @@ func (h *MCPHandler) handleToolsCall(params map[string]any) (*MCPToolCallResult,
 		Content: result.Content,
 		IsError: false,
 	}, nil
-}
-
-// resultToContent converts a handler result to MCP content.
-func resultToContent(result any) []types.MCPContent {
-	switch v := result.(type) {
-	case string:
-		return []types.MCPContent{NewMCPTextContent(v)}
-	case []types.MCPContent:
-		return v
-	case types.MCPContent:
-		return []types.MCPContent{v}
-	default:
-		// Marshal to JSON
-		data, err := json.Marshal(v)
-		if err != nil {
-			return []types.MCPContent{NewMCPTextContent(fmt.Sprintf("%v", v))}
-		}
-		return []types.MCPContent{NewMCPTextContent(string(data))}
-	}
 }
