@@ -514,11 +514,11 @@ func TestQuery_HandleHookCallback(t *testing.T) {
 	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 
-	// Register a hook callback
-	callbackCalled := false
+	// Register a hook callback - use atomic for thread-safe access
+	var callbackCalled atomic.Bool
 	query.hookMu.Lock()
 	query.hookCallbacks["hook_1"] = func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
-		callbackCalled = true
+		callbackCalled.Store(true)
 		cont := true
 		return &types.HookOutput{Continue: &cont}, nil
 	}
@@ -546,7 +546,7 @@ func TestQuery_HandleHookCallback(t *testing.T) {
 	// Wait for processing
 	time.Sleep(100 * time.Millisecond)
 
-	if !callbackCalled {
+	if !callbackCalled.Load() {
 		t.Error("hook callback was not called")
 	}
 
