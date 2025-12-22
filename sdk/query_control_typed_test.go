@@ -150,11 +150,21 @@ func TestHandleControlRequest_HookCallback_TypedStruct(t *testing.T) {
 		ToolUseID:  stringPtr("tool_789"),
 	}
 
+	// Marshal to map (simulating what comes from CLI)
+	reqData, err := json.Marshal(hookRequest)
+	if err != nil {
+		t.Fatalf("Failed to marshal: %v", err)
+	}
+	var requestMap map[string]any
+	if err := json.Unmarshal(reqData, &requestMap); err != nil {
+		t.Fatalf("Failed to unmarshal: %v", err)
+	}
+
 	// Create control request wrapper
 	controlRequest := map[string]any{
 		"type":       "control_request",
 		"request_id": "req_hook_test",
-		"request":    hookRequest,
+		"request":    requestMap,
 	}
 
 	// Handle the request
@@ -214,11 +224,21 @@ func TestHandleControlRequest_CanUseTool_TypedStruct(t *testing.T) {
 		Input:    map[string]any{"command": "ls"},
 	}
 
+	// Marshal to map (simulating what comes from CLI)
+	reqData, err := json.Marshal(permRequest)
+	if err != nil {
+		t.Fatalf("Failed to marshal: %v", err)
+	}
+	var requestMap map[string]any
+	if err := json.Unmarshal(reqData, &requestMap); err != nil {
+		t.Fatalf("Failed to unmarshal: %v", err)
+	}
+
 	// Create control request wrapper
 	controlRequest := map[string]any{
 		"type":       "control_request",
 		"request_id": "req_perm_test",
-		"request":    permRequest,
+		"request":    requestMap,
 	}
 
 	// Handle the request

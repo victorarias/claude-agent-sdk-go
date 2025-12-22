@@ -25,14 +25,15 @@ func TestParseControlRequest_UsingTypedStructs(t *testing.T) {
 	defer query.Close()
 
 	// Register hook callback to verify typed struct is passed
-	receivedTypedRequest := false
+	// Use channel for thread-safe signaling instead of boolean
+	receivedChan := make(chan bool, 1)
 	query.hookMu.Lock()
 	query.hookCallbacks["cb_typed"] = func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
-		receivedTypedRequest = true
 		// Input should be properly typed from the parsed struct
 		if input == nil {
 			t.Error("Expected input to not be nil")
 		}
+		receivedChan <- true
 		return &types.HookOutput{Continue: boolPtr(true)}, nil
 	}
 	query.hookMu.Unlock()
@@ -64,10 +65,11 @@ func TestParseControlRequest_UsingTypedStructs(t *testing.T) {
 	// Handle the request
 	go query.handleControlRequest(controlMsg)
 
-	// Wait for processing
-	time.Sleep(100 * time.Millisecond)
-
-	if !receivedTypedRequest {
+	// Wait for callback to be invoked
+	select {
+	case <-receivedChan:
+		// Success - callback was invoked
+	case <-time.After(time.Second):
 		t.Error("Hook callback was not invoked with typed request")
 	}
 }
