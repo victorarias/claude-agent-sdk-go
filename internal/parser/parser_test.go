@@ -239,6 +239,32 @@ func TestParseContentBlock(t *testing.T) {
 	}
 }
 
+func TestParseContentBlock_ThinkingWithSignature(t *testing.T) {
+	raw := map[string]any{
+		"type":      "thinking",
+		"thinking":  "some thought",
+		"signature": "abc123",
+	}
+
+	block, err := parseContentBlock(raw)
+	if err != nil {
+		t.Fatalf("parseContentBlock failed: %v", err)
+	}
+
+	thinkingBlock, ok := block.(*types.ThinkingBlock)
+	if !ok {
+		t.Fatalf("expected *ThinkingBlock, got %T", block)
+	}
+
+	if thinkingBlock.ThinkingContent != "some thought" {
+		t.Errorf("got thinking %q, want 'some thought'", thinkingBlock.ThinkingContent)
+	}
+
+	if thinkingBlock.Signature != "abc123" {
+		t.Errorf("got signature %q, want 'abc123'", thinkingBlock.Signature)
+	}
+}
+
 func TestParseMessage_UnknownType(t *testing.T) {
 	raw := map[string]any{
 		"type": "unknown_type",

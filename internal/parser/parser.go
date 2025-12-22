@@ -191,6 +191,7 @@ func parseContentBlock(raw map[string]any) (types.ContentBlock, error) {
 	case "thinking":
 		return &types.ThinkingBlock{
 			ThinkingContent: getString(raw, "thinking"),
+			Signature:       getString(raw, "signature"),
 		}, nil
 
 	case "tool_use":
