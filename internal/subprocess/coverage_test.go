@@ -324,10 +324,10 @@ func TestEndInput_NotConnected(t *testing.T) {
 func TestOptimizeCommandLength_ShortCommand(t *testing.T) {
 	opts := types.DefaultOptions()
 	opts.Agents = map[string]types.AgentDefinition{
-		"agent1": {Name: "agent1"},
+		"agent1": {Description: "Test agent", Prompt: "test"},
 	}
 
-	cmd := []string{"claude", "run", "--agents", `{"agent1":{"name":"agent1"}}`}
+	cmd := []string{"claude", "run", "--agents", `{"agent1":{"description":"Test agent","prompt":"test"}}`}
 	optimized := optimizeCommandLength(cmd, opts)
 
 	// Command should remain unchanged
@@ -347,7 +347,7 @@ func TestOptimizeCommandLength_LongCommand(t *testing.T) {
 	longAgents := make(map[string]types.AgentDefinition, 1000)
 	for i := 0; i < 1000; i++ {
 		name := "very-long-agent-name-that-takes-up-space"
-		longAgents[name] = types.AgentDefinition{Name: name}
+		longAgents[name] = types.AgentDefinition{Description: "desc", Prompt: "prompt"}
 	}
 	opts.Agents = longAgents
 
