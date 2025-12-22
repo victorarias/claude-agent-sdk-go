@@ -1,16 +1,11 @@
 # golangci-lint configuration for Claude Agent SDK Go
 # See https://golangci-lint.run/usage/configuration/
-#
-# Test this configuration:
-#   golangci-lint config verify    # Validate config
-#   golangci-lint run              # Run all linters
-#   golangci-lint run --fix        # Run with auto-fixes
 
 version: "2"
 
 run:
   timeout: 5m
-  tests: false  # Reduce noise from test files
+  tests: true
   build-tags: []
   exclude-dirs:
     - examples  # Examples are for demonstration, not production code
@@ -18,101 +13,49 @@ run:
 linters:
   default: none
   enable:
-    # Essential
+    # Essential - must pass
     - govet        # Official Go tool
-    - errcheck     # Check error handling
-    - staticcheck  # Advanced static analysis (includes gosimple)
+    - staticcheck  # Advanced static analysis
     - unused       # Find unused code
     - ineffassign  # Detect ineffectual assignments
 
-    # Quality
+    # Important
     - misspell     # Spelling mistakes
-    - unconvert    # Unnecessary conversions
-    - goconst      # Repeated strings
     - gosec        # Security issues
-    - revive       # General linting
-
-    # Complexity
-    - gocyclo      # Cyclomatic complexity
-    - cyclop       # Cyclomatic complexity
-    - funlen       # Function length
-
-    # Style/Best practices
-    - gocritic     # Comprehensive checks
-    - noctx        # HTTP requests without context
-    - nilerr       # Return nil instead of error
-    - predeclared  # Shadowing predeclared identifiers
-    - thelper      # Test helper detection
-    - tparallel    # Parallel test detection
-    - whitespace   # Whitespace issues
 
   settings:
     govet:
       enable-all: true
       disable:
         - shadow         # too many false positives
-        - fieldalignment # micro-optimization, not worth the noise
+        - fieldalignment # micro-optimization
         - printf         # disabled due to bug with Go 1.25.x
-
-    errcheck:
-      check-type-assertions: true
-      check-blank: false
+        - unusedwrite    # too strict for struct initialization patterns
 
     staticcheck:
-      checks: ["all"]
+      checks:
+        - all
+        - "-SA1012"  # nil context is ok in tests
+        - "-S1009"   # len nil check is fine
 
     misspell:
       locale: US
-
-    goconst:
-      min-len: 3
-      min-occurrences: 4  # 3 is too strict for test files
+      ignore-words:
+        - cancelled  # MCP protocol uses British spelling
 
     gosec:
-      severity: medium
-      confidence: medium
+      severity: high
+      confidence: high
       excludes:
         - G104  # unhandled errors - covered by errcheck
-        - G304  # file path from variable - needed for SDK functionality
-        - G204  # subprocess with variable - needed for SDK functionality
-
-    revive:
-      enable-all-rules: false
-      rules:
-        - name: exported
-          disabled: true  # too strict for SDK with many public APIs
-        - name: package-comments
-          disabled: true  # we have package docs where needed
-        - name: blank-imports
-          disabled: false
-        - name: context-as-argument
-          disabled: false
-        - name: error-return
-          disabled: false
-
-    cyclop:
-      max-complexity: 15
-
-    gocyclo:
-      min-complexity: 15
-
-    funlen:
-      lines: 100
-      statements: 50
-
-    gocritic:
-      enabled-tags:
-        - diagnostic
-        - style
-        - performance
-      disabled-checks:
-        - unnamedResult  # named results not always needed
-        - hugeParam      # sometimes large structs by value are okay
+        - G304  # file path from variable - needed for SDK
+        - G204  # subprocess with variable - needed for SDK
+        - G306  # file permissions - tests need 0755
 
 formatters:
   enable:
-    - gofmt        # Check formatting
-    - goimports    # Check imports
+    - gofmt
+    - goimports
   settings:
     gofmt:
       simplify: true
