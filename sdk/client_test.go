@@ -802,3 +802,100 @@ func TestClient_Messages(t *testing.T) {
 		t.Errorf("expected 2 texts, got %d: %v", len(texts), texts)
 	}
 }
+
+func TestClient_GetServerInfo(t *testing.T) {
+	transport := NewMockTransport()
+	client := NewClient(types.WithTransport(transport))
+
+	// Respond to initialize with server info
+	go func() {
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			reqID, ok := req["request_id"].(string)
+			if !ok {
+				continue
+			}
+
+			// Send init response with server info
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response": map[string]any{
+						"session_id": "test_session",
+						"commands": []any{
+							map[string]any{"name": "help", "description": "Show help"},
+							map[string]any{"name": "quit", "description": "Quit session"},
+						},
+						"output_style": "markdown",
+						"available_output_styles": []string{"markdown", "plain", "json"},
+					},
+				},
+			})
+			return
+		}
+	}()
+
+	ctx := context.Background()
+	if err := client.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	// Test GetServerInfo
+	info := client.GetServerInfo()
+	if info == nil {
+		t.Fatal("GetServerInfo returned nil")
+	}
+
+	// Verify server info fields
+	if sessionID, ok := info["session_id"].(string); !ok || sessionID != "test_session" {
+		t.Errorf("expected session_id 'test_session', got %v", info["session_id"])
+	}
+
+	if commands, ok := info["commands"].([]any); !ok || len(commands) != 2 {
+		t.Errorf("expected 2 commands, got %v", info["commands"])
+	}
+
+	if style, ok := info["output_style"].(string); !ok || style != "markdown" {
+		t.Errorf("expected output_style 'markdown', got %v", info["output_style"])
+	}
+}
+
+func TestClient_GetServerInfo_NotConnected(t *testing.T) {
+	client := NewClient()
+
+	// Should return nil when not connected
+	info := client.GetServerInfo()
+	if info != nil {
+		t.Errorf("expected nil from GetServerInfo when not connected, got %v", info)
+	}
+}
+
+func TestClient_GetServerInfo_NonStreaming(t *testing.T) {
+	transport := NewMockTransport()
+	client := NewClient(types.WithTransport(transport))
+
+	// Connect in non-streaming mode
+	ctx := context.Background()
+	if err := client.ConnectWithPrompt(ctx, "Hello"); err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	// Should return nil in non-streaming mode (no initialization)
+	info := client.GetServerInfo()
+	if info != nil {
+		t.Errorf("expected nil from GetServerInfo in non-streaming mode, got %v", info)
+	}
+}

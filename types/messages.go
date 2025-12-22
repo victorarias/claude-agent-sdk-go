@@ -358,6 +358,39 @@ type HookOutput struct {
 // HookCallback is the signature for hook callback functions.
 type HookCallback func(input any, toolUseID *string, ctx *HookContext) (*HookOutput, error)
 
+// Type-safe hook callback signatures for each hook event type.
+// These eliminate the need for type assertions in hook implementations.
+
+// PreToolUseCallback is a type-safe callback for PreToolUse hooks.
+type PreToolUseCallback func(input *PreToolUseHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error)
+
+// PostToolUseCallback is a type-safe callback for PostToolUse hooks.
+type PostToolUseCallback func(input *PostToolUseHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error)
+
+// UserPromptSubmitCallback is a type-safe callback for UserPromptSubmit hooks.
+type UserPromptSubmitCallback func(input *UserPromptSubmitHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error)
+
+// StopCallback is a type-safe callback for Stop hooks.
+type StopCallback func(input *StopHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error)
+
+// SubagentStopCallback is a type-safe callback for SubagentStop hooks.
+type SubagentStopCallback func(input *SubagentStopHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error)
+
+// PreCompactCallback is a type-safe callback for PreCompact hooks.
+type PreCompactCallback func(input *PreCompactHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error)
+
+// ToGenericCallback converts a type-safe callback to a generic HookCallback.
+// This allows using type-safe callbacks with the existing hook infrastructure.
+func ToGenericCallback[T any](callback func(*T, *string, *HookContext) (*HookOutput, error)) HookCallback {
+	return func(input any, toolUseID *string, ctx *HookContext) (*HookOutput, error) {
+		typedInput, ok := input.(*T)
+		if !ok {
+			return nil, fmt.Errorf("invalid input type: expected *%T, got %T", new(T), input)
+		}
+		return callback(typedInput, toolUseID, ctx)
+	}
+}
+
 // HookMatcher configures which hooks to run for an event.
 type HookMatcher struct {
 	Matcher map[string]any `json:"matcher,omitempty"` // e.g., {"tool_name": "Bash"} or nil for all
