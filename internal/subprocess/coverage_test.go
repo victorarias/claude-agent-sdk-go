@@ -343,23 +343,26 @@ func TestOptimizeCommandLength_LongCommand(t *testing.T) {
 	}
 
 	opts := types.DefaultOptions()
-	// Create a very long agents JSON to exceed command length limit
-	longAgents := make([]string, 1000)
-	for i := range longAgents {
-		longAgents[i] = "very-long-agent-name-that-takes-up-space"
+	// Create a very long agents map to exceed command length limit
+	longAgents := make(map[string]types.AgentDefinition, 1000)
+	for i := 0; i < 1000; i++ {
+		name := "very-long-agent-name-that-takes-up-space"
+		longAgents[name] = types.AgentDefinition{Name: name}
 	}
 	opts.Agents = longAgents
 
 	cmd := []string{"claude", "run", "--agents"}
 	// Build a long JSON string
-	longJSON := `["`
-	for i, agent := range longAgents {
-		if i > 0 {
-			longJSON += `","`
+	longJSON := `{`
+	first := true
+	for name := range longAgents {
+		if !first {
+			longJSON += `,`
 		}
-		longJSON += agent
+		first = false
+		longJSON += `"` + name + `":{"name":"` + name + `"}`
 	}
-	longJSON += `"]`
+	longJSON += `}`
 	cmd = append(cmd, longJSON)
 
 	optimized := optimizeCommandLength(cmd, opts)
