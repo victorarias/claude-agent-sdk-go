@@ -1,3 +1,9 @@
+// Package mcp defines types for the Model Context Protocol (MCP).
+//
+// This file contains the core type definitions for the MCP protocol, including
+// JSON-RPC 2.0 message structures, tool definitions, and protocol constants.
+// These types are used by both the handler and transport layers to implement
+// the MCP specification.
 package mcp
 
 import (
