@@ -59,18 +59,12 @@ linters:
     staticcheck:
       checks: ["all"]
 
-    unused:
-      check-exported: false
-
     misspell:
       locale: US
-      ignore-words:
-        - cancelled  # British spelling, but acceptable
 
     goconst:
       min-len: 3
       min-occurrences: 3
-      ignore-tests: true
 
     gosec:
       severity: medium
@@ -93,24 +87,9 @@ linters:
           disabled: false
         - name: error-return
           disabled: false
-        - name: error-strings
-          disabled: false
-        - name: error-naming
-          disabled: false
-        - name: if-return
-          disabled: false
-        - name: var-naming
-          disabled: false
-        - name: range
-          disabled: false
-        - name: receiver-naming
-          disabled: false
-        - name: indent-error-flow
-          disabled: false
 
     cyclop:
       max-complexity: 15
-      skip-tests: true
 
     gocyclo:
       min-complexity: 15
@@ -118,7 +97,6 @@ linters:
     funlen:
       lines: 100
       statements: 50
-      ignore-comments: true
 
     gocritic:
       enabled-tags:
@@ -139,35 +117,6 @@ formatters:
     goimports:
       local-prefixes:
         - github.com/victorarias/claude-agent-sdk-go
-
-issues:
-  exclude-dirs:
-    - reference
-    - .beads
-    - .github
-    - .claude
-
-  exclude-rules:
-    # Exclude some linters from running on tests files
-    - path: _test\.go
-      linters:
-        - funlen
-        - gocyclo
-        - cyclop
-        - goconst
-
-    # Exclude some staticcheck messages
-    - linters:
-        - staticcheck
-      text: "SA1019:"  # Don't warn about deprecated usage
-
-    # Allow unused parameters in interface implementations
-    - linters:
-        - revive
-      text: "unused-parameter"
-
-  max-issues-per-linter: 0
-  max-same-issues: 0
 
 output:
   formats:

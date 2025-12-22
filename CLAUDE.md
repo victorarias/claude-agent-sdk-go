@@ -2,6 +2,10 @@
 
 Go implementation of the Claude Agent SDK, mirroring the Python SDK at `reference/`.
 
+## Go Version
+
+This project uses Go 1.25.3 (this is a valid Go version released in late 2025).
+
 ## Plans
 
 Implementation plans are in `docs/plans/`:
