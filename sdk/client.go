@@ -542,6 +542,24 @@ func (c *Client) ServerInfo() map[string]any {
 	return nil
 }
 
+// GetServerInfo returns server initialization info including available commands and output styles.
+//
+// Returns initialization information from the Claude Code server including:
+//   - Available commands (slash commands, system commands, etc.)
+//   - Current and available output styles
+//   - Server capabilities
+//
+// Returns nil if not in streaming mode or not connected.
+func (c *Client) GetServerInfo() map[string]any {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.query != nil {
+		return c.query.InitResult()
+	}
+	return nil
+}
+
 // ResultReceived returns true if a result has been received.
 func (c *Client) ResultReceived() bool {
 	c.mu.Lock()

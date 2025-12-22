@@ -280,12 +280,29 @@ func (m *StreamEvent) MessageType() string { return "stream_event" }
 type HookEvent string
 
 const (
-	HookPreToolUse       HookEvent = "PreToolUse"
-	HookPostToolUse      HookEvent = "PostToolUse"
+	// HookPreToolUse is triggered before a tool is invoked. This allows inspection,
+	// modification, or blocking of tool calls before they execute.
+	HookPreToolUse HookEvent = "PreToolUse"
+
+	// HookPostToolUse is triggered after a tool has been invoked. This allows
+	// inspection or modification of tool results before they are returned to Claude.
+	HookPostToolUse HookEvent = "PostToolUse"
+
+	// HookUserPromptSubmit is triggered when a user submits a prompt. This allows
+	// inspection or modification of user input before it is sent to Claude.
 	HookUserPromptSubmit HookEvent = "UserPromptSubmit"
-	HookStop             HookEvent = "Stop"
-	HookSubagentStop     HookEvent = "SubagentStop"
-	HookPreCompact       HookEvent = "PreCompact"
+
+	// HookStop is triggered when a session is about to stop. This allows cleanup
+	// or logging before the session ends.
+	HookStop HookEvent = "Stop"
+
+	// HookSubagentStop is triggered when a subagent session is about to stop.
+	// This allows cleanup specific to subagent termination.
+	HookSubagentStop HookEvent = "SubagentStop"
+
+	// HookPreCompact is triggered before the conversation history is compacted.
+	// This allows inspection or archival of messages before they are removed.
+	HookPreCompact HookEvent = "PreCompact"
 )
 
 // HookContext provides context for hook callbacks.
