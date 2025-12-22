@@ -840,7 +840,7 @@ func TestClient_GetServerInfo(t *testing.T) {
 							map[string]any{"name": "help", "description": "Show help"},
 							map[string]any{"name": "quit", "description": "Quit session"},
 						},
-						"output_style": "markdown",
+						"output_style":            "markdown",
 						"available_output_styles": []string{"markdown", "plain", "json"},
 					},
 				},

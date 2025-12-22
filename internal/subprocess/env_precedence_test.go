@@ -17,7 +17,7 @@ import (
 // 3. SDK-required env (TERM=dumb, NO_COLOR=1) - these CANNOT be overridden
 func TestEnvironmentPrecedence(t *testing.T) {
 	tests := []struct {
-		name     string
+		name      string
 		systemEnv map[string]string
 		userEnv   map[string]string
 		want      map[string]string
@@ -31,10 +31,10 @@ func TestEnvironmentPrecedence(t *testing.T) {
 				"CUSTOM": "value",
 			},
 			want: map[string]string{
-				"PATH":   "/usr/bin",
-				"CUSTOM": "value",
-				"TERM":   "dumb",
-				"NO_COLOR": "1",
+				"PATH":                   "/usr/bin",
+				"CUSTOM":                 "value",
+				"TERM":                   "dumb",
+				"NO_COLOR":               "1",
 				"CLAUDE_CODE_ENTRYPOINT": "sdk-go",
 			},
 		},
@@ -47,8 +47,8 @@ func TestEnvironmentPrecedence(t *testing.T) {
 				"TERM": "xterm-256color", // User tries to set TERM
 			},
 			want: map[string]string{
-				"PATH":   "/usr/bin",
-				"TERM":   "dumb", // SDK overrides to dumb
+				"PATH":     "/usr/bin",
+				"TERM":     "dumb", // SDK overrides to dumb
 				"NO_COLOR": "1",
 			},
 		},
@@ -61,8 +61,8 @@ func TestEnvironmentPrecedence(t *testing.T) {
 				"NO_COLOR": "0", // User tries to enable color
 			},
 			want: map[string]string{
-				"PATH":   "/usr/bin",
-				"TERM":   "dumb",
+				"PATH":     "/usr/bin",
+				"TERM":     "dumb",
 				"NO_COLOR": "1", // SDK forces NO_COLOR=1
 			},
 		},
@@ -76,9 +76,9 @@ func TestEnvironmentPrecedence(t *testing.T) {
 				"CUSTOM": "user-value", // User overrides system
 			},
 			want: map[string]string{
-				"PATH":   "/usr/bin",
-				"CUSTOM": "user-value", // User value takes precedence over system
-				"TERM":   "dumb",
+				"PATH":     "/usr/bin",
+				"CUSTOM":   "user-value", // User value takes precedence over system
+				"TERM":     "dumb",
 				"NO_COLOR": "1",
 			},
 		},
@@ -91,10 +91,10 @@ func TestEnvironmentPrecedence(t *testing.T) {
 				"CLAUDE_CODE_ENTRYPOINT": "malicious", // User tries to override
 			},
 			want: map[string]string{
-				"PATH": "/usr/bin",
+				"PATH":                   "/usr/bin",
 				"CLAUDE_CODE_ENTRYPOINT": "sdk-go", // SDK maintains control
-				"TERM":   "dumb",
-				"NO_COLOR": "1",
+				"TERM":                   "dumb",
+				"NO_COLOR":               "1",
 			},
 		},
 	}

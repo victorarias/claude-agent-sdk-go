@@ -220,7 +220,7 @@ func TestMixedMCPServersOnlyExternalPassedToCLI(t *testing.T) {
 // compatibility with the Python SDK.
 func TestStdioMCPServerWithoutTypeFieldDefaultsToStdio(t *testing.T) {
 	testCases := []struct {
-		name        string
+		name         string
 		serverConfig map[string]any
 	}{
 		{
