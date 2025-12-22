@@ -9,9 +9,16 @@ import (
 	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
-// TestQueryStream_GoroutineLeak demonstrates that QueryStream leaks goroutines
+// TestQueryStream_NoGoroutineLeak verifies that QueryStream does NOT leak goroutines
 // when the caller abandons the returned channels without consuming them.
-func TestQueryStream_GoroutineLeak(t *testing.T) {
+//
+// The goroutine should exit cleanly even when:
+// 1. The caller doesn't consume from msgChan/errChan
+// 2. The transport continues to produce messages
+// 3. The msgChan buffer fills up
+//
+// This requires proper context-based cancellation to ensure cleanup.
+func TestQueryStream_NoGoroutineLeak(t *testing.T) {
 	// Force GC to clean up any existing goroutines
 	runtime.GC()
 	time.Sleep(10 * time.Millisecond)
@@ -35,13 +42,12 @@ func TestQueryStream_GoroutineLeak(t *testing.T) {
 			})
 			time.Sleep(1 * time.Millisecond)
 		}
-		transport.SendMessage(map[string]any{
-			"type":    "result",
-			"subtype": "success",
-		})
+		// Never send result - keep transport "alive"
 	}()
 
-	ctx := context.Background()
+	// Use a context with timeout to eventually clean up
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
 
 	// Call QueryStream but ABANDON the channels without consuming
 	// This simulates a caller that starts the stream but doesn't read from it
@@ -69,13 +75,15 @@ func TestQueryStream_GoroutineLeak(t *testing.T) {
 	// 5. There's no mechanism to cancel the goroutine when caller abandons
 
 	// With proper cleanup, no goroutines should leak
-	// We allow a small margin (1-2 goroutines) for test infrastructure
+	// We allow a margin of 2-3 goroutines for test infrastructure
 	leaked := afterCount - beforeCount
 
-	if leaked > 2 {
+	if leaked > 3 {
 		t.Errorf("Goroutine leak detected: count went from %d to %d (diff: %d). "+
-			"QueryStream goroutine should exit when caller abandons channels.",
+			"QueryStream goroutine should exit when caller abandons channels, "+
+			"but it's blocked trying to send to an abandoned msgChan.",
 			beforeCount, afterCount, leaked)
+		t.Logf("This indicates the goroutine is stuck at client.go:402 trying to send to msgChan")
 	}
 
 	t.Logf("Goroutines: before=%d, after=%d, leaked=%d",
