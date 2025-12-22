@@ -1,3 +1,9 @@
+// Package mcp implements the Model Context Protocol (MCP) for the Claude Agent SDK.
+//
+// This package provides handler functionality for MCP servers, allowing custom tools
+// to be exposed to Claude through the standard MCP protocol. The handler processes
+// JSON-RPC 2.0 requests from the Claude CLI and routes them to the appropriate tool
+// implementations defined in the MCPServer configuration.
 package mcp
 
 import (

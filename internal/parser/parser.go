@@ -1,3 +1,11 @@
+// Package parser provides message parsing functionality for the Claude Agent SDK.
+//
+// This package handles the conversion of raw JSON-RPC messages from the Claude CLI
+// into strongly-typed Go message structures. It supports all message types including
+// system messages, user messages, assistant messages, stream events, and result messages.
+//
+// The parser automatically handles type inference and validation, ensuring that all
+// messages conform to the expected schema before being returned to the client.
 package parser
 
 import (
