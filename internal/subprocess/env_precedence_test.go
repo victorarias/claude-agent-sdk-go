@@ -214,3 +214,71 @@ func TestFeatureFlagEnvironment(t *testing.T) {
 		t.Errorf("user should not be able to override SDK feature flag, expected 'true' got %q", val)
 	}
 }
+
+// TestPWDEnvironmentVariable verifies that PWD is set when Cwd option is provided
+func TestPWDEnvironmentVariable(t *testing.T) {
+	tests := []struct {
+		name        string
+		cwd         string
+		userEnv     map[string]string
+		expectPWD   bool
+		expectedVal string
+	}{
+		{
+			name:        "PWD set when Cwd is provided",
+			cwd:         "/custom/working/dir",
+			userEnv:     map[string]string{},
+			expectPWD:   true,
+			expectedVal: "/custom/working/dir",
+		},
+		{
+			name:      "PWD not set when Cwd is empty",
+			cwd:       "",
+			userEnv:   map[string]string{},
+			expectPWD: false,
+		},
+		{
+			name: "user can override PWD",
+			cwd:  "/custom/working/dir",
+			userEnv: map[string]string{
+				"PWD": "/user/override/dir",
+			},
+			expectPWD:   true,
+			expectedVal: "/user/override/dir",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := types.DefaultOptions()
+			opts.Cwd = tt.cwd
+			opts.Env = tt.userEnv
+
+			env := buildEnvironment(opts)
+
+			// Parse env into map
+			envMap := make(map[string]string)
+			for _, e := range env {
+				parts := strings.SplitN(e, "=", 2)
+				if len(parts) == 2 {
+					envMap[parts[0]] = parts[1]
+				}
+			}
+
+			if tt.expectPWD {
+				val, exists := envMap["PWD"]
+				if !exists {
+					t.Errorf("expected PWD to be set")
+					return
+				}
+				if val != tt.expectedVal {
+					t.Errorf("PWD: expected %q, got %q", tt.expectedVal, val)
+				}
+			} else {
+				if val, exists := envMap["PWD"]; exists {
+					t.Errorf("expected PWD not to be set, but got %q", val)
+				}
+			}
+		})
+	}
+}
