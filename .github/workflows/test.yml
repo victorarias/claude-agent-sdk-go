@@ -22,8 +22,11 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
 
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
+
       - name: Download dependencies
         run: go mod download
 
       - name: Run tests
-        run: go test ./... -race -v
+        run: gotestsum --format pkgname -- ./... -race
