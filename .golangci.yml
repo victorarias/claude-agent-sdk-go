@@ -6,6 +6,8 @@
 #   golangci-lint run              # Run all linters
 #   golangci-lint run --fix        # Run with auto-fixes
 
+version: "2"
+
 run:
   timeout: 5m
   tests: true
