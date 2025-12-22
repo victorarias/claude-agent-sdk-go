@@ -266,10 +266,13 @@ func TestWithTransport(t *testing.T) {
 func TestMCPServerBuilder(t *testing.T) {
 	server := NewMCPServerBuilder("test-server").
 		WithVersion("1.0.0").
-		WithTool("greet", "Greet a person", map[string]ToolProperty{
-			"name": {Type: "string", Description: "Person's name"},
-		}, func(input map[string]any) ([]MCPContent, error) {
-			return []MCPContent{{Type: "text", Text: "Hello!"}}, nil
+		WithTool("greet", "Greet a person", map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"name": map[string]any{"type": "string", "description": "Person's name"},
+			},
+		}, func(args map[string]any) (*MCPToolResult, error) {
+			return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: "Hello!"}}}, nil
 		}).
 		Build()
 
