@@ -227,86 +227,102 @@ func (s *MCPServer) ToConfig() map[string]any {
 
 // Options configures the Claude SDK client.
 type Options struct {
-	// Tools configuration - can be []string or ToolsPreset
-	Tools           any      `json:"tools,omitempty"`
-	AllowedTools    []string `json:"allowed_tools,omitempty"`
+	// Tools specifies which tools are available. Can be []string of tool names or ToolsPreset.
+	Tools any `json:"tools,omitempty"`
+	// AllowedTools explicitly allows specific tools, overriding defaults.
+	AllowedTools []string `json:"allowed_tools,omitempty"`
+	// DisallowedTools explicitly disallows specific tools.
 	DisallowedTools []string `json:"disallowed_tools,omitempty"`
 
-	// System prompt - can be string or SystemPromptPreset
-	SystemPrompt       any    `json:"system_prompt,omitempty"`
+	// SystemPrompt sets the system prompt. Can be string or SystemPromptPreset.
+	SystemPrompt any `json:"system_prompt,omitempty"`
+	// AppendSystemPrompt appends additional text to the system prompt.
 	AppendSystemPrompt string `json:"append_system_prompt,omitempty"`
 
-	// Model configuration
-	Model         string `json:"model,omitempty"`
+	// Model specifies which Claude model to use (e.g., "opus", "sonnet").
+	Model string `json:"model,omitempty"`
+	// FallbackModel specifies a model to use if the primary model fails.
 	FallbackModel string `json:"fallback_model,omitempty"`
 
-	// Permission settings
-	PermissionMode           PermissionMode `json:"permission_mode,omitempty"`
-	PermissionPromptToolName string         `json:"permission_prompt_tool_name,omitempty"`
+	// PermissionMode controls how tool permissions are handled.
+	PermissionMode PermissionMode `json:"permission_mode,omitempty"`
+	// PermissionPromptToolName specifies a custom tool for permission prompts.
+	PermissionPromptToolName string `json:"permission_prompt_tool_name,omitempty"`
 
-	// Session settings
-	ContinueConversation bool   `json:"continue_conversation,omitempty"`
-	Resume               string `json:"resume,omitempty"`
-	ForkSession          bool   `json:"fork_session,omitempty"`
+	// ContinueConversation resumes the last conversation session.
+	ContinueConversation bool `json:"continue_conversation,omitempty"`
+	// Resume specifies a session ID to resume.
+	Resume string `json:"resume,omitempty"`
+	// ForkSession creates a new session forked from the current one.
+	ForkSession bool `json:"fork_session,omitempty"`
 
-	// Limits
-	MaxTurns          int     `json:"max_turns,omitempty"`
-	MaxBudgetUSD      float64 `json:"max_budget_usd,omitempty"`
-	MaxThinkingTokens int     `json:"max_thinking_tokens,omitempty"`
-	MaxBufferSize     int     `json:"max_buffer_size,omitempty"`
+	// MaxTurns limits the number of conversation turns.
+	MaxTurns int `json:"max_turns,omitempty"`
+	// MaxBudgetUSD limits spending in USD.
+	MaxBudgetUSD float64 `json:"max_budget_usd,omitempty"`
+	// MaxThinkingTokens limits extended thinking tokens.
+	MaxThinkingTokens int `json:"max_thinking_tokens,omitempty"`
+	// MaxBufferSize sets the maximum buffer size for stdout (default: 1MB).
+	MaxBufferSize int `json:"max_buffer_size,omitempty"`
 
-	// Paths
-	Cwd           string   `json:"cwd,omitempty"`
-	CLIPath       string   `json:"cli_path,omitempty"`
-	BundledCLIPath string  `json:"bundled_cli_path,omitempty"`
-	AddDirs       []string `json:"add_dirs,omitempty"`
+	// Cwd sets the working directory for the CLI subprocess.
+	Cwd string `json:"cwd,omitempty"`
+	// CLIPath specifies an explicit path to the Claude CLI binary.
+	CLIPath string `json:"cli_path,omitempty"`
+	// BundledCLIPath is used by packaged distributions to specify a bundled CLI.
+	BundledCLIPath string `json:"bundled_cli_path,omitempty"`
+	// AddDirs adds additional directories to make available to the agent.
+	AddDirs []string `json:"add_dirs,omitempty"`
 
-	// Environment
+	// Env specifies environment variables for the CLI subprocess.
 	Env map[string]string `json:"env,omitempty"`
 
-	// MCP Servers
-	MCPServers    any                   `json:"mcp_servers,omitempty"`
+	// MCPServers configures external MCP servers (map[string]MCPServerConfig).
+	MCPServers any `json:"mcp_servers,omitempty"`
+	// SDKMCPServers configures in-process MCP servers hosted by the SDK.
 	SDKMCPServers map[string]*MCPServer `json:"-"`
 
-	// Hooks for client
-	Hooks      map[HookEvent][]HookMatcher `json:"-"`
-	CanUseTool CanUseToolCallback          `json:"-"`
+	// Hooks registers event handlers for message processing.
+	Hooks map[HookEvent][]HookMatcher `json:"-"`
+	// CanUseTool is a callback to control tool usage dynamically.
+	CanUseTool CanUseToolCallback `json:"-"`
 
-	// Streaming
+	// IncludePartialMessages enables streaming of partial message updates.
 	IncludePartialMessages bool `json:"include_partial_messages,omitempty"`
 
-	// File checkpointing
+	// EnableFileCheckpointing enables file state checkpointing for recovery.
 	EnableFileCheckpointing bool `json:"enable_file_checkpointing,omitempty"`
 
-	// Output format for structured outputs
+	// OutputFormat specifies a JSON schema for structured outputs.
 	OutputFormat map[string]any `json:"output_format,omitempty"`
 
-	// Extra CLI arguments
+	// ExtraArgs provides escape hatch for additional CLI flags.
 	ExtraArgs map[string]string `json:"extra_args,omitempty"`
 
-	// Beta features
+	// Betas enables beta features.
 	Betas []SdkBeta `json:"betas,omitempty"`
 
-	// Settings sources
+	// SettingSources specifies which settings sources to load (user, project, local).
 	SettingSources []SettingSource `json:"setting_sources,omitempty"`
-	Settings       string          `json:"settings,omitempty"`
+	// Settings provides settings as JSON string or file path.
+	Settings string `json:"settings,omitempty"`
 
-	// User identifier
+	// User specifies a user identifier for the session.
 	User string `json:"user,omitempty"`
 
-	// Custom agents
+	// Agents defines custom agent configurations.
 	Agents map[string]AgentDefinition `json:"agents,omitempty"`
 
-	// Sandbox configuration
+	// Sandbox configures sandbox isolation settings.
 	Sandbox *SandboxSettings `json:"sandbox,omitempty"`
 
-	// Plugins
+	// Plugins specifies plugin configurations (currently only local plugins).
 	Plugins []PluginConfig `json:"plugins,omitempty"`
 
-	// Stderr callback for debugging
+	// StderrCallback is invoked with each line of stderr output for debugging.
 	StderrCallback func(string) `json:"-"`
 
-	// Internal: custom transport for testing
+	// customTransport is used internally for testing with custom transport implementations.
 	customTransport Transport `json:"-"`
 }
 
