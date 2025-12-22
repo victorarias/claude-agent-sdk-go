@@ -121,3 +121,230 @@ func TestClosedError(t *testing.T) {
 		}
 	})
 }
+
+// TestSDKError tests the SDKError type.
+func TestSDKError(t *testing.T) {
+	t.Run("Error message without cause", func(t *testing.T) {
+		err := &SDKError{
+			Message: "operation failed",
+		}
+
+		expected := "sdk: operation failed"
+		if err.Error() != expected {
+			t.Errorf("Expected %q, got %q", expected, err.Error())
+		}
+	})
+
+	t.Run("Error message with cause", func(t *testing.T) {
+		cause := errors.New("underlying error")
+		err := &SDKError{
+			Message: "operation failed",
+			Cause:   cause,
+		}
+
+		expected := "sdk: operation failed: underlying error"
+		if err.Error() != expected {
+			t.Errorf("Expected %q, got %q", expected, err.Error())
+		}
+	})
+}
+
+// TestCLINotFoundError tests the CLINotFoundError type.
+func TestCLINotFoundError(t *testing.T) {
+	t.Run("Error with explicit path", func(t *testing.T) {
+		err := &CLINotFoundError{
+			CLIPath: "/usr/local/bin/claude",
+		}
+
+		expected := "claude CLI not found at: /usr/local/bin/claude"
+		if err.Error() != expected {
+			t.Errorf("Expected %q, got %q", expected, err.Error())
+		}
+	})
+
+	t.Run("Error with searched paths", func(t *testing.T) {
+		err := &CLINotFoundError{
+			SearchedPaths: []string{"/usr/bin", "/usr/local/bin", "/opt/bin"},
+		}
+
+		expected := "claude CLI not found, searched: /usr/bin, /usr/local/bin, /opt/bin"
+		if err.Error() != expected {
+			t.Errorf("Expected %q, got %q", expected, err.Error())
+		}
+	})
+
+	t.Run("errors.Is returns true for ErrCLINotFound", func(t *testing.T) {
+		err := &CLINotFoundError{
+			CLIPath: "/usr/bin/claude",
+		}
+
+		if !errors.Is(err, ErrCLINotFound) {
+			t.Error("Expected errors.Is(err, ErrCLINotFound) to be true")
+		}
+	})
+}
+
+// TestConnectionError tests the ConnectionError type.
+func TestConnectionError(t *testing.T) {
+	t.Run("Error message without cause", func(t *testing.T) {
+		err := &ConnectionError{
+			Message: "failed to connect",
+		}
+
+		expected := "connection error: failed to connect"
+		if err.Error() != expected {
+			t.Errorf("Expected %q, got %q", expected, err.Error())
+		}
+	})
+
+	t.Run("Error message with cause", func(t *testing.T) {
+		cause := errors.New("network unreachable")
+		err := &ConnectionError{
+			Message: "failed to connect",
+			Cause:   cause,
+		}
+
+		expected := "connection error: failed to connect: network unreachable"
+		if err.Error() != expected {
+			t.Errorf("Expected %q, got %q", expected, err.Error())
+		}
+	})
+
+	t.Run("errors.Is returns true for ErrConnection", func(t *testing.T) {
+		err := &ConnectionError{
+			Message: "timeout",
+		}
+
+		if !errors.Is(err, ErrConnection) {
+			t.Error("Expected errors.Is(err, ErrConnection) to be true")
+		}
+	})
+
+	t.Run("Unwrap returns cause", func(t *testing.T) {
+		cause := errors.New("network unreachable")
+		err := &ConnectionError{
+			Message: "failed to connect",
+			Cause:   cause,
+		}
+
+		if err.Unwrap() != cause {
+			t.Error("Expected Unwrap to return the cause")
+		}
+	})
+}
+
+// TestProcessError tests the ProcessError type.
+func TestProcessError(t *testing.T) {
+	t.Run("Error message format", func(t *testing.T) {
+		err := &ProcessError{
+			ExitCode: 1,
+			Stderr:   "command not found",
+		}
+
+		expected := "process exited with code 1: command not found"
+		if err.Error() != expected {
+			t.Errorf("Expected %q, got %q", expected, err.Error())
+		}
+	})
+
+	t.Run("errors.Is returns true for ErrProcess", func(t *testing.T) {
+		err := &ProcessError{
+			ExitCode: 127,
+			Stderr:   "file not found",
+		}
+
+		if !errors.Is(err, ErrProcess) {
+			t.Error("Expected errors.Is(err, ErrProcess) to be true")
+		}
+	})
+}
+
+// TestJSONDecodeError tests the JSONDecodeError type.
+func TestJSONDecodeError(t *testing.T) {
+	t.Run("Error message format", func(t *testing.T) {
+		originalErr := errors.New("unexpected end of JSON input")
+		err := &JSONDecodeError{
+			Line:          `{"incomplete": `,
+			OriginalError: originalErr,
+		}
+
+		expected := `JSON decode error on line "{\"incomplete\": ": unexpected end of JSON input`
+		if err.Error() != expected {
+			t.Errorf("Expected %q, got %q", expected, err.Error())
+		}
+	})
+
+	t.Run("errors.Is returns true for ErrParse", func(t *testing.T) {
+		err := &JSONDecodeError{
+			Line:          "invalid json",
+			OriginalError: errors.New("parse error"),
+		}
+
+		if !errors.Is(err, ErrParse) {
+			t.Error("Expected errors.Is(err, ErrParse) to be true")
+		}
+	})
+
+	t.Run("Unwrap returns original error", func(t *testing.T) {
+		originalErr := errors.New("syntax error")
+		err := &JSONDecodeError{
+			Line:          "bad json",
+			OriginalError: originalErr,
+		}
+
+		if err.Unwrap() != originalErr {
+			t.Error("Expected Unwrap to return the original error")
+		}
+	})
+}
+
+// TestMessageParseError tests the MessageParseError type.
+func TestMessageParseError(t *testing.T) {
+	t.Run("Error message format", func(t *testing.T) {
+		err := &MessageParseError{
+			Message: "missing required field 'type'",
+			Data:    map[string]any{"content": "test"},
+		}
+
+		expected := "message parse error: missing required field 'type'"
+		if err.Error() != expected {
+			t.Errorf("Expected %q, got %q", expected, err.Error())
+		}
+	})
+
+	t.Run("errors.Is returns true for ErrParse", func(t *testing.T) {
+		err := &MessageParseError{
+			Message: "invalid message structure",
+		}
+
+		if !errors.Is(err, ErrParse) {
+			t.Error("Expected errors.Is(err, ErrParse) to be true")
+		}
+	})
+}
+
+// TestCLIVersionError tests the CLIVersionError type.
+func TestCLIVersionError(t *testing.T) {
+	t.Run("Error message format", func(t *testing.T) {
+		err := &CLIVersionError{
+			InstalledVersion: "1.0.0",
+			MinimumVersion:   "2.0.0",
+		}
+
+		expected := "CLI version 1.0.0 is below minimum required version 2.0.0"
+		if err.Error() != expected {
+			t.Errorf("Expected %q, got %q", expected, err.Error())
+		}
+	})
+
+	t.Run("errors.Is returns true for ErrCLIVersion", func(t *testing.T) {
+		err := &CLIVersionError{
+			InstalledVersion: "0.5.0",
+			MinimumVersion:   "1.0.0",
+		}
+
+		if !errors.Is(err, ErrCLIVersion) {
+			t.Error("Expected errors.Is(err, ErrCLIVersion) to be true")
+		}
+	})
+}
