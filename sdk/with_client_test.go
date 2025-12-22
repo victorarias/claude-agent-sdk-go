@@ -120,7 +120,7 @@ func TestWithClient_Success(t *testing.T) {
 
 // TestWithClient_FunctionError tests that disconnect is called even if function returns error
 func TestWithClient_FunctionError(t *testing.T) {
-	mock := &mockTransportWithClient{}
+	mock := newMockTransportWithClient()
 	opts := []types.Option{
 		types.WithTransport(mock),
 	}
@@ -143,7 +143,7 @@ func TestWithClient_FunctionError(t *testing.T) {
 
 // TestWithClient_FunctionPanic tests that disconnect is called even if function panics
 func TestWithClient_FunctionPanic(t *testing.T) {
-	mock := &mockTransportWithClient{}
+	mock := newMockTransportWithClient()
 	opts := []types.Option{
 		types.WithTransport(mock),
 	}
