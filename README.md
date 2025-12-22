@@ -235,27 +235,13 @@ See [docs/LINTING.md](docs/LINTING.md) for detailed linting configuration.
 ├── types/          # Core types, messages, and options
 ├── internal/       # Internal implementation (parser, subprocess, etc.)
 ├── examples/       # Example applications
-└── docs/           # Implementation plans and documentation
+└── docs/           # Documentation
 ```
-
-### Implementation Plans
-
-Detailed implementation plans are available in [`docs/plans/`](./docs/plans):
-- [01-types-interfaces.md](./docs/plans/01-types-interfaces.md) - Core types and interfaces
-- [02-transport-layer.md](./docs/plans/02-transport-layer.md) - Subprocess and CLI communication
-- [03-query-protocol.md](./docs/plans/03-query-protocol.md) - Message parsing and control protocol
-- [04-client-api.md](./docs/plans/04-client-api.md) - Client API design
-- [05-integration.md](./docs/plans/05-integration.md) - Examples and integration tests
-- [06-mcp-servers.md](./docs/plans/06-mcp-servers.md) - MCP server support
 
 ## Contributing
 
-Contributions are welcome! Please ensure all tests pass before submitting pull requests.
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
 This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
-
-## Reference
-
-This implementation mirrors the official Python SDK. The Python reference is maintained in the `reference/` directory (gitignored) for comparison during development.

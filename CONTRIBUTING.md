@@ -126,7 +126,7 @@ This project follows standard Go conventions and best practices:
 - `types/` - Core types, messages, options (public)
 - `internal/` - Internal implementation details (private)
 - `examples/` - Example applications and use cases
-- `docs/` - Documentation and implementation plans
+- `docs/` - Documentation
 
 ## Testing Requirements
 
