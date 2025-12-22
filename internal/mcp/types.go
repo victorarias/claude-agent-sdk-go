@@ -126,7 +126,7 @@ func NewMCPError(code int, message string, data any) *MCPError {
 }
 
 // NewMCPResponse creates a successful response.
-func NewMCPResponse(id any, result any) *MCPResponse {
+func NewMCPResponse(id, result any) *MCPResponse {
 	return &MCPResponse{
 		JSONRPC: "2.0",
 		ID:      id,
