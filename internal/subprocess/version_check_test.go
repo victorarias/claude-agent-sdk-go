@@ -106,10 +106,8 @@ func TestVersionCheckCanBeSkipped(t *testing.T) {
 	err := transport.Connect(ctx)
 
 	// Error should be CLINotFoundError, not CLIVersionError
-	if err != nil {
-		if _, ok := err.(*types.CLIVersionError); ok {
-			t.Error("version check should be skipped when CLAUDE_AGENT_SDK_SKIP_VERSION_CHECK is set")
-		}
+	if _, ok := err.(*types.CLIVersionError); ok {
+		t.Error("version check should be skipped when CLAUDE_AGENT_SDK_SKIP_VERSION_CHECK is set")
 	}
 }
 
