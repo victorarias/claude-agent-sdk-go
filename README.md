@@ -199,17 +199,23 @@ if err != nil {
 
 ## Development
 
-### Running Tests
+### Setup
 
 ```bash
-# Run all tests
-go test ./...
+# Install development tools (gotestsum for better test output, golangci-lint)
+make install-tools
+```
 
-# Run with race detector
-go test -race ./...
+### Running Tests
 
-# Run with coverage
-go test -cover ./...
+We use [gotestsum](https://github.com/gotestyourself/gotestsum) for clearer test output with failure summaries:
+
+```bash
+# Run all tests (recommended)
+make test
+
+# Run with coverage report
+make test-coverage
 ```
 
 ### Code Quality
@@ -223,6 +229,17 @@ make lint
 
 # Full check (format, lint, test, build)
 make all
+```
+
+### Available Make Targets
+
+```bash
+make help          # Show all available targets
+make all           # Format, lint, test, and build
+make test          # Run tests with gotestsum
+make lint          # Run golangci-lint
+make build         # Build all packages
+make build-examples # Build example applications
 ```
 
 See [docs/LINTING.md](docs/LINTING.md) for detailed linting configuration.
