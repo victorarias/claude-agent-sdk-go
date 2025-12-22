@@ -266,33 +266,43 @@ func (q *Query) handleControlRequest(msg map[string]any) {
 		return
 	}
 
-	subtype, _ := request["subtype"].(string)
+	// Parse the request into a typed struct
+	typedRequest, parseErr := types.ParseSDKControlRequest(request)
+	if parseErr != nil {
+		q.sendControlResponse(requestID, nil, fmt.Errorf("failed to parse control request: %w", parseErr))
+		return
+	}
 
 	var responseData map[string]any
 	var err error
 
-	switch subtype {
-	case "can_use_tool":
-		responseData, err = q.handleCanUseTool(request)
-	case "hook_callback":
-		responseData, err = q.handleHookCallback(request)
-	case "mcp_tool_call":
-		responseData, err = q.handleMCPToolCall(request)
-	case "mcp_message":
-		serverName, _ := request["server_name"].(string)
-		mcpMessage, _ := request["message"].(map[string]any)
-		if serverName == "" || mcpMessage == nil {
-			err = fmt.Errorf("missing server_name or message for MCP request")
-		} else {
-			var mcpResponse any
-			mcpResponse, err = q.handleMCPMessage(serverName, mcpMessage)
-			if err == nil {
-				// Wrap the MCP response as expected by the control protocol
-				responseData = map[string]any{"mcp_response": mcpResponse}
-			}
+	// Handle based on typed request
+	switch req := typedRequest.(type) {
+	case *types.SDKControlPermissionRequest:
+		responseData, err = q.handleCanUseToolTyped(req)
+	case *types.SDKHookCallbackRequest:
+		responseData, err = q.handleHookCallbackTyped(req)
+	case *types.SDKControlInterruptRequest:
+		// Interrupt is handled via sendControlRequest, not incoming
+		err = fmt.Errorf("interrupt request not expected as incoming request")
+	case *types.SDKControlInitializeRequest:
+		// Initialize is handled via sendControlRequest, not incoming
+		err = fmt.Errorf("initialize request not expected as incoming request")
+	case *types.SDKControlSetPermissionModeRequest:
+		// Set permission mode is handled via sendControlRequest, not incoming
+		err = fmt.Errorf("set permission mode request not expected as incoming request")
+	case *types.SDKControlMcpMessageRequest:
+		var mcpResponse any
+		mcpResponse, err = q.handleMCPMessage(req.ServerName, req.Message.(map[string]any))
+		if err == nil {
+			// Wrap the MCP response as expected by the control protocol
+			responseData = map[string]any{"mcp_response": mcpResponse}
 		}
+	case *types.SDKControlRewindFilesRequest:
+		// Rewind files is handled via sendControlRequest, not incoming
+		err = fmt.Errorf("rewind files request not expected as incoming request")
 	default:
-		err = fmt.Errorf("unsupported control request: %s", subtype)
+		err = fmt.Errorf("unsupported control request type: %T", typedRequest)
 	}
 
 	// Send response
