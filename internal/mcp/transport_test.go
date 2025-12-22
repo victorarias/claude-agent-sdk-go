@@ -103,7 +103,7 @@ func TestMCPServerTransport_ToolsCall(t *testing.T) {
 func TestMCPServerTransport_MultipleRequests(t *testing.T) {
 	server := types.NewMCPServerBuilder("test").
 		WithTool("echo", "Echo input", nil, func(input map[string]any) (*types.MCPToolResult, error) {
-			text := input["text"].(string)
+			text, _ := input["text"].(string) //nolint:errcheck // Test code
 			return &types.MCPToolResult{
 				Content: []types.MCPContent{{Type: "text", Text: text}},
 			}, nil
@@ -127,8 +127,8 @@ func TestMCPServerTransport_MultipleRequests(t *testing.T) {
 			},
 		}
 		reqBytes, _ := json.Marshal(req)
-		clientToServer.Write(reqBytes)
-		clientToServer.Write([]byte("\n"))
+		_, _ = clientToServer.Write(reqBytes)
+		_, _ = clientToServer.WriteString("\n")
 	}
 
 	// Process all requests
