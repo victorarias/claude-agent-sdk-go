@@ -1,3 +1,6 @@
+// Copyright (C) 2025 Claude Agent SDK Go Contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package mcp implements the Model Context Protocol (MCP) for the Claude Agent SDK.
 //
 // This package provides handler functionality for MCP servers, allowing custom tools

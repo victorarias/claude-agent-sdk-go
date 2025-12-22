@@ -1,3 +1,6 @@
+// Copyright (C) 2025 Claude Agent SDK Go Contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
 package types
 
 // NewPreToolUseOutput creates a HookOutput for PreToolUse events with hook-specific fields.

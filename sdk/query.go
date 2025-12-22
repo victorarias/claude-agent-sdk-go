@@ -1,3 +1,6 @@
+// Copyright (C) 2025 Claude Agent SDK Go Contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
 package sdk
 
 import (

@@ -1,3 +1,6 @@
+// Copyright (C) 2025 Claude Agent SDK Go Contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package mcp defines types for the Model Context Protocol (MCP).
 //
 // This file contains the core type definitions for the MCP protocol, including
