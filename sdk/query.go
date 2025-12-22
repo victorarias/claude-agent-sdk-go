@@ -393,47 +393,6 @@ func (q *Query) handleCanUseToolTyped(req *types.SDKControlPermissionRequest) (m
 	return q.permissionResultToResponse(result)
 }
 
-// handleCanUseTool handles tool permission requests (legacy, kept for backward compatibility).
-func (q *Query) handleCanUseTool(request map[string]any) (map[string]any, error) {
-	if q.canUseTool == nil {
-		// Default: allow all
-		return map[string]any{"behavior": "allow"}, nil
-	}
-
-	toolName, _ := request["tool_name"].(string)
-	input, _ := request["input"].(map[string]any)
-	suggestions, _ := request["permission_suggestions"].([]any)
-
-	ctx := &types.ToolPermissionContext{
-		Suggestions: q.parsePermissionSuggestions(suggestions),
-	}
-
-	result, err := q.canUseTool(toolName, input, ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return q.permissionResultToResponse(result)
-}
-
-// parsePermissionSuggestions converts raw suggestions to PermissionUpdate slice.
-func (q *Query) parsePermissionSuggestions(raw []any) []types.PermissionUpdate {
-	if raw == nil {
-		return nil
-	}
-
-	var updates []types.PermissionUpdate
-	for _, item := range raw {
-		if m, ok := item.(map[string]any); ok {
-			update := types.PermissionUpdate{
-				Type: types.PermissionUpdateType(getString(m, "type")),
-			}
-			updates = append(updates, update)
-		}
-	}
-	return updates
-}
-
 // permissionResultToResponse converts a permission result to a response map.
 func (q *Query) permissionResultToResponse(result types.PermissionResult) (map[string]any, error) {
 	switch r := result.(type) {
