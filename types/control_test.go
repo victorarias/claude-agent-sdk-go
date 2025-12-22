@@ -324,6 +324,15 @@ func TestParseSDKControlRequest(t *testing.T) {
 			},
 		},
 		{
+			name: "mcp_tool_call",
+			json: `{"subtype":"mcp_tool_call","server_name":"test","tool_name":"calculate","input":null}`,
+			expected: &SDKControlMcpToolCallRequest{
+				Subtype:    "mcp_tool_call",
+				ServerName: "test",
+				ToolName:   "calculate",
+			},
+		},
+		{
 			name: "rewind_files",
 			json: `{"subtype":"rewind_files","user_message_id":"msg_123"}`,
 			expected: &SDKControlRewindFilesRequest{

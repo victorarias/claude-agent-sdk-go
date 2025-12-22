@@ -205,13 +205,13 @@ func TestHandleControlRequest_CanUseTool_TypedStruct(t *testing.T) {
 	}
 	defer query.Close()
 
-	// Set up permission callback
-	callbackInvoked := false
+	// Set up permission callback - use channel for thread-safe signaling
+	callbackChan := make(chan bool, 1)
 	query.SetCanUseTool(func(toolName string, input map[string]any, ctx *types.ToolPermissionContext) (types.PermissionResult, error) {
-		callbackInvoked = true
 		if toolName != "Bash" {
 			t.Errorf("Expected tool_name 'Bash', got %v", toolName)
 		}
+		callbackChan <- true
 		return &types.PermissionResultAllow{
 			Behavior: "allow",
 		}, nil
@@ -244,10 +244,11 @@ func TestHandleControlRequest_CanUseTool_TypedStruct(t *testing.T) {
 	// Handle the request
 	go query.handleControlRequest(controlRequest)
 
-	// Wait for processing
-	time.Sleep(100 * time.Millisecond)
-
-	if !callbackInvoked {
+	// Wait for callback to be invoked
+	select {
+	case <-callbackChan:
+		// Success - callback was invoked
+	case <-time.After(time.Second):
 		t.Error("Permission callback was not invoked")
 	}
 
