@@ -823,13 +823,19 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 // buildEnvironment creates the environment for the subprocess.
 // Environment variable precedence (matching Python SDK):
 // 1. System environment (os.Environ)
-// 2. User-provided env overrides (from Options.Env)
-// 3. SDK-required env (TERM, NO_COLOR, SDK internal vars) - CANNOT be overridden
+// 2. PWD environment variable (set when Cwd is provided, can be overridden by user)
+// 3. User-provided env overrides (from Options.Env)
+// 4. SDK-required env (TERM, NO_COLOR, SDK internal vars) - CANNOT be overridden
 func buildEnvironment(opts *types.Options) []string {
 	// Start with system environment
 	env := os.Environ()
 
-	// Add user-provided vars (can override system env)
+	// Set PWD when Cwd is provided (BEFORE user env, so it can be overridden)
+	if opts.Cwd != "" {
+		env = append(env, "PWD="+opts.Cwd)
+	}
+
+	// Add user-provided vars (can override system env and PWD)
 	for k, v := range opts.Env {
 		env = append(env, k+"="+v)
 	}

@@ -449,3 +449,57 @@ func TestSettingsMerge_SettingsFileInvalidJSON(t *testing.T) {
 		t.Errorf("expected 'failed to parse settings file as JSON' error, got: %v", err)
 	}
 }
+
+// TestSettingsMerge_JSONLikeStringThatFailsParsing tests the edge case where settings
+// looks like JSON (starts with { and ends with }) but fails to parse, then gets treated
+// as a file path. This matches Python SDK behavior.
+func TestSettingsMerge_JSONLikeStringThatFailsParsing(t *testing.T) {
+	// Create a file with valid JSON
+	tempDir := t.TempDir()
+	settingsFile := tempDir + "/{malformed}.json"
+	validContent := `{"model":"claude-opus-4"}`
+
+	if err := os.WriteFile(settingsFile, []byte(validContent), 0644); err != nil {
+		t.Fatalf("failed to create temp settings file: %v", err)
+	}
+
+	opts := types.DefaultOptions()
+	// Settings looks like JSON but isn't valid, matches a file path
+	opts.Settings = settingsFile
+	opts.Sandbox = &types.SandboxSettings{
+		Enabled: true,
+	}
+
+	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
+
+	// Find settings value
+	var settingsValue string
+	foundSettings := false
+	for i, arg := range cmd {
+		if arg == "--settings" && i+1 < len(cmd) {
+			settingsValue = cmd[i+1]
+			foundSettings = true
+			break
+		}
+	}
+
+	if !foundSettings {
+		t.Fatal("--settings flag not found in command")
+	}
+
+	// Should have read the file and merged sandbox
+	var settingsObj map[string]any
+	if err := json.Unmarshal([]byte(settingsValue), &settingsObj); err != nil {
+		t.Fatalf("failed to parse settings JSON: %v", err)
+	}
+
+	// Verify file content was read
+	if settingsObj["model"] != "claude-opus-4" {
+		t.Errorf("model not found: got %v", settingsObj["model"])
+	}
+
+	// Verify sandbox was merged
+	if _, ok := settingsObj["sandbox"]; !ok {
+		t.Error("sandbox key not found in merged settings")
+	}
+}

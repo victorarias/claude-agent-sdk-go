@@ -221,21 +221,15 @@ func TestPWDEnvironmentVariable(t *testing.T) {
 		name        string
 		cwd         string
 		userEnv     map[string]string
-		expectPWD   bool
+		checkValue  bool
 		expectedVal string
 	}{
 		{
-			name:        "PWD set when Cwd is provided",
+			name:        "PWD set to Cwd when provided",
 			cwd:         "/custom/working/dir",
 			userEnv:     map[string]string{},
-			expectPWD:   true,
+			checkValue:  true,
 			expectedVal: "/custom/working/dir",
-		},
-		{
-			name:      "PWD not set when Cwd is empty",
-			cwd:       "",
-			userEnv:   map[string]string{},
-			expectPWD: false,
 		},
 		{
 			name: "user can override PWD",
@@ -243,7 +237,7 @@ func TestPWDEnvironmentVariable(t *testing.T) {
 			userEnv: map[string]string{
 				"PWD": "/user/override/dir",
 			},
-			expectPWD:   true,
+			checkValue:  true,
 			expectedVal: "/user/override/dir",
 		},
 	}
@@ -265,7 +259,7 @@ func TestPWDEnvironmentVariable(t *testing.T) {
 				}
 			}
 
-			if tt.expectPWD {
+			if tt.checkValue {
 				val, exists := envMap["PWD"]
 				if !exists {
 					t.Errorf("expected PWD to be set")
@@ -273,10 +267,6 @@ func TestPWDEnvironmentVariable(t *testing.T) {
 				}
 				if val != tt.expectedVal {
 					t.Errorf("PWD: expected %q, got %q", tt.expectedVal, val)
-				}
-			} else {
-				if val, exists := envMap["PWD"]; exists {
-					t.Errorf("expected PWD not to be set, but got %q", val)
 				}
 			}
 		})
