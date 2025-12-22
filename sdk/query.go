@@ -579,28 +579,6 @@ func (q *Query) handleMCPToolCallTyped(req *types.SDKControlMcpToolCallRequest) 
 	return map[string]any{"result": result}, nil
 }
 
-// handleMCPToolCall handles MCP tool call requests (legacy, kept for backward compatibility).
-func (q *Query) handleMCPToolCall(request map[string]any) (map[string]any, error) {
-	serverName, _ := request["server_name"].(string)
-	toolName, _ := request["tool_name"].(string)
-	input, _ := request["input"].(map[string]any)
-
-	q.mcpServersMu.RLock()
-	server, exists := q.mcpServers[serverName]
-	q.mcpServersMu.RUnlock()
-
-	if !exists {
-		return nil, fmt.Errorf("MCP server not found: %s", serverName)
-	}
-
-	result, err := server.CallTool(toolName, input)
-	if err != nil {
-		return nil, err
-	}
-
-	return map[string]any{"result": result}, nil
-}
-
 // handleMCPMessage handles MCP JSONRPC messages for SDK-hosted MCP servers.
 // This bridges JSONRPC messages from the CLI to the in-process MCP server.
 func (q *Query) handleMCPMessage(serverName string, message map[string]any) (any, error) {
