@@ -179,7 +179,7 @@ func TestWithClient_FunctionPanic(t *testing.T) {
 
 // TestWithClient_PanicReraise tests that original panic is re-raised after cleanup
 func TestWithClient_PanicReraise(t *testing.T) {
-	mock := &mockTransportWithClient{}
+	mock := newMockTransportWithClient()
 	opts := []types.Option{
 		types.WithTransport(mock),
 	}
