@@ -85,8 +85,8 @@ func TestMCPServerTransport_ToolsCall(t *testing.T) {
 		},
 	}
 	reqBytes, _ := json.Marshal(callReq)
-	clientToServer.Write(reqBytes)
-	clientToServer.Write([]byte("\n"))
+	_, _ = clientToServer.Write(reqBytes)
+	_, _ = clientToServer.WriteString("\n")
 
 	// Process request
 	if err := transport.ProcessOne(); err != nil {
