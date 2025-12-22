@@ -107,7 +107,7 @@ func (h *MCPHandler) handleNotification(req *MCPRequest) {
 	switch req.Method {
 	case "notifications/initialized":
 		// Client acknowledges initialization, nothing to do
-	case "notifications/cancelled":
+	case "notifications/cancelled": //nolint:misspell // MCP protocol uses British spelling
 		// Request cancellation, we could track this if needed
 	}
 }
@@ -171,6 +171,8 @@ func (h *MCPHandler) handleToolsCall(params map[string]any) (*MCPToolCallResult,
 	// Execute handler
 	result, err := tool.Handler(args)
 	if err != nil {
+		// Return error as tool result content, not as RPC error
+		//nolint:nilerr // Intentional: tool errors are returned as result content with IsError=true
 		return &MCPToolCallResult{
 			Content: []types.MCPContent{{Type: "text", Text: "Error: " + err.Error()}},
 			IsError: true,
