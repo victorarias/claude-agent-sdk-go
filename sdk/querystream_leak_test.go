@@ -26,24 +26,22 @@ func TestQueryStream_NoGoroutineLeak(t *testing.T) {
 	// Count goroutines before
 	beforeCount := runtime.NumGoroutine()
 
-	// Create a transport that will send MORE messages than the buffer can hold
-	// QueryStream uses a buffered channel of size 100, so we send 150 messages
+	// Create a transport and pre-fill it with messages
+	// This avoids race conditions from concurrent sends
 	transport := NewMockTransport()
-	go func() {
-		// Send MANY messages to exceed buffer capacity
-		for i := 0; i < 150; i++ {
-			transport.SendMessage(map[string]any{
-				"type": "assistant",
-				"message": map[string]any{
-					"content": []any{
-						map[string]any{"type": "text", "text": "Hello!"},
-					},
+
+	// Pre-fill the transport's message buffer with enough messages
+	// to exceed QueryStream's internal buffer (100)
+	for i := 0; i < 120; i++ {
+		transport.SendMessage(map[string]any{
+			"type": "assistant",
+			"message": map[string]any{
+				"content": []any{
+					map[string]any{"type": "text", "text": "Hello!"},
 				},
-			})
-			time.Sleep(1 * time.Millisecond)
-		}
-		// Never send result - keep transport "alive"
-	}()
+			},
+		})
+	}
 
 	// Use a cancellable context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -57,7 +55,7 @@ func TestQueryStream_NoGoroutineLeak(t *testing.T) {
 	_ = errChan
 
 	// Give the goroutine time to fill the buffer and block
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// Now cancel the context to signal abandonment
 	cancel()
@@ -71,13 +69,6 @@ func TestQueryStream_NoGoroutineLeak(t *testing.T) {
 
 	// Count goroutines after
 	afterCount := runtime.NumGoroutine()
-
-	// The goroutine should have leaked because:
-	// 1. The QueryStream goroutine is trying to send to msgChan
-	// 2. The msgChan buffer (size 100) is full
-	// 3. Nobody is receiving from msgChan
-	// 4. The goroutine is blocked forever on the send
-	// 5. There's no mechanism to cancel the goroutine when caller abandons
 
 	// With proper cleanup, no goroutines should leak
 	// We expect exactly 0 leaked goroutines (the QueryStream goroutine should exit)
@@ -105,32 +96,23 @@ func TestQueryStream_WithContextCancellation(t *testing.T) {
 	// Count goroutines before
 	beforeCount := runtime.NumGoroutine()
 
-	// Create a transport that will keep sending messages
+	// Create a transport and pre-fill with messages
 	transport := NewMockTransport()
+
+	// Pre-fill with some messages
+	for i := 0; i < 50; i++ {
+		transport.SendMessage(map[string]any{
+			"type": "assistant",
+			"message": map[string]any{
+				"content": []any{
+					map[string]any{"type": "text", "text": "Hello!"},
+				},
+			},
+		})
+	}
 
 	// Create a cancellable context
 	ctx, cancel := context.WithCancel(context.Background())
-
-	go func() {
-		// Send messages continuously until context is cancelled
-		for i := 0; i < 100; i++ {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-
-			transport.SendMessage(map[string]any{
-				"type": "assistant",
-				"message": map[string]any{
-					"content": []any{
-						map[string]any{"type": "text", "text": "Hello!"},
-					},
-				},
-			})
-			time.Sleep(5 * time.Millisecond)
-		}
-	}()
 
 	// Call QueryStream
 	msgChan, errChan := QueryStream(ctx, "Hello", types.WithTransport(transport))
