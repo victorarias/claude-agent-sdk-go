@@ -139,11 +139,9 @@ func TestHandleCanUseTool_TypedParsing(t *testing.T) {
 	}
 	defer query.Close()
 
-	// Track if callback was invoked with correct data
-	callbackInvoked := false
+	// Track if callback was invoked with correct data - use channel for thread-safe signaling
+	callbackChan := make(chan bool, 1)
 	query.SetCanUseTool(func(toolName string, input map[string]any, ctx *types.ToolPermissionContext) (types.PermissionResult, error) {
-		callbackInvoked = true
-
 		// Verify typed parsing extracted the right fields
 		if toolName != "TestTool" {
 			t.Errorf("Expected tool_name 'TestTool', got %v", toolName)
@@ -151,7 +149,7 @@ func TestHandleCanUseTool_TypedParsing(t *testing.T) {
 		if input["param"] != "value" {
 			t.Errorf("Expected input param 'value', got %v", input["param"])
 		}
-
+		callbackChan <- true
 		return &types.PermissionResultAllow{Behavior: "allow"}, nil
 	})
 
@@ -179,9 +177,12 @@ func TestHandleCanUseTool_TypedParsing(t *testing.T) {
 	}
 
 	go query.handleControlRequest(controlMsg)
-	time.Sleep(100 * time.Millisecond)
 
-	if !callbackInvoked {
+	// Wait for callback to be invoked
+	select {
+	case <-callbackChan:
+		// Success - callback was invoked
+	case <-time.After(time.Second):
 		t.Error("Permission callback was not invoked")
 	}
 }
