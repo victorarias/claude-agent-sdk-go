@@ -1,5 +1,11 @@
 # Claude Agent SDK Go
 
+> **⚠️ WARNING: Experimental Library**
+>
+> This library was ported from the official Python SDK for our own internal use in another Go project. That project is still under active development, so **this SDK has not been fully tested in production**. Use at your own risk.
+>
+> Contributions and bug reports are welcome!
+
 A Go implementation of the Claude Agent SDK for building interactive AI agents with Claude.
 
 ## Overview
