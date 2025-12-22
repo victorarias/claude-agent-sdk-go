@@ -320,47 +320,80 @@ func TestSettingsMerge_SettingsAsFilePath(t *testing.T) {
 }
 
 // TestSettingsMerge_SettingsFilePathWithSandbox tests that when settings is a file path
-// AND sandbox is provided, we need to read the file and merge. However, since we can't
-// read files during buildCommand, we should convert to JSON string with sandbox merged.
+// AND sandbox is provided, we read the file and merge sandbox into it.
+// This matches Python SDK behavior: read file, parse JSON, merge sandbox under "sandbox" key.
 func TestSettingsMerge_SettingsFilePathWithSandbox(t *testing.T) {
+	// Create a temporary settings file
+	tempDir := t.TempDir()
+	settingsFile := tempDir + "/settings.json"
+	settingsContent := `{"model":"claude-opus-4","timeout":60}`
+
+	if err := os.WriteFile(settingsFile, []byte(settingsContent), 0644); err != nil {
+		t.Fatalf("failed to create temp settings file: %v", err)
+	}
+
 	opts := types.DefaultOptions()
 
 	// Settings as a file path
-	opts.Settings = "/path/to/settings.json"
+	opts.Settings = settingsFile
 
 	// Sandbox config
 	opts.Sandbox = &types.SandboxSettings{
-		Enabled: true,
+		Enabled:                  true,
+		AutoAllowBashIfSandboxed: true,
 	}
 
 	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
 
 	// Find settings value
 	var settingsValue string
+	foundSettings := false
 	for i, arg := range cmd {
 		if arg == "--settings" && i+1 < len(cmd) {
 			settingsValue = cmd[i+1]
+			foundSettings = true
 			break
 		}
 	}
 
-	// When sandbox is present with a file path, we can't merge without reading the file.
-	// The Python SDK reads the file. For now, we test that it's JSON with sandbox.
-	// This test documents the expected behavior - file path + sandbox = error or read file.
-
-	// Check if it starts with { (JSON) or if it's still a file path
-	if !strings.HasPrefix(settingsValue, "{") {
-		t.Skip("File path merging requires file reading - not implemented yet")
+	if !foundSettings {
+		t.Fatal("--settings flag not found in command")
 	}
 
-	// If we get here, it was converted to JSON
+	// Should be JSON (file was read and merged)
+	if !strings.HasPrefix(settingsValue, "{") {
+		t.Errorf("expected JSON output, got: %s", settingsValue)
+	}
+
+	// Parse and verify merged settings
 	var settingsObj map[string]any
 	if err := json.Unmarshal([]byte(settingsValue), &settingsObj); err != nil {
 		t.Fatalf("failed to parse settings JSON: %v", err)
 	}
 
-	// Should have sandbox key
-	if _, ok := settingsObj["sandbox"]; !ok {
-		t.Error("sandbox key not found in merged settings")
+	// Verify original file content is preserved
+	if settingsObj["model"] != "claude-opus-4" {
+		t.Errorf("model not preserved: got %v", settingsObj["model"])
+	}
+	if timeout, ok := settingsObj["timeout"].(float64); !ok || timeout != 60 {
+		t.Errorf("timeout not preserved: got %v", settingsObj["timeout"])
+	}
+
+	// Verify sandbox was merged
+	sandboxValue, ok := settingsObj["sandbox"]
+	if !ok {
+		t.Fatal("sandbox key not found in merged settings")
+	}
+
+	sandboxMap, ok := sandboxValue.(map[string]any)
+	if !ok {
+		t.Fatalf("sandbox value is not a map: %T", sandboxValue)
+	}
+
+	if sandboxMap["enabled"] != true {
+		t.Errorf("sandbox.enabled: got %v, want true", sandboxMap["enabled"])
+	}
+	if sandboxMap["autoAllowBashIfSandboxed"] != true {
+		t.Errorf("sandbox.autoAllowBashIfSandboxed: got %v, want true", sandboxMap["autoAllowBashIfSandboxed"])
 	}
 }
