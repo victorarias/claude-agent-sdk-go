@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/victorarias/claude-agent-sdk-go/types"
 )
@@ -29,12 +30,24 @@ func (m *mockTransportWithClient) Connect(ctx context.Context) error {
 	}
 	m.connected = true
 
-	// Send initialization messages that query expects
+	// Start goroutine to respond to control requests
 	go func() {
-		// Send init response
+		// The SDK will send an initialize control request
+		// We need to send back a control response
+		// Wait a bit for the SDK to start reading, then send response
+		time.Sleep(10 * time.Millisecond)
+
+		// Send control response for initialize request
 		m.messageChan <- map[string]any{
-			"type":       "result",
-			"session_id": "test-session",
+			"type": "control",
+			"control": map[string]any{
+				"type":       "control_response",
+				"request_id": "1",
+				"response": map[string]any{
+					"subtype":    "success",
+					"session_id": "test-session",
+				},
+			},
 		}
 	}()
 
