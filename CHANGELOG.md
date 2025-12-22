@@ -5,24 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 1.0.0 (2025-12-22)
-
-
-### Features
-
-* add gotestsum for clearer test output ([181875a](https://github.com/victorarias/claude-agent-sdk-go/commit/181875a63c17a4756fa8ef4ad7c236a8bf07cd28))
-* **sdk:** add WithClient panic recovery and simplify tests ([43609a8](https://github.com/victorarias/claude-agent-sdk-go/commit/43609a8d71eb9aefce6d74e61c885b14ca887558))
-
-
-### Bug Fixes
-
-* **ci:** fix golangci-lint config and command length test ([863f41f](https://github.com/victorarias/claude-agent-sdk-go/commit/863f41ffd69aeed0f199a4e453d5e797523ca7ec))
-* **ci:** lint only core packages, exclude examples ([59c2d67](https://github.com/victorarias/claude-agent-sdk-go/commit/59c2d67105726b2f51896a2c622e0be4701f2aed))
-* **ci:** upgrade golangci-lint-action to v7 for golangci-lint v2 support ([84eca09](https://github.com/victorarias/claude-agent-sdk-go/commit/84eca092361a1a182acb1961b6446f81cf4280b3))
-
 ## [Unreleased]
-
-## [0.1.0] - 2025-12-22
 
 Initial release of the Claude Agent SDK Go, a Go implementation of the Claude Agent SDK.
 
@@ -74,5 +57,3 @@ Initial release of the Claude Agent SDK Go, a Go implementation of the Claude Ag
 - **Control Protocol**: Approval flow, hook handling, and session management
 - **Transport Layer**: Stdio-based communication with the Claude CLI process
 
-[unreleased]: https://github.com/victorarias/claude-agent-sdk-go/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/victorarias/claude-agent-sdk-go/releases/tag/v0.1.0
