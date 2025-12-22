@@ -6,9 +6,6 @@ version: "2"
 run:
   timeout: 5m
   tests: true
-  build-tags: []
-  exclude-dirs:
-    - examples  # Examples are for demonstration, not production code
 
 linters:
   default: none
@@ -40,8 +37,6 @@ linters:
 
     misspell:
       locale: US
-      ignore-words:
-        - cancelled  # MCP protocol uses British spelling
 
     gosec:
       severity: high
