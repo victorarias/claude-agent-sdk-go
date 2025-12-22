@@ -1,3 +1,8 @@
+// Package mcp implements stdio transport for MCP servers.
+//
+// This file provides the transport layer for MCP servers, handling stdio-based
+// communication with the Claude CLI. It manages bidirectional message flow,
+// reading JSON-RPC requests from stdin and writing responses to stdout.
 package mcp
 
 import (
