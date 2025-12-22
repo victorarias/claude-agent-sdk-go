@@ -122,9 +122,8 @@ linters:
     # Essential
     - govet        # Official Go tool
     - errcheck     # Check error handling
-    - staticcheck  # Advanced static analysis
+    - staticcheck  # Advanced static analysis (includes gosimple)
     - unused       # Find unused code
-    - gosimple     # Simplification suggestions
     - ineffassign  # Detect ineffectual assignments
 
     # Quality
