@@ -231,6 +231,46 @@ func TestSDKControlRewindFilesRequest(t *testing.T) {
 	}
 }
 
+// TestSDKControlMcpToolCallRequest tests the MCP tool call request type.
+func TestSDKControlMcpToolCallRequest(t *testing.T) {
+	req := &SDKControlMcpToolCallRequest{
+		Subtype:    "mcp_tool_call",
+		ServerName: "test-server",
+		ToolName:   "calculate",
+		Input:      map[string]any{"a": 1, "b": 2},
+	}
+
+	// Test that it implements SDKControlRequest interface
+	var _ SDKControlRequest = req
+
+	// Test JSON marshaling
+	data, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("Failed to marshal: %v", err)
+	}
+
+	// Unmarshal to verify structure
+	var result map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("Failed to unmarshal: %v", err)
+	}
+
+	if result["subtype"] != "mcp_tool_call" {
+		t.Errorf("Expected subtype 'mcp_tool_call', got %v", result["subtype"])
+	}
+	if result["server_name"] != "test-server" {
+		t.Errorf("Expected server_name 'test-server', got %v", result["server_name"])
+	}
+	if result["tool_name"] != "calculate" {
+		t.Errorf("Expected tool_name 'calculate', got %v", result["tool_name"])
+	}
+
+	// Test type discrimination
+	if req.ControlRequestType() != "mcp_tool_call" {
+		t.Errorf("Expected type 'mcp_tool_call', got '%s'", req.ControlRequestType())
+	}
+}
+
 // TestParseSDKControlRequest tests parsing raw JSON into typed structs.
 func TestParseSDKControlRequest(t *testing.T) {
 	tests := []struct {
