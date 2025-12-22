@@ -384,8 +384,6 @@ func TestQuery_Initialize_NonStreaming(t *testing.T) {
 	}
 }
 
-func strPtr(s string) *string { return &s }
-
 func TestQuery_Interrupt(t *testing.T) {
 	transport := NewMockTransport()
 	query := NewQuery(transport, true)
