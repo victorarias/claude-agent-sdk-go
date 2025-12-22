@@ -1,0 +1,245 @@
+# Contributing to Claude Agent SDK Go
+
+Thank you for your interest in contributing to the Claude Agent SDK Go! This document provides guidelines and instructions for contributing to the project.
+
+## Getting Started
+
+### Prerequisites
+
+- **Go 1.21 or later** - Install from [go.dev/dl](https://go.dev/dl/)
+- **Claude CLI** - Required for running tests and examples:
+  ```bash
+  npm install -g @anthropic-ai/claude-code
+  ```
+- **Git** - For version control
+
+### Development Setup
+
+1. **Fork the repository** on GitHub
+
+2. **Clone your fork**:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/claude-agent-sdk-go.git
+   cd claude-agent-sdk-go
+   ```
+
+3. **Install dependencies**:
+   ```bash
+   go mod download
+   ```
+
+4. **Verify your setup**:
+   ```bash
+   go test ./...
+   ```
+
+## Development Workflow
+
+### Making Changes
+
+1. **Create a feature branch**:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+2. **Make your changes** following the code style guidelines below
+
+3. **Run tests** to ensure everything works:
+   ```bash
+   # Run all tests
+   go test ./...
+
+   # Run tests with race detection
+   go test -race ./...
+
+   # Run tests with coverage
+   go test -cover ./...
+   ```
+
+4. **Commit your changes** with clear, descriptive messages:
+   ```bash
+   git commit -m "Add feature: brief description"
+   ```
+
+## Code Style
+
+### Go Conventions
+
+This project follows standard Go conventions and best practices:
+
+- **Formatting**: All code must be formatted with `gofmt`:
+  ```bash
+  gofmt -w .
+  ```
+
+- **Linting**: Code should pass `golint` checks:
+  ```bash
+  golint ./...
+  ```
+
+- **Go Vet**: Run `go vet` to catch common issues:
+  ```bash
+  go vet ./...
+  ```
+
+### Style Guidelines
+
+- Use clear, descriptive names for functions, variables, and types
+- Write godoc-style comments for all exported functions, types, and packages
+- Keep functions focused and reasonably sized
+- Prefer composition over inheritance
+- Handle errors explicitly - avoid ignoring errors
+- Use context for cancellation and timeouts
+- Follow the project's existing patterns and idioms
+
+### Package Organization
+
+- `sdk/` - High-level client API (public-facing)
+- `types/` - Core types, messages, options (public)
+- `internal/` - Internal implementation details (private)
+- `examples/` - Example applications and use cases
+- `docs/` - Documentation and implementation plans
+
+## Testing Requirements
+
+### Test Coverage
+
+- All new features must include tests
+- Bug fixes should include regression tests
+- Aim for meaningful test coverage, not just high percentages
+- Tests should be clear and maintainable
+
+### Running Tests
+
+```bash
+# Run all tests
+go test ./...
+
+# Run with race detector (required before submitting)
+go test -race ./...
+
+# Run specific package tests
+go test ./sdk
+go test ./types
+
+# Run with verbose output
+go test -v ./...
+
+# Run with coverage report
+go test -cover ./...
+```
+
+### Test Organization
+
+- Unit tests go in `*_test.go` files alongside the code
+- Integration tests use the Claude CLI and should clean up resources
+- Use table-driven tests for testing multiple scenarios
+- Mock external dependencies when appropriate
+
+## Pull Request Process
+
+### Before Submitting
+
+1. **Ensure all tests pass**:
+   ```bash
+   go test ./...
+   go test -race ./...
+   ```
+
+2. **Format your code**:
+   ```bash
+   gofmt -w .
+   ```
+
+3. **Run linters**:
+   ```bash
+   go vet ./...
+   golint ./...
+   ```
+
+4. **Update documentation** if you've changed APIs or added features
+
+5. **Add examples** for new features when appropriate
+
+### Submitting a PR
+
+1. **Push your branch** to your fork:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+2. **Open a Pull Request** on GitHub with:
+   - Clear title describing the change
+   - Description explaining what and why
+   - Reference to any related issues
+   - Test results showing all tests pass
+
+3. **Address review feedback** promptly and professionally
+
+4. **Keep your PR focused** - one feature or fix per PR when possible
+
+### PR Review Process
+
+- Maintainers will review your PR and may request changes
+- All tests must pass before merging
+- At least one maintainer approval is required
+- PRs are typically reviewed within a few days
+
+## Reporting Issues
+
+### Bug Reports
+
+When reporting bugs, include:
+
+- **Go version**: Output of `go version`
+- **Claude CLI version**: Output of `claude --version`
+- **Operating system** and version
+- **Clear description** of the issue
+- **Steps to reproduce** the problem
+- **Expected behavior** vs actual behavior
+- **Code sample** demonstrating the issue (if applicable)
+- **Error messages** and stack traces
+
+### Feature Requests
+
+When requesting features, include:
+
+- **Clear description** of the feature and its benefits
+- **Use cases** explaining when and why it would be useful
+- **Examples** of how the API might look
+- **Alternatives** you've considered
+
+### Security Issues
+
+Please report security vulnerabilities privately to the maintainers rather than opening public issues.
+
+## Internal Development Notes
+
+### Task Tracking
+
+The project uses `bd` (beads) for internal task tracking and development planning. External contributors should use GitHub Issues for feature requests and bug reports. The maintainers will create corresponding beads for tracking internal work.
+
+### Implementation Plans
+
+Detailed implementation plans are available in `docs/plans/`. These provide context for architectural decisions and ongoing work:
+
+- `01-types-interfaces.md` - Core types and interfaces
+- `02-transport-layer.md` - Subprocess and CLI communication
+- `03-query-protocol.md` - Message parsing and control protocol
+- `04-client-api.md` - Client API design
+- `05-integration.md` - Examples and integration tests
+- `06-mcp-servers.md` - MCP server support
+
+## Getting Help
+
+- **Documentation**: Check the [README](README.md) and [examples](examples/)
+- **Issues**: Search existing issues or create a new one
+- **Code**: Review the implementation plans in `docs/plans/`
+
+## License
+
+By contributing to this project, you agree that your contributions will be licensed under the GNU General Public License v3.0.
+
+---
+
+Thank you for contributing to Claude Agent SDK Go!
