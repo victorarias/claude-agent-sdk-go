@@ -309,7 +309,26 @@ func (q *Query) handleControlRequest(msg map[string]any) {
 	q.sendControlResponse(requestID, responseData, err)
 }
 
-// handleHookCallback invokes a registered hook callback.
+// handleHookCallbackTyped invokes a registered hook callback using typed request.
+func (q *Query) handleHookCallbackTyped(req *types.SDKHookCallbackRequest) (map[string]any, error) {
+	q.hookMu.RLock()
+	callback, exists := q.hookCallbacks[req.CallbackID]
+	q.hookMu.RUnlock()
+
+	if !exists {
+		return nil, fmt.Errorf("hook callback not found: %s", req.CallbackID)
+	}
+
+	output, err := callback(req.Input, req.ToolUseID, &types.HookContext{})
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert HookOutput to response
+	return q.hookOutputToResponse(output), nil
+}
+
+// handleHookCallback invokes a registered hook callback (legacy, kept for backward compatibility).
 func (q *Query) handleHookCallback(request map[string]any) (map[string]any, error) {
 	callbackID, _ := request["callback_id"].(string)
 	input := request["input"]
@@ -369,7 +388,27 @@ func (q *Query) hookOutputToResponse(output *types.HookOutput) map[string]any {
 	return result
 }
 
-// handleCanUseTool handles tool permission requests.
+// handleCanUseToolTyped handles tool permission requests using typed request.
+func (q *Query) handleCanUseToolTyped(req *types.SDKControlPermissionRequest) (map[string]any, error) {
+	if q.canUseTool == nil {
+		// Default: allow all
+		return map[string]any{"behavior": "allow"}, nil
+	}
+
+	ctx := &types.ToolPermissionContext{
+		Suggestions: req.PermissionSuggestions,
+		BlockedPath: req.BlockedPath,
+	}
+
+	result, err := q.canUseTool(req.ToolName, req.Input, ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return q.permissionResultToResponse(result)
+}
+
+// handleCanUseTool handles tool permission requests (legacy, kept for backward compatibility).
 func (q *Query) handleCanUseTool(request map[string]any) (map[string]any, error) {
 	if q.canUseTool == nil {
 		// Default: allow all

@@ -92,8 +92,13 @@ func TestQuery_ResultReceived(t *testing.T) {
 		"session_id": "test_123",
 	})
 
-	// Wait for processing
-	time.Sleep(100 * time.Millisecond)
+	// Wait for result to be processed
+	select {
+	case <-query.WaitForFirstResult():
+		// Result received successfully
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for result to be processed")
+	}
 
 	if !query.ResultReceived() {
 		t.Error("expected result to be received")
@@ -1058,3 +1063,28 @@ func TestQuery_SendControlResponse_MarshalError(t *testing.T) {
 	}
 }
 
+
+// TestQuery_ChannelBufferConstants verifies that channel buffer size constants exist,
+// are properly used in NewQuery, and have the expected values.
+func TestQuery_ChannelBufferConstants(t *testing.T) {
+	// Verify constants are defined with expected values
+	if MessageChannelBuffer != 100 {
+		t.Errorf("MessageChannelBuffer = %d, want 100", MessageChannelBuffer)
+	}
+	if RawMessageChannelBuffer != 100 {
+		t.Errorf("RawMessageChannelBuffer = %d, want 100", RawMessageChannelBuffer)
+	}
+
+	// Verify constants are actually used by creating a Query
+	// and checking the channel capacities
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	// Verify the channels were created with correct buffer sizes
+	if cap(query.messages) != MessageChannelBuffer {
+		t.Errorf("messages channel capacity = %d, want %d", cap(query.messages), MessageChannelBuffer)
+	}
+	if cap(query.rawMessages) != RawMessageChannelBuffer {
+		t.Errorf("rawMessages channel capacity = %d, want %d", cap(query.rawMessages), RawMessageChannelBuffer)
+	}
+}
