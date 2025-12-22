@@ -691,6 +691,11 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 		// matching Python SDK behavior
 	}
 
+	// Validate path options for security
+	if err := ValidatePathOptions(t.options); err != nil {
+		return err
+	}
+
 	// Build command
 	args := buildCommand(cliPath, t.prompt, t.options, t.streaming)
 
