@@ -136,6 +136,23 @@ type MCPContent struct {
 	MimeType string `json:"mimeType,omitempty"` // For image content (e.g., "image/png")
 }
 
+// NewTextContent creates a text content item.
+func NewTextContent(text string) MCPContent {
+	return MCPContent{
+		Type: "text",
+		Text: text,
+	}
+}
+
+// NewImageContent creates an image content item with base64-encoded data.
+func NewImageContent(data string, mimeType string) MCPContent {
+	return MCPContent{
+		Type:     "image",
+		Data:     data,
+		MimeType: mimeType,
+	}
+}
+
 // Version is the SDK version.
 const Version = "0.1.0"
 
