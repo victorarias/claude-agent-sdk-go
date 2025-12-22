@@ -261,7 +261,12 @@ func TestQuery_Initialize(t *testing.T) {
 
 	// Simulate init response
 	go func() {
-		time.Sleep(10 * time.Millisecond)
+		// Wait for the control request to be written
+		if !transport.WaitForWrite(time.Second) {
+			t.Error("timeout waiting for init request write")
+			return
+		}
+
 		written := transport.Written()
 		if len(written) > 0 {
 			var req map[string]any
