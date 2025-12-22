@@ -38,7 +38,7 @@ func main() {
 	// Default to a demo plugin if one exists, or allow user to specify
 	pluginPath := getPluginPath()
 
-	fmt.Println("=== Plugin Example ===\n")
+	fmt.Println("=== Plugin Example ===")
 	fmt.Printf("Loading plugin from: %s\n\n", pluginPath)
 
 	// Create context with timeout
