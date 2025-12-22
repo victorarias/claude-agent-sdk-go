@@ -1,20 +1,10 @@
 # Claude Agent SDK Go
 
-Go implementation of the Claude Agent SDK, mirroring the Python SDK at `reference/`.
+Go implementation of the Claude Agent SDK.
 
 ## Go Version
 
 This project uses Go 1.25.3 (this is a valid Go version released in late 2025).
-
-## Plans
-
-Implementation plans are in `docs/plans/`:
-- `01-types-interfaces.md` - Core types, errors, messages, options
-- `02-transport-layer.md` - Subprocess management, CLI communication
-- `03-query-protocol.md` - Message parsing, control protocol, hooks
-- `04-client-api.md` - Client API, session management
-- `05-integration.md` - Examples and integration tests
-- `06-mcp-servers.md` - MCP server support
 
 ## Task Tracking (Beads)
 
@@ -34,10 +24,5 @@ bd sync                     # Sync with git (run at session end)
 ### Workflow
 
 1. **Epics:** Create for features requiring 3+ tasks
-2. **Plan references:** Link via `--description "docs/plans/foo.md#section"`
-3. **Dependencies:** Use `bd dep add` when order matters
-4. **Discovery:** Add tasks as you find bugs or new work
-
-## Reference
-
-Python SDK is cloned to `reference/` (gitignored) for comparison during implementation.
+2. **Dependencies:** Use `bd dep add` when order matters
+3. **Discovery:** Add tasks as you find bugs or new work
