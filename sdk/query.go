@@ -282,6 +282,15 @@ func (q *Query) handleControlRequest(msg map[string]any) {
 		responseData, err = q.handleCanUseToolTyped(req)
 	case *types.SDKHookCallbackRequest:
 		responseData, err = q.handleHookCallbackTyped(req)
+	case *types.SDKControlMcpToolCallRequest:
+		responseData, err = q.handleMCPToolCallTyped(req)
+	case *types.SDKControlMcpMessageRequest:
+		var mcpResponse any
+		mcpResponse, err = q.handleMCPMessage(req.ServerName, req.Message.(map[string]any))
+		if err == nil {
+			// Wrap the MCP response as expected by the control protocol
+			responseData = map[string]any{"mcp_response": mcpResponse}
+		}
 	case *types.SDKControlInterruptRequest:
 		// Interrupt is handled via sendControlRequest, not incoming
 		err = fmt.Errorf("interrupt request not expected as incoming request")
@@ -291,13 +300,6 @@ func (q *Query) handleControlRequest(msg map[string]any) {
 	case *types.SDKControlSetPermissionModeRequest:
 		// Set permission mode is handled via sendControlRequest, not incoming
 		err = fmt.Errorf("set permission mode request not expected as incoming request")
-	case *types.SDKControlMcpMessageRequest:
-		var mcpResponse any
-		mcpResponse, err = q.handleMCPMessage(req.ServerName, req.Message.(map[string]any))
-		if err == nil {
-			// Wrap the MCP response as expected by the control protocol
-			responseData = map[string]any{"mcp_response": mcpResponse}
-		}
 	case *types.SDKControlRewindFilesRequest:
 		// Rewind files is handled via sendControlRequest, not incoming
 		err = fmt.Errorf("rewind files request not expected as incoming request")

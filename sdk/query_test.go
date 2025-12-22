@@ -949,7 +949,10 @@ func TestQuery_MCPToolCall(t *testing.T) {
 		},
 	})
 
-	time.Sleep(100 * time.Millisecond)
+	// Wait for response to be written
+	if !transport.WaitForWrite(time.Second) {
+		t.Fatal("timeout waiting for MCP tool call response")
+	}
 
 	// Verify response was sent
 	written := transport.Written()
@@ -987,7 +990,10 @@ func TestQuery_MCPToolCall_ServerNotFound(t *testing.T) {
 		},
 	})
 
-	time.Sleep(100 * time.Millisecond)
+	// Wait for error response to be written
+	if !transport.WaitForWrite(time.Second) {
+		t.Fatal("timeout waiting for server not found error response")
+	}
 
 	written := transport.Written()
 	if len(written) == 0 {
