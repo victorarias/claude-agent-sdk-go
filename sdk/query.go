@@ -340,33 +340,6 @@ func (q *Query) handleHookCallbackTyped(req *types.SDKHookCallbackRequest) (map[
 	return q.hookOutputToResponse(output), nil
 }
 
-// handleHookCallback invokes a registered hook callback (legacy, kept for backward compatibility).
-func (q *Query) handleHookCallback(request map[string]any) (map[string]any, error) {
-	callbackID, _ := request["callback_id"].(string)
-	input := request["input"]
-
-	var toolUseID *string
-	if id, ok := request["tool_use_id"].(string); ok {
-		toolUseID = &id
-	}
-
-	q.hookMu.RLock()
-	callback, exists := q.hookCallbacks[callbackID]
-	q.hookMu.RUnlock()
-
-	if !exists {
-		return nil, fmt.Errorf("hook callback not found: %s", callbackID)
-	}
-
-	output, err := callback(input, toolUseID, &types.HookContext{})
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert HookOutput to response
-	return q.hookOutputToResponse(output), nil
-}
-
 // hookOutputToResponse converts a HookOutput to a response map.
 func (q *Query) hookOutputToResponse(output *types.HookOutput) map[string]any {
 	if output == nil {
