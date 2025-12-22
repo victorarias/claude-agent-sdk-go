@@ -25,6 +25,7 @@ linters-settings:
     disable:
       - shadow  # too many false positives
       - fieldalignment  # micro-optimization, not worth the noise
+      - printf  # disabled due to bug with Go 1.25.x
 
   errcheck:
     check-type-assertions: true
