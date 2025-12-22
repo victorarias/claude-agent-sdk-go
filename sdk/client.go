@@ -385,28 +385,33 @@ func QueryStream(ctx context.Context, prompt string, opts ...types.Option) (<-ch
 		}
 		defer transport.Close()
 
-		for msg := range transport.Messages() {
+		// Read from transport with context cancellation support
+		for {
 			select {
 			case <-ctx.Done():
 				errChan <- ctx.Err()
 				return
-			default:
-			}
+			case msg, ok := <-transport.Messages():
+				if !ok {
+					// Transport closed
+					return
+				}
 
-			parsed, err := parser.ParseMessage(msg)
-			if err != nil {
-				continue
-			}
+				parsed, err := parser.ParseMessage(msg)
+				if err != nil {
+					continue
+				}
 
-			select {
-			case msgChan <- parsed:
-			case <-ctx.Done():
-				errChan <- ctx.Err()
-				return
-			}
+				select {
+				case msgChan <- parsed:
+				case <-ctx.Done():
+					errChan <- ctx.Err()
+					return
+				}
 
-			if _, ok := parsed.(*types.ResultMessage); ok {
-				return
+				if _, ok := parsed.(*types.ResultMessage); ok {
+					return
+				}
 			}
 		}
 	}()

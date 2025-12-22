@@ -415,6 +415,146 @@ type HookMatcher struct {
 	Timeout *float64       `json:"timeout,omitempty"`
 }
 
+// HookBuilder provides a fluent API for building hooks.
+// This unifies the three different ways to register hooks into a single, discoverable pattern.
+//
+// Example usage:
+//
+//	hook := NewHookBuilder().
+//	    ForEvent(types.HookPreToolUse).
+//	    WithMatcher(map[string]any{"tool_name": "Bash"}).
+//	    WithCallback(func(input *PreToolUseHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error) {
+//	        // Your hook logic here
+//	        return &HookOutput{Continue: boolPtr(true)}, nil
+//	    }).
+//	    WithTimeout(5.0).
+//	    Build()
+type HookBuilder struct {
+	event     HookEvent
+	matcher   map[string]any
+	callbacks []HookCallback
+	timeout   *float64
+}
+
+// NewHookBuilder creates a new HookBuilder.
+func NewHookBuilder() *HookBuilder {
+	return &HookBuilder{
+		callbacks: make([]HookCallback, 0),
+	}
+}
+
+// ForEvent sets the hook event type.
+func (b *HookBuilder) ForEvent(event HookEvent) *HookBuilder {
+	b.event = event
+	return b
+}
+
+// WithMatcher sets the matcher for the hook.
+// The matcher filters which tool calls this hook applies to.
+// For example: map[string]any{"tool_name": "Bash"} only matches Bash tool calls.
+func (b *HookBuilder) WithMatcher(matcher map[string]any) *HookBuilder {
+	b.matcher = matcher
+	return b
+}
+
+// MatchAll configures the hook to match all tool calls (no filtering).
+func (b *HookBuilder) MatchAll() *HookBuilder {
+	b.matcher = nil
+	return b
+}
+
+// WithCallback adds a type-safe callback to the hook.
+// The callback type should match the event type (e.g., PreToolUseCallback for HookPreToolUse).
+// The callback is automatically converted to a generic HookCallback.
+func (b *HookBuilder) WithCallback(callback any) *HookBuilder {
+	// Convert type-safe callback to generic HookCallback
+	var genericCallback HookCallback
+
+	switch cb := callback.(type) {
+	case PreToolUseCallback:
+		genericCallback = ToGenericCallback[PreToolUseHookInput](cb)
+	case PostToolUseCallback:
+		genericCallback = ToGenericCallback[PostToolUseHookInput](cb)
+	case UserPromptSubmitCallback:
+		genericCallback = ToGenericCallback[UserPromptSubmitHookInput](cb)
+	case StopCallback:
+		genericCallback = ToGenericCallback[StopHookInput](cb)
+	case SubagentStopCallback:
+		genericCallback = ToGenericCallback[SubagentStopHookInput](cb)
+	case PreCompactCallback:
+		genericCallback = ToGenericCallback[PreCompactHookInput](cb)
+	case HookCallback:
+		// Already a generic callback
+		genericCallback = cb
+	default:
+		// Try to convert using reflection-based approach for function types
+		// This handles inline function definitions
+		if fn, ok := callback.(func(*PreToolUseHookInput, *string, *HookContext) (*HookOutput, error)); ok {
+			genericCallback = ToGenericCallback[PreToolUseHookInput](fn)
+		} else if fn, ok := callback.(func(*PostToolUseHookInput, *string, *HookContext) (*HookOutput, error)); ok {
+			genericCallback = ToGenericCallback[PostToolUseHookInput](fn)
+		} else if fn, ok := callback.(func(*UserPromptSubmitHookInput, *string, *HookContext) (*HookOutput, error)); ok {
+			genericCallback = ToGenericCallback[UserPromptSubmitHookInput](fn)
+		} else if fn, ok := callback.(func(*StopHookInput, *string, *HookContext) (*HookOutput, error)); ok {
+			genericCallback = ToGenericCallback[StopHookInput](fn)
+		} else if fn, ok := callback.(func(*SubagentStopHookInput, *string, *HookContext) (*HookOutput, error)); ok {
+			genericCallback = ToGenericCallback[SubagentStopHookInput](fn)
+		} else if fn, ok := callback.(func(*PreCompactHookInput, *string, *HookContext) (*HookOutput, error)); ok {
+			genericCallback = ToGenericCallback[PreCompactHookInput](fn)
+		} else {
+			panic(fmt.Sprintf("unsupported callback type: %T", callback))
+		}
+	}
+
+	b.callbacks = append(b.callbacks, genericCallback)
+	return b
+}
+
+// WithGenericCallback adds a generic HookCallback directly.
+// This is useful for backward compatibility with existing code.
+func (b *HookBuilder) WithGenericCallback(callback HookCallback) *HookBuilder {
+	b.callbacks = append(b.callbacks, callback)
+	return b
+}
+
+// WithTimeout sets the timeout for the hook in seconds.
+func (b *HookBuilder) WithTimeout(timeout float64) *HookBuilder {
+	b.timeout = &timeout
+	return b
+}
+
+// Build creates the HookMatcher from the builder configuration.
+func (b *HookBuilder) Build() HookMatcher {
+	return HookMatcher{
+		Matcher: b.matcher,
+		Hooks:   b.callbacks,
+		Timeout: b.timeout,
+	}
+}
+
+// ToOption converts the builder to an Option that can be passed to NewClient.
+// This allows using HookBuilder with the existing options pattern.
+func (b *HookBuilder) ToOption() Option {
+	matcher := b.Build()
+	event := b.event
+
+	return func(o *Options) {
+		if o.Hooks == nil {
+			o.Hooks = make(map[HookEvent][]HookMatcher)
+		}
+		o.Hooks[event] = append(o.Hooks[event], matcher)
+	}
+}
+
+// BuildForOptions builds the hook and directly adds it to the given Options.
+// This is a convenience method that combines Build() and adding to Options.
+func (b *HookBuilder) BuildForOptions(opts *Options) {
+	if opts.Hooks == nil {
+		opts.Hooks = make(map[HookEvent][]HookMatcher)
+	}
+	opts.Hooks[b.event] = append(opts.Hooks[b.event], b.Build())
+}
+
 // ControlRequest is sent to the CLI for control operations.
 type ControlRequest struct {
 	Type      string         `json:"type"`

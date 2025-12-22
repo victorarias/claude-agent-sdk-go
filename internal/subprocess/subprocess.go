@@ -1,3 +1,14 @@
+// Package subprocess manages Claude CLI subprocess lifecycle and communication.
+//
+// This package handles spawning and managing the Claude CLI subprocess, including:
+//   - CLI executable resolution and version checking
+//   - Subprocess lifecycle (start, monitor, cleanup)
+//   - Bidirectional JSON-RPC communication over stdio
+//   - Path security validation
+//   - Graceful shutdown and resource cleanup
+//
+// The subprocess package is the primary transport layer between the SDK and the
+// Claude CLI, ensuring reliable message passing and proper process management.
 package subprocess
 
 import (
