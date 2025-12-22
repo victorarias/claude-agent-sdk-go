@@ -368,3 +368,90 @@ func TestOptionsDefaultValues(t *testing.T) {
 		t.Error("Default MaxBufferSize should be positive")
 	}
 }
+
+// TestPythonGoFieldDifferences documents intentional differences between
+// Python and Go implementations for maintainability.
+func TestPythonGoFieldDifferences(t *testing.T) {
+	// This test documents known differences between Python's ClaudeAgentOptions
+	// and Go's Options struct. These are intentional design decisions.
+
+	t.Run("AppendSystemPrompt exists in Go but not Python", func(t *testing.T) {
+		// In Python, appending to system prompt is done via SystemPromptPreset.append field
+		// In Go, we have a separate AppendSystemPrompt field for convenience
+		opts := &Options{
+			AppendSystemPrompt: "Additional instructions",
+		}
+		if opts.AppendSystemPrompt == "" {
+			t.Error("AppendSystemPrompt should be settable")
+		}
+	})
+
+	t.Run("Tools field type difference", func(t *testing.T) {
+		// Python: tools: list[str] | ToolsPreset | None
+		// Go: Tools []string (currently)
+		// TODO: Consider making Go's Tools field `any` type like SystemPrompt
+		// to support both []string and ToolsPreset
+		opts := &Options{
+			Tools: []string{"bash", "edit"},
+		}
+		if opts.Tools == nil {
+			t.Error("Tools should support string slice")
+		}
+	})
+
+	t.Run("SDK-specific fields in Go", func(t *testing.T) {
+		// Go has additional fields not in Python ClaudeAgentOptions:
+		// - SDKMCPServers (for in-process MCP servers)
+		// - BundledCLIPath
+		// - customTransport (for testing)
+		// These are Go SDK implementation details
+
+		opts := &Options{}
+
+		// Verify these exist
+		optType := reflect.TypeOf(opts).Elem()
+
+		if _, found := optType.FieldByName("SDKMCPServers"); !found {
+			t.Error("SDKMCPServers should exist for in-process MCP servers")
+		}
+
+		if _, found := optType.FieldByName("BundledCLIPath"); !found {
+			t.Error("BundledCLIPath should exist")
+		}
+	})
+
+	t.Run("Python debug_stderr vs Go StderrCallback", func(t *testing.T) {
+		// Python has both:
+		//   - debug_stderr: Any (file-like object, deprecated)
+		//   - stderr: Callable[[str], None] | None
+		// Go has:
+		//   - StderrCallback: func(string)
+		// Go uses only the callback approach for simplicity
+
+		opts := &Options{
+			StderrCallback: func(s string) {
+				// Callback for stderr
+			},
+		}
+		if opts.StderrCallback == nil {
+			t.Error("StderrCallback should be settable")
+		}
+	})
+}
+
+// TestOptionsFieldCount verifies we have roughly the expected number of fields.
+func TestOptionsFieldCount(t *testing.T) {
+	optType := reflect.TypeOf(Options{})
+	fieldCount := optType.NumField()
+
+	// Python ClaudeAgentOptions has ~35 fields
+	// Go Options should have at least that many (may have a few extra for SDK-specific features)
+	if fieldCount < 35 {
+		t.Errorf("Options has %d fields, expected at least 35 to match Python", fieldCount)
+	}
+
+	// Sanity check: shouldn't have way more than Python
+	if fieldCount > 50 {
+		t.Logf("Warning: Options has %d fields, Python has ~35. Consider if all fields are necessary.", fieldCount)
+	}
+}
