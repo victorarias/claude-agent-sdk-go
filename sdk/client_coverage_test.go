@@ -209,8 +209,10 @@ func TestClient_Interrupt(t *testing.T) {
 	transport := NewMockTransport()
 	client := NewClient(types.WithTransport(transport))
 
-	// Respond to initialize
+	done := make(chan bool)
+	// Respond to initialize and interrupt
 	go func() {
+		defer close(done)
 		for {
 			time.Sleep(10 * time.Millisecond)
 			written := transport.Written()
@@ -222,23 +224,26 @@ func TestClient_Interrupt(t *testing.T) {
 			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
 				continue
 			}
+			reqID, ok := req["request_id"].(string)
+			if !ok {
+				continue
+			}
 
-			// Check if it's Initialize
-			if reqType, ok := req["type"].(string); ok && reqType == "control_request" {
-				reqID, ok := req["request_id"].(string)
-				if !ok {
-					continue
+			// Respond to all control requests
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{"session_id": "test_session"},
+				},
+			})
+
+			// If it's the interrupt request, we're done
+			if requestData, ok := req["request"].(map[string]any); ok {
+				if requestData["subtype"] == "interrupt" {
+					return
 				}
-
-				transport.SendMessage(map[string]any{
-					"type": "control_response",
-					"response": map[string]any{
-						"subtype":    "success",
-						"request_id": reqID,
-						"response":   map[string]any{"session_id": "test_session"},
-					},
-				})
-				return
 			}
 		}
 	}()
@@ -254,6 +259,8 @@ func TestClient_Interrupt(t *testing.T) {
 	if err != nil {
 		t.Errorf("Interrupt failed: %v", err)
 	}
+
+	<-done
 }
 
 func TestClient_Interrupt_NotConnected(t *testing.T) {
