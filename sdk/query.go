@@ -611,7 +611,7 @@ func (q *Query) handleMCPMessage(serverName string, message map[string]any) (any
 		case "notifications/initialized":
 			// Acknowledged, no response needed
 			return nil, nil
-		case "notifications/cancelled":
+		case "notifications/cancelled": //nolint:misspell // MCP protocol uses British spelling
 			// TODO: Implement cancellation
 			return nil, nil
 		}
