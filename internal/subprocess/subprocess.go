@@ -276,14 +276,16 @@ func buildSettingsValue(opts *types.Options) (string, error) {
 		if strings.HasPrefix(settingsStr, "{") && strings.HasSuffix(settingsStr, "}") {
 			// Parse JSON string
 			if err := json.Unmarshal([]byte(settingsStr), &settingsObj); err != nil {
-				// If parsing fails, treat as file path
-				// Note: File reading would go here, but for now we only support JSON strings
-				return "", fmt.Errorf("failed to parse settings as JSON: %w", err)
+				// If parsing fails, treat as file path and read it
+				if err := readSettingsFile(settingsStr, &settingsObj); err != nil {
+					return "", fmt.Errorf("failed to parse settings as JSON and failed to read as file: %w", err)
+				}
 			}
 		} else {
-			// It's a file path - for now, we don't support reading files during command building
-			// This matches the skipped test case
-			return "", fmt.Errorf("file path settings with sandbox not yet supported")
+			// It's a file path - read and parse
+			if err := readSettingsFile(settingsStr, &settingsObj); err != nil {
+				return "", fmt.Errorf("failed to read settings file: %w", err)
+			}
 		}
 	}
 
@@ -298,6 +300,31 @@ func buildSettingsValue(opts *types.Options) (string, error) {
 	}
 
 	return string(data), nil
+}
+
+// readSettingsFile reads and parses a JSON settings file.
+// Matches Python SDK behavior: read file, parse as JSON.
+func readSettingsFile(path string, settingsObj *map[string]any) error {
+	// Check if file exists
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("settings file not found: %s", path)
+		}
+		return fmt.Errorf("failed to stat settings file: %w", err)
+	}
+
+	// Read file content
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("failed to read settings file: %w", err)
+	}
+
+	// Parse JSON
+	if err := json.Unmarshal(data, settingsObj); err != nil {
+		return fmt.Errorf("failed to parse settings file as JSON: %w", err)
+	}
+
+	return nil
 }
 
 // buildCommand constructs the CLI command with arguments.
