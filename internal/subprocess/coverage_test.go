@@ -207,7 +207,7 @@ func TestWriteJSON(t *testing.T) {
 
 	opts := types.DefaultOptions()
 	opts.CLIPath = mockCLI
-	transport := NewSubprocessTransport(opts)
+	transport := NewStreamingTransport(opts)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -240,7 +240,7 @@ func TestWriteJSON_InvalidJSON(t *testing.T) {
 
 	opts := types.DefaultOptions()
 	opts.CLIPath = mockCLI
-	transport := NewSubprocessTransport(opts)
+	transport := NewStreamingTransport(opts)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
