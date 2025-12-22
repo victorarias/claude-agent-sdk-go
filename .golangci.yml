@@ -126,7 +126,6 @@ linters:
     - unused       # Find unused code
     - gosimple     # Simplification suggestions
     - ineffassign  # Detect ineffectual assignments
-    - typecheck    # Type checking
 
     # Formatting
     - gofmt        # Check formatting
@@ -201,7 +200,6 @@ severity:
         - errcheck
         - govet
         - staticcheck
-        - typecheck
       severity: error
 
 output:
