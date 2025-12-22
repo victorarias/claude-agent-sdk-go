@@ -261,7 +261,7 @@ func TestWriteJSON_InvalidJSON(t *testing.T) {
 // TestWriteJSON_NotReady tests WriteJSON before connection
 func TestWriteJSON_NotReady(t *testing.T) {
 	opts := types.DefaultOptions()
-	transport := NewSubprocessTransport(opts)
+	transport := NewStreamingTransport(opts)
 
 	data := map[string]string{"key": "value"}
 
@@ -283,7 +283,7 @@ func TestEndInput(t *testing.T) {
 
 	opts := types.DefaultOptions()
 	opts.CLIPath = mockCLI
-	transport := NewSubprocessTransport(opts)
+	transport := NewStreamingTransport(opts)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
