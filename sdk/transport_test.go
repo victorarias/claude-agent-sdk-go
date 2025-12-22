@@ -14,18 +14,18 @@ import (
 
 // MockTransport implements Transport for testing.
 type MockTransport struct {
-	mu           sync.Mutex
-	connected    bool
-	closed       bool
-	written      []string
-	inputEnded   bool
-	messageChan  chan map[string]any
-	errorChan    chan error
-	connectErr   error
-	writeErr     error
-	closeErr     error
-	endInputErr  error
-	writeChan    chan struct{} // Notifies when a write occurs
+	mu          sync.Mutex
+	connected   bool
+	closed      bool
+	written     []string
+	inputEnded  bool
+	messageChan chan map[string]any
+	errorChan   chan error
+	connectErr  error
+	writeErr    error
+	closeErr    error
+	endInputErr error
+	writeChan   chan struct{} // Notifies when a write occurs
 }
 
 // NewMockTransport creates a new MockTransport.

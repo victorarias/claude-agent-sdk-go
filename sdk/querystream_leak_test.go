@@ -87,7 +87,7 @@ func TestQueryStream_NoGoroutineLeak(t *testing.T) {
 }
 
 // TestQueryStream_WithContextCancellation tests that QueryStream properly
-// cleans up goroutines when the context is cancelled.
+// cleans up goroutines when the context is canceled.
 func TestQueryStream_WithContextCancellation(t *testing.T) {
 	// Force GC to clean up any existing goroutines
 	runtime.GC()

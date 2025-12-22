@@ -870,7 +870,7 @@ func TestQuery_StreamInput_ContextCancelled(t *testing.T) {
 
 	err := query.StreamInput(input)
 	if err == nil {
-		t.Error("expected context cancelled error")
+		t.Error("expected context canceled error")
 	}
 }
 
@@ -1080,7 +1080,6 @@ func TestQuery_SendControlResponse_MarshalError(t *testing.T) {
 		t.Errorf("expected no data written when marshal fails, got %d items", len(written))
 	}
 }
-
 
 // TestQuery_ChannelBufferConstants verifies that channel buffer size constants exist,
 // are properly used in NewQuery, and have the expected values.
