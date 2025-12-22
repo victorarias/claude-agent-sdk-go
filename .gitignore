@@ -1,7 +1,3 @@
-# Reference SDK (for comparison during development)
-.reference/
-reference/
-
 # Compiled example binaries (build locally with: go build ./examples/...)
 agents
 agents-filesystem
