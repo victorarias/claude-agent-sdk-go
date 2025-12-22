@@ -143,7 +143,7 @@ func Example_errors() {
 	fmt.Println("Process error:", processErr.Error())
 
 	// Output:
-	// Timeout error: operation 'connect' timed out after 30s
+	// Timeout error: timeout after 30s: connect
 	// Closed error: resource closed: session
 	// Process error: process exited with code 1: command failed
 }
