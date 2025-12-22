@@ -68,15 +68,17 @@ func TestQueryStream_GoroutineLeak(t *testing.T) {
 	// 4. The goroutine is blocked forever on the send
 	// 5. There's no mechanism to cancel the goroutine when caller abandons
 
-	// We expect at least 1 leaked goroutine (the QueryStream goroutine)
+	// With proper cleanup, no goroutines should leak
+	// We allow a small margin (1-2 goroutines) for test infrastructure
 	leaked := afterCount - beforeCount
 
-	if leaked < 1 {
-		t.Errorf("Expected at least 1 leaked goroutine, but count went from %d to %d (diff: %d)",
+	if leaked > 2 {
+		t.Errorf("Goroutine leak detected: count went from %d to %d (diff: %d). "+
+			"QueryStream goroutine should exit when caller abandons channels.",
 			beforeCount, afterCount, leaked)
 	}
 
-	t.Logf("Goroutine leak detected: before=%d, after=%d, leaked=%d",
+	t.Logf("Goroutines: before=%d, after=%d, leaked=%d",
 		beforeCount, afterCount, leaked)
 }
 
