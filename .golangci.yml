@@ -1,0 +1,206 @@
+# golangci-lint configuration for Claude Agent SDK Go
+# See https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m
+  tests: true
+  build-tags: []
+  skip-dirs:
+    - reference
+    - .beads
+    - .github
+    - .claude
+  skip-files: []
+
+linters-settings:
+  govet:
+    enable-all: true
+    disable:
+      - shadow  # too many false positives
+      - fieldalignment  # micro-optimization, not worth the noise
+
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+
+  staticcheck:
+    checks: ["all"]
+
+  unused:
+    check-exported: false
+
+  gosimple:
+    checks: ["all"]
+
+  gofmt:
+    simplify: true
+
+  goimports:
+    local-prefixes: github.com/victorarias/claude-agent-sdk-go
+
+  misspell:
+    locale: US
+    ignore-words:
+      - cancelled  # British spelling, but acceptable
+
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+    ignore-tests: true
+
+  gosec:
+    severity: medium
+    confidence: medium
+    excludes:
+      - G104  # unhandled errors - covered by errcheck
+      - G304  # file path from variable - needed for SDK functionality
+      - G204  # subprocess with variable - needed for SDK functionality
+
+  revive:
+    enable-all-rules: false
+    rules:
+      - name: exported
+        disabled: true  # too strict for SDK with many public APIs
+      - name: package-comments
+        disabled: true  # we have package docs where needed
+      - name: blank-imports
+        disabled: false
+      - name: context-as-argument
+        disabled: false
+      - name: error-return
+        disabled: false
+      - name: error-strings
+        disabled: false
+      - name: error-naming
+        disabled: false
+      - name: if-return
+        disabled: false
+      - name: var-naming
+        disabled: false
+      - name: range
+        disabled: false
+      - name: receiver-naming
+        disabled: false
+      - name: indent-error-flow
+        disabled: false
+
+  cyclop:
+    max-complexity: 15
+    skip-tests: true
+
+  gocyclo:
+    min-complexity: 15
+
+  funlen:
+    lines: 100
+    statements: 50
+    ignore-comments: true
+
+  lll:
+    line-length: 140
+    tab-width: 1
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+    disabled-checks:
+      - unnamedResult  # named results not always needed
+      - hugeParam      # sometimes large structs by value are okay
+
+linters:
+  disable-all: true
+  enable:
+    # Essential
+    - govet        # Official Go tool
+    - errcheck     # Check error handling
+    - staticcheck  # Advanced static analysis
+    - unused       # Find unused code
+    - gosimple     # Simplification suggestions
+    - ineffassign  # Detect ineffectual assignments
+    - typecheck    # Type checking
+
+    # Formatting
+    - gofmt        # Check formatting
+    - goimports    # Check imports
+
+    # Quality
+    - misspell     # Spelling mistakes
+    - unconvert    # Unnecessary conversions
+    - goconst      # Repeated strings
+    - gosec        # Security issues
+    - revive       # General linting
+
+    # Complexity
+    - gocyclo      # Cyclomatic complexity
+    - cyclop       # Cyclomatic complexity
+    - funlen       # Function length
+
+    # Style/Best practices
+    - gocritic     # Comprehensive checks
+    - exportloopref # Exported loop vars (Go 1.22+)
+    - noctx        # HTTP requests without context
+    - nilerr       # Return nil instead of error
+    - predeclared  # Shadowing predeclared identifiers
+    - thelper      # Test helper detection
+    - tparallel    # Parallel test detection
+    - whitespace   # Whitespace issues
+
+issues:
+  exclude-use-default: false
+  exclude-dirs:
+    - reference
+  exclude-files:
+    - ".*_test\\.go$"  # Relax some rules for test files (configured per-linter)
+
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - funlen
+        - gocyclo
+        - cyclop
+        - goconst
+        - lll
+
+    # Exclude some staticcheck messages
+    - linters:
+        - staticcheck
+      text: "SA1019:"  # Don't warn about deprecated usage (we may need it for compatibility)
+
+    # Allow long lines in go:generate comments
+    - linters:
+        - lll
+      source: "^//\\s*go:generate"
+
+    # Allow unused parameters in interface implementations
+    - linters:
+        - revive
+      text: "unused-parameter"
+
+    # Allow blank identifier in type assertions for ok checks
+    - linters:
+        - errcheck
+      text: "type assertion must be checked"
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+severity:
+  default-severity: warning
+  rules:
+    - linters:
+        - errcheck
+        - govet
+        - staticcheck
+        - typecheck
+      severity: error
+
+output:
+  formats:
+    - format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  uniq-by-line: true
+  sort-results: true
