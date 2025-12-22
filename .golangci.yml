@@ -203,8 +203,7 @@ severity:
       severity: error
 
 output:
-  formats:
-    - format: colored-line-number
+  format: colored-line-number
   print-issued-lines: true
   print-linter-name: true
   uniq-by-line: true

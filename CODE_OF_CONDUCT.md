@@ -56,7 +56,7 @@ It also applies when an individual is officially representing the project in pub
 Instances of abusive, harassing, or otherwise unacceptable behavior should be reported to the project maintainers. You may:
 
 - Open a confidential issue on GitHub
-- Email the project maintainers at [maintainer@example.com]
+- Email the project maintainers at victorcodes@proton.me
 
 All complaints will be reviewed and investigated promptly and fairly. The project team is obligated to maintain confidentiality regarding the reporter of an incident. Further details of specific enforcement policies may be posted separately.
 

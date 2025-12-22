@@ -60,7 +60,7 @@ When reporting a vulnerability, please include:
 For security-related questions or concerns:
 
 - **GitHub:** [@victorarias](https://github.com/victorarias)
-- **Email:** [security contact needed]
+- **Email:** victorcodes@proton.me
 
 ## Security Best Practices
 
