@@ -193,18 +193,13 @@ issues:
   max-issues-per-linter: 0
   max-same-issues: 0
 
-severity:
-  default-severity: warning
-  rules:
-    - linters:
-        - errcheck
-        - govet
-        - staticcheck
-      severity: error
-
 output:
-  format: colored-line-number
-  print-issued-lines: true
-  print-linter-name: true
+  formats:
+    text:
+      path: stdout
+      print-issued-lines: true
+      print-linter-name: true
+  sort-order:
+    - file
+    - linter
   uniq-by-line: true
-  sort-results: true
