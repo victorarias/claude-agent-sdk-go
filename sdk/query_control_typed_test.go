@@ -130,11 +130,11 @@ func TestHandleControlRequest_HookCallback_TypedStruct(t *testing.T) {
 	}
 	defer query.Close()
 
-	// Register a hook callback
-	callbackInvoked := false
+	// Register a hook callback - use channel for thread-safe signaling
+	callbackChan := make(chan bool, 1)
 	query.hookMu.Lock()
 	query.hookCallbacks["hook_123"] = func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
-		callbackInvoked = true
+		callbackChan <- true
 		return &types.HookOutput{
 			Continue: boolPtr(true),
 			Decision: "approve",
@@ -170,10 +170,11 @@ func TestHandleControlRequest_HookCallback_TypedStruct(t *testing.T) {
 	// Handle the request
 	go query.handleControlRequest(controlRequest)
 
-	// Wait for processing
-	time.Sleep(100 * time.Millisecond)
-
-	if !callbackInvoked {
+	// Wait for callback to be invoked
+	select {
+	case <-callbackChan:
+		// Success - callback was invoked
+	case <-time.After(time.Second):
 		t.Error("Hook callback was not invoked")
 	}
 
