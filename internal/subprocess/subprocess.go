@@ -254,8 +254,15 @@ func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) [
 	}
 
 	// Tools configuration
-	if len(opts.Tools) > 0 {
-		cmd = append(cmd, "--tools", strings.Join(opts.Tools, ","))
+	switch t := opts.Tools.(type) {
+	case []string:
+		if len(t) > 0 {
+			cmd = append(cmd, "--tools", strings.Join(t, ","))
+		}
+	case types.ToolsPreset:
+		if data, err := json.Marshal(t); err == nil {
+			cmd = append(cmd, "--tools", string(data))
+		}
 	}
 
 	if len(opts.AllowedTools) > 0 {
