@@ -574,9 +574,21 @@ func WithClient(ctx context.Context, opts []types.Option, fn ClientFunc) error {
 	if err := client.Connect(ctx); err != nil {
 		return err
 	}
-	defer client.Close()
 
-	return fn(client)
+	// Use defer with recover to ensure cleanup even on panic
+	var fnErr error
+	defer func() {
+		// Always close the client
+		client.Close()
+
+		// Re-raise panic after cleanup
+		if r := recover(); r != nil {
+			panic(r)
+		}
+	}()
+
+	fnErr = fn(client)
+	return fnErr
 }
 
 // Run connects and runs a function with the client.
