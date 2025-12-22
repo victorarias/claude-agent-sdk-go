@@ -161,7 +161,7 @@ func TestKill(t *testing.T) {
 
 	opts := types.DefaultOptions()
 	opts.CLIPath = mockCLI
-	transport := NewSubprocessTransport(opts)
+	transport := NewStreamingTransport(opts)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -186,7 +186,7 @@ func TestKill(t *testing.T) {
 // TestKill_NoProcess tests Kill() when no process is running
 func TestKill_NoProcess(t *testing.T) {
 	opts := types.DefaultOptions()
-	transport := NewSubprocessTransport(opts)
+	transport := NewStreamingTransport(opts)
 
 	// Should not error when called before Connect
 	if err := transport.Kill(); err != nil {
