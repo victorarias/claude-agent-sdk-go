@@ -440,7 +440,11 @@ func (q *Query) sendControlResponse(requestID string, data map[string]any, err e
 		}
 	}
 
-	responseData, _ := json.Marshal(response)
+	responseData, marshalErr := json.Marshal(response)
+	if marshalErr != nil {
+		// Cannot marshal response - silently return to avoid writing invalid data
+		return
+	}
 	q.transport.Write(string(responseData))
 }
 

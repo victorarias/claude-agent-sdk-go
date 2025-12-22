@@ -232,7 +232,7 @@ Contributions are welcome! Please ensure all tests pass before submitting pull r
 
 ## License
 
-To be determined.
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
 
 ## Reference
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -605,15 +604,8 @@ func TestQuery_HandleCanUseTool(t *testing.T) {
 	query := NewQuery(transport, true)
 
 	var called atomic.Bool
-	done := make(chan struct{})
 	query.SetCanUseTool(func(toolName string, input map[string]any, ctx *types.ToolPermissionContext) (types.PermissionResult, error) {
 		called.Store(true)
-		// Signal after callback completes
-		go func() {
-			// Wait a bit for the response to be written
-			time.Sleep(10 * time.Millisecond)
-			close(done)
-		}()
 		return &types.PermissionResultAllow{Behavior: "allow"}, nil
 	})
 
@@ -634,7 +626,22 @@ func TestQuery_HandleCanUseTool(t *testing.T) {
 		},
 	})
 
-	<-done
+	// Wait for callback and response with timeout
+	timeout := time.After(1 * time.Second)
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			t.Fatal("timeout waiting for response")
+		case <-ticker.C:
+			if called.Load() && len(transport.Written()) > 0 {
+				goto done
+			}
+		}
+	}
+done:
 
 	if !called.Load() {
 		t.Error("canUseTool callback was not called")
@@ -979,5 +986,34 @@ func TestQuery_MCPToolCall_ToolNotFound(t *testing.T) {
 	response := resp["response"].(map[string]any)
 	if response["subtype"] != "error" {
 		t.Errorf("expected error response, got %v", response["subtype"])
+	}
+}
+
+// TestQuery_SendControlResponse_MarshalError verifies that json.Marshal errors
+// are handled gracefully (nothing written to transport, no panic).
+func TestQuery_SendControlResponse_MarshalError(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	// Create data with an unmarshallable type (channel)
+	// This will cause json.Marshal to fail
+	unmarshallableData := map[string]any{
+		"channel": make(chan int),
+	}
+
+	// Call sendControlResponse with unmarshallable data
+	// Should not panic and should not write anything to transport
+	query.sendControlResponse("test_req_id", unmarshallableData, nil)
+
+	// With proper error handling, nothing should be written when marshal fails
+	written := transport.Written()
+	if len(written) > 0 {
+		t.Errorf("expected no data written when marshal fails, got %d items", len(written))
 	}
 }

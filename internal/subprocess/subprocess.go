@@ -21,6 +21,41 @@ import (
 // versionCheckTimeout is the timeout for checking CLI version.
 const versionCheckTimeout = 2 * time.Second
 
+// ErrInvalidPath is returned when a path fails security validation.
+var ErrInvalidPath = fmt.Errorf("invalid path")
+
+// ValidatePath checks a path for security issues like path traversal.
+// It rejects paths containing ".." components, null bytes, or empty strings.
+func ValidatePath(path string) error {
+	if path == "" {
+		return fmt.Errorf("%w: empty path", ErrInvalidPath)
+	}
+
+	// Reject null bytes
+	if strings.ContainsRune(path, '\x00') {
+		return fmt.Errorf("%w: contains null byte", ErrInvalidPath)
+	}
+
+	// Clean the path and check for traversal
+	cleaned := filepath.Clean(path)
+
+	// Check if cleaning the path results in going above the starting point
+	// For relative paths, this means the cleaned path starts with ".."
+	if strings.HasPrefix(cleaned, "..") {
+		return fmt.Errorf("%w: path traversal detected", ErrInvalidPath)
+	}
+
+	// Also check for ".." components in the original path
+	// This catches cases where the path contains traversal even if the end result is valid
+	for _, part := range strings.Split(path, string(filepath.Separator)) {
+		if part == ".." {
+			return fmt.Errorf("%w: path traversal detected", ErrInvalidPath)
+		}
+	}
+
+	return nil
+}
+
 // parseVersionOutput extracts a semver version from CLI output.
 func parseVersionOutput(output string) (string, error) {
 	output = strings.TrimSpace(output)
