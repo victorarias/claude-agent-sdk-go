@@ -90,7 +90,7 @@ func (m *mockTransportWithClient) IsReady() bool {
 
 // TestWithClient_Success tests that WithClient creates client, runs function, and disconnects
 func TestWithClient_Success(t *testing.T) {
-	mock := &mockTransportWithClient{}
+	mock := newMockTransportWithClient()
 	opts := []types.Option{
 		types.WithTransport(mock),
 	}
