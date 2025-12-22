@@ -235,6 +235,11 @@ func TestOptionsFieldTypes(t *testing.T) {
 			fieldType = fieldType.Elem()
 		}
 
+		// Allow Interface (any) type if specified
+		if tt.allowAny && fieldType.Kind() == reflect.Interface {
+			continue
+		}
+
 		if fieldType.Kind() != tt.expectedKind {
 			t.Errorf("Field %s: expected kind %v, got %v (%s)",
 				tt.fieldName, tt.expectedKind, fieldType.Kind(), tt.description)
