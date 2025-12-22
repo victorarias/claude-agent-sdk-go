@@ -450,9 +450,22 @@ func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) [
 		case map[string]any:
 			for name, server := range servers {
 				if serverMap, ok := server.(map[string]any); ok {
-					if serverType, _ := serverMap["type"].(string); serverType != "sdk" {
+					serverType, hasType := serverMap["type"].(string)
+					// Default empty type to "stdio" for backwards compatibility
+					if !hasType || serverType == "" {
+						// Create a copy of the server map with type defaulted to "stdio"
+						serverCopy := make(map[string]any)
+						for k, v := range serverMap {
+							serverCopy[k] = v
+						}
+						serverCopy["type"] = "stdio"
+						// When type is missing/empty, it defaults to stdio (not sdk), so include it
+						filteredServers[name] = serverCopy
+					} else if serverType != "sdk" {
+						// Explicit type that's not "sdk" - include it
 						filteredServers[name] = server
 					}
+					// If serverType == "sdk", we skip it (don't add to filteredServers)
 				} else {
 					filteredServers[name] = server
 				}

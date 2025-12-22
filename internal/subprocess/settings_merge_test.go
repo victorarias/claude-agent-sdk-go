@@ -398,3 +398,54 @@ func TestSettingsMerge_SettingsFilePathWithSandbox(t *testing.T) {
 		t.Errorf("sandbox.autoAllowBashIfSandboxed: got %v, want true", sandboxMap["autoAllowBashIfSandboxed"])
 	}
 }
+
+// TestSettingsMerge_SettingsFileNotFound tests error handling when settings file doesn't exist.
+func TestSettingsMerge_SettingsFileNotFound(t *testing.T) {
+	opts := types.DefaultOptions()
+
+	// Settings as a non-existent file path
+	opts.Settings = "/non/existent/path/settings.json"
+
+	// Sandbox config
+	opts.Sandbox = &types.SandboxSettings{
+		Enabled: true,
+	}
+
+	// buildSettingsValue should return an error
+	_, err := buildSettingsValue(opts)
+	if err == nil {
+		t.Fatal("expected error for non-existent settings file, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "settings file not found") {
+		t.Errorf("expected 'settings file not found' error, got: %v", err)
+	}
+}
+
+// TestSettingsMerge_SettingsFileInvalidJSON tests error handling for invalid JSON in file.
+func TestSettingsMerge_SettingsFileInvalidJSON(t *testing.T) {
+	// Create a temporary file with invalid JSON
+	tempDir := t.TempDir()
+	settingsFile := tempDir + "/invalid.json"
+	invalidContent := `{this is not valid JSON}`
+
+	if err := os.WriteFile(settingsFile, []byte(invalidContent), 0644); err != nil {
+		t.Fatalf("failed to create temp settings file: %v", err)
+	}
+
+	opts := types.DefaultOptions()
+	opts.Settings = settingsFile
+	opts.Sandbox = &types.SandboxSettings{
+		Enabled: true,
+	}
+
+	// buildSettingsValue should return an error
+	_, err := buildSettingsValue(opts)
+	if err == nil {
+		t.Fatal("expected error for invalid JSON in settings file, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "failed to parse settings file as JSON") {
+		t.Errorf("expected 'failed to parse settings file as JSON' error, got: %v", err)
+	}
+}
