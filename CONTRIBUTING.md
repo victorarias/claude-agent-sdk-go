@@ -6,7 +6,7 @@ Thank you for your interest in contributing to the Claude Agent SDK Go! This doc
 
 ### Prerequisites
 
-- **Go 1.21 or later** - Install from [go.dev/dl](https://go.dev/dl/)
+- **Go 1.25 or later** - Install from [go.dev/dl](https://go.dev/dl/)
 - **Claude CLI** - Required for running tests and examples:
   ```bash
   npm install -g @anthropic-ai/claude-code
