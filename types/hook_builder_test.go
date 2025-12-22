@@ -242,8 +242,8 @@ func TestHookBuilderFluentAPI(t *testing.T) {
 
 	hookMatcher := result4.Build()
 
-	if hookMatcher == nil {
-		t.Fatal("Build should return a HookMatcher")
+	if len(hookMatcher.Hooks) == 0 {
+		t.Fatal("Build should return a HookMatcher with hooks")
 	}
 }
 
