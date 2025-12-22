@@ -15,7 +15,7 @@ import (
 	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
-// MCP Protocol Version
+// MCPProtocolVersion is the MCP protocol version.
 const MCPProtocolVersion = "2024-11-05"
 
 // MCPToolDefinition defines a tool exposed via MCP protocol.
@@ -113,7 +113,7 @@ type MCPToolsListResult struct {
 // MCPToolCallResult is the result of tools/call request.
 type MCPToolCallResult struct {
 	Content []types.MCPContent `json:"content"`
-	IsError bool         `json:"isError,omitempty"`
+	IsError bool               `json:"isError,omitempty"`
 }
 
 // NewMCPError creates a new MCP error.
