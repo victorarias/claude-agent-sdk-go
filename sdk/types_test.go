@@ -203,7 +203,6 @@ func TestHookOutput(t *testing.T) {
 }
 
 func boolPtr(b bool) *bool { return &b }
-func intPtr(i int) *int    { return &i }
 
 func TestControlRequest(t *testing.T) {
 	req := &types.ControlRequest{
