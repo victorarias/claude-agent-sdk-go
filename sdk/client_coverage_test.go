@@ -350,8 +350,10 @@ func TestClient_SetModel(t *testing.T) {
 	transport := NewMockTransport()
 	client := NewClient(types.WithTransport(transport))
 
+	done := make(chan bool)
 	// Respond to initialize and SetModel
 	go func() {
+		defer close(done)
 		for {
 			time.Sleep(10 * time.Millisecond)
 			written := transport.Written()
@@ -376,6 +378,13 @@ func TestClient_SetModel(t *testing.T) {
 					"response":   map[string]any{},
 				},
 			})
+
+			// If it's the set_model request, we're done
+			if requestData, ok := req["request"].(map[string]any); ok {
+				if requestData["subtype"] == "set_model" {
+					return
+				}
+			}
 		}
 	}()
 
@@ -389,6 +398,8 @@ func TestClient_SetModel(t *testing.T) {
 	if err != nil {
 		t.Errorf("SetModel failed: %v", err)
 	}
+
+	<-done
 }
 
 func TestClient_SetModel_NotConnected(t *testing.T) {
