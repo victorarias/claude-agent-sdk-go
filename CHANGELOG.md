@@ -49,7 +49,7 @@ Initial release of the Claude Agent SDK Go, a Go implementation of the Claude Ag
   - Prompt variations
   - Advanced tool usage
 - **Testing**: Full test coverage including unit tests and integration tests
-- **Documentation**: Complete README with API examples, CONTRIBUTING guide, and implementation plans
+- **Documentation**: Complete README with API examples and CONTRIBUTING guide
 
 ### Internal
 
