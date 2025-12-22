@@ -19,11 +19,12 @@ func TestQueryStream_GoroutineLeak(t *testing.T) {
 	// Count goroutines before
 	beforeCount := runtime.NumGoroutine()
 
-	// Create a transport that will keep sending messages
+	// Create a transport that will send MORE messages than the buffer can hold
+	// QueryStream uses a buffered channel of size 100, so we send 150 messages
 	transport := NewMockTransport()
 	go func() {
-		// Send messages continuously
-		for i := 0; i < 10; i++ {
+		// Send MANY messages to exceed buffer capacity
+		for i := 0; i < 150; i++ {
 			transport.SendMessage(map[string]any{
 				"type": "assistant",
 				"message": map[string]any{
@@ -32,7 +33,7 @@ func TestQueryStream_GoroutineLeak(t *testing.T) {
 					},
 				},
 			})
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(1 * time.Millisecond)
 		}
 		transport.SendMessage(map[string]any{
 			"type":    "result",
@@ -50,8 +51,8 @@ func TestQueryStream_GoroutineLeak(t *testing.T) {
 	_ = msgChan
 	_ = errChan
 
-	// Give the goroutine time to start and try to send
-	time.Sleep(100 * time.Millisecond)
+	// Give the goroutine time to fill the buffer and block
+	time.Sleep(300 * time.Millisecond)
 
 	// Force GC again
 	runtime.GC()
@@ -62,12 +63,12 @@ func TestQueryStream_GoroutineLeak(t *testing.T) {
 
 	// The goroutine should have leaked because:
 	// 1. The QueryStream goroutine is trying to send to msgChan
-	// 2. Nobody is receiving from msgChan
-	// 3. The goroutine is blocked forever on the send
-	// 4. There's no mechanism to cancel the goroutine when caller abandons
+	// 2. The msgChan buffer (size 100) is full
+	// 3. Nobody is receiving from msgChan
+	// 4. The goroutine is blocked forever on the send
+	// 5. There's no mechanism to cancel the goroutine when caller abandons
 
 	// We expect at least 1 leaked goroutine (the QueryStream goroutine)
-	// Plus possibly 1 more from the mock transport's goroutine
 	leaked := afterCount - beforeCount
 
 	if leaked < 1 {

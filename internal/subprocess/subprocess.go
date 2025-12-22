@@ -804,7 +804,11 @@ func parseJSONLine(line string) (map[string]any, error) {
 
 	var result map[string]any
 	if err := json.Unmarshal([]byte(line), &result); err != nil {
-		return nil, fmt.Errorf("invalid JSON: %w", err)
+		// Wrap JSON unmarshaling errors in JSONDecodeError
+		return nil, &types.JSONDecodeError{
+			Line:          line,
+			OriginalError: err,
+		}
 	}
 
 	return result, nil
