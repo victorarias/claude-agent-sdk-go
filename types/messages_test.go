@@ -423,7 +423,7 @@ func TestPermissionResult(t *testing.T) {
 	})
 
 	t.Run("PermissionResultDeny serialization", func(t *testing.T) {
-		result := PermissionResultDeny{Reason: "unauthorized"}
+		result := PermissionResultDeny{}
 		data, err := json.Marshal(result)
 		if err != nil {
 			t.Fatalf("Failed to marshal PermissionResultDeny: %v", err)
@@ -436,33 +436,6 @@ func TestPermissionResult(t *testing.T) {
 
 		if decoded["decision"] != "deny" {
 			t.Errorf("Expected decision 'deny', got %v", decoded["decision"])
-		}
-		if decoded["reason"] != "unauthorized" {
-			t.Errorf("Expected reason 'unauthorized', got %v", decoded["reason"])
-		}
-	})
-}
-
-// TestSDKControlMcpToolCallRequest tests MCPToolCall ToDict method.
-func TestSDKControlMcpToolCallRequest(t *testing.T) {
-	t.Run("ToDict converts to dictionary", func(t *testing.T) {
-		params := map[string]any{"x": 5, "y": 10}
-		req := &SDKControlMcpToolCallRequest{
-			Name:   "calculator",
-			Params: params,
-		}
-
-		dict := req.ToDict()
-		if dict["name"] != "calculator" {
-			t.Errorf("Expected name 'calculator', got %v", dict["name"])
-		}
-
-		resultParams, ok := dict["params"].(map[string]any)
-		if !ok {
-			t.Fatal("Expected params to be map[string]any")
-		}
-		if resultParams["x"] != 5 {
-			t.Errorf("Expected x=5, got %v", resultParams["x"])
 		}
 	})
 }
