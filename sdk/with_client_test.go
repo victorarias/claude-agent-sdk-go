@@ -38,15 +38,12 @@ func (m *mockTransportWithClient) Connect(ctx context.Context) error {
 		time.Sleep(10 * time.Millisecond)
 
 		// Send control response for initialize request
+		// The request_id format is "req_1" for the first request
 		m.messageChan <- map[string]any{
-			"type": "control",
-			"control": map[string]any{
-				"type":       "control_response",
-				"request_id": "1",
-				"response": map[string]any{
-					"subtype":    "success",
-					"session_id": "test-session",
-				},
+			"type":       "control_response",
+			"request_id": "req_1",
+			"response": map[string]any{
+				"session_id": "test-session",
 			},
 		}
 	}()
