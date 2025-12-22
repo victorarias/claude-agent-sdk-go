@@ -218,12 +218,18 @@ func (q *Query) handleSDKMessage(raw map[string]any) {
 
 // handleControlResponse routes a control response to the waiting request.
 func (q *Query) handleControlResponse(msg map[string]any) {
-	response, ok := msg["response"].(map[string]any)
-	if !ok {
-		return
+	// Parse the response into a typed struct
+	responseBytes, err := json.Marshal(msg)
+	if err != nil {
+		return // Cannot parse, silently drop
 	}
 
-	requestID, _ := response["request_id"].(string)
+	var typedResponse types.ControlResponse
+	if err := json.Unmarshal(responseBytes, &typedResponse); err != nil {
+		return // Cannot parse, silently drop
+	}
+
+	requestID := typedResponse.Response.RequestID
 	if requestID == "" {
 		return
 	}
@@ -237,17 +243,16 @@ func (q *Query) handleControlResponse(msg map[string]any) {
 	}
 
 	// Check for error
-	if response["subtype"] == "error" {
-		errMsg, _ := response["error"].(string)
+	if typedResponse.Response.Subtype == "error" {
 		select {
-		case respChan <- map[string]any{"error": errMsg}:
+		case respChan <- map[string]any{"error": typedResponse.Response.Error}:
 		default:
 		}
 		return
 	}
 
 	// Send success response
-	respData, _ := response["response"].(map[string]any)
+	respData := typedResponse.Response.Response
 	if respData == nil {
 		respData = make(map[string]any)
 	}
