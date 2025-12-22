@@ -175,23 +175,24 @@ func TestWithPartialMessages(t *testing.T) {
 
 func TestWithOutputFormat(t *testing.T) {
 	opts := DefaultOptions()
-	WithOutputFormat("json")(opts)
-	if opts.OutputFormat != "json" {
-		t.Errorf("expected 'json', got %q", opts.OutputFormat)
+	format := map[string]any{"type": "json_schema", "schema": map[string]any{}}
+	WithOutputFormat(format)(opts)
+	if opts.OutputFormat == nil {
+		t.Error("expected OutputFormat to be set")
 	}
 }
 
 func TestWithBetas(t *testing.T) {
 	opts := DefaultOptions()
-	WithBetas("feature1", "feature2")(opts)
-	if len(opts.Betas) != 2 {
-		t.Errorf("expected 2 betas, got %d", len(opts.Betas))
+	WithBetas(BetaContext1M)(opts)
+	if len(opts.Betas) != 1 {
+		t.Errorf("expected 1 beta, got %d", len(opts.Betas))
 	}
 }
 
 func TestWithSettingSources(t *testing.T) {
 	opts := DefaultOptions()
-	WithSettingSources("local", "global")(opts)
+	WithSettingSources(SettingSourceLocal, SettingSourceProject)(opts)
 	if len(opts.SettingSources) != 2 {
 		t.Errorf("expected 2 setting sources, got %d", len(opts.SettingSources))
 	}
@@ -199,19 +200,18 @@ func TestWithSettingSources(t *testing.T) {
 
 func TestWithSettings(t *testing.T) {
 	opts := DefaultOptions()
-	settings := map[string]any{"key": "value"}
-	WithSettings(settings)(opts)
-	if opts.Settings["key"] != "value" {
-		t.Errorf("expected 'value', got %v", opts.Settings["key"])
+	WithSettings("/path/to/settings.json")(opts)
+	if opts.Settings != "/path/to/settings.json" {
+		t.Errorf("expected settings path, got %v", opts.Settings)
 	}
 }
 
 func TestWithSandbox(t *testing.T) {
 	opts := DefaultOptions()
-	sandbox := SandboxConfig{Type: "docker"}
+	sandbox := SandboxSettings{Enabled: true}
 	WithSandbox(sandbox)(opts)
-	if opts.Sandbox.Type != "docker" {
-		t.Errorf("expected type 'docker', got %q", opts.Sandbox.Type)
+	if opts.Sandbox == nil || !opts.Sandbox.Enabled {
+		t.Error("expected Sandbox.Enabled=true")
 	}
 }
 
