@@ -588,8 +588,10 @@ func TestQuery_HandleHookCallback(t *testing.T) {
 		},
 	})
 
-	// Wait for processing
-	time.Sleep(100 * time.Millisecond)
+	// Wait for response to be written
+	if !transport.WaitForWrite(time.Second) {
+		t.Fatal("timeout waiting for hook callback response")
+	}
 
 	if !callbackCalled.Load() {
 		t.Error("hook callback was not called")
@@ -628,7 +630,10 @@ func TestQuery_HandleHookCallback_Error(t *testing.T) {
 		},
 	})
 
-	time.Sleep(100 * time.Millisecond)
+	// Wait for error response to be written
+	if !transport.WaitForWrite(time.Second) {
+		t.Fatal("timeout waiting for hook error response")
+	}
 
 	// Verify error response was sent
 	written := transport.Written()
