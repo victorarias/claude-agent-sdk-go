@@ -1,5 +1,10 @@
 # golangci-lint configuration for Claude Agent SDK Go
 # See https://golangci-lint.run/usage/configuration/
+#
+# Test this configuration:
+#   golangci-lint config verify    # Validate config
+#   golangci-lint run              # Run all linters
+#   golangci-lint run --fix        # Run with auto-fixes
 
 run:
   timeout: 5m

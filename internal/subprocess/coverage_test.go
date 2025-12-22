@@ -91,7 +91,7 @@ func TestIsVersionAtLeast(t *testing.T) {
 // TestErrorsChannel tests the Errors() method
 func TestErrorsChannel(t *testing.T) {
 	opts := types.DefaultOptions()
-	transport := NewSubprocessTransport(opts)
+	transport := NewStreamingTransport(opts)
 
 	errChan := transport.Errors()
 	if errChan == nil {
@@ -112,7 +112,7 @@ func TestErrorsChannel(t *testing.T) {
 // TestExitError tests the ExitError() method
 func TestExitError(t *testing.T) {
 	opts := types.DefaultOptions()
-	transport := NewSubprocessTransport(opts)
+	transport := NewStreamingTransport(opts)
 
 	// Initially should be nil
 	if err := transport.ExitError(); err != nil {
@@ -131,7 +131,7 @@ func TestExitError(t *testing.T) {
 	}
 
 	opts.CLIPath = mockCLI
-	transport = NewSubprocessTransport(opts)
+	transport = NewStreamingTransport(opts)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
