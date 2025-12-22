@@ -227,8 +227,8 @@ func (s *MCPServer) ToConfig() map[string]any {
 
 // Options configures the Claude SDK client.
 type Options struct {
-	// Tools configuration
-	Tools           []string `json:"tools,omitempty"`
+	// Tools configuration - can be []string or ToolsPreset
+	Tools           any      `json:"tools,omitempty"`
 	AllowedTools    []string `json:"allowed_tools,omitempty"`
 	DisallowedTools []string `json:"disallowed_tools,omitempty"`
 
