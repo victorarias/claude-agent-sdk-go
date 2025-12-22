@@ -653,6 +653,19 @@ func (r *SDKControlMcpMessageRequest) ControlRequestType() string {
 	return r.Subtype
 }
 
+// SDKControlMcpToolCallRequest calls a tool on an MCP server.
+type SDKControlMcpToolCallRequest struct {
+	Subtype    string         `json:"subtype"`
+	ServerName string         `json:"server_name"`
+	ToolName   string         `json:"tool_name"`
+	Input      map[string]any `json:"input,omitempty"`
+}
+
+// ControlRequestType returns the request subtype.
+func (r *SDKControlMcpToolCallRequest) ControlRequestType() string {
+	return r.Subtype
+}
+
 // SDKControlRewindFilesRequest rewinds files to a previous message.
 type SDKControlRewindFilesRequest struct {
 	Subtype       string `json:"subtype"`
@@ -716,6 +729,13 @@ func ParseSDKControlRequest(raw map[string]any) (SDKControlRequest, error) {
 		var req SDKControlMcpMessageRequest
 		if err := json.Unmarshal(data, &req); err != nil {
 			return nil, fmt.Errorf("failed to parse mcp message request: %w", err)
+		}
+		return &req, nil
+
+	case "mcp_tool_call":
+		var req SDKControlMcpToolCallRequest
+		if err := json.Unmarshal(data, &req); err != nil {
+			return nil, fmt.Errorf("failed to parse mcp tool call request: %w", err)
 		}
 		return &req, nil
 
