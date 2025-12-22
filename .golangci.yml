@@ -12,8 +12,6 @@ run:
   timeout: 5m
   tests: true
   build-tags: []
-
-issues:
   exclude-dirs:
     - examples  # Examples are for demonstration, not production code
 
