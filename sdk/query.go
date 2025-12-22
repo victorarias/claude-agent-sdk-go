@@ -5,6 +5,8 @@ package sdk
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -838,9 +840,12 @@ func (q *Query) sendControlRequest(request map[string]any, timeout time.Duration
 		return nil, fmt.Errorf("control requests require streaming mode")
 	}
 
-	// Generate request ID
+	// Generate request ID with random hex to prevent collisions
+	// Matches Python SDK format: req_{counter}_{random_hex}
 	id := q.requestCounter.Add(1)
-	requestID := fmt.Sprintf("req_%d", id)
+	randomBytes := make([]byte, 4)
+	rand.Read(randomBytes)
+	requestID := fmt.Sprintf("req_%d_%s", id, hex.EncodeToString(randomBytes))
 
 	// Create response channel
 	respChan := make(chan map[string]any, 1)
