@@ -266,9 +266,8 @@ func TestWithClient_DisconnectError(t *testing.T) {
 
 // TestWithClient_DisconnectErrorOnly tests when only disconnect fails
 func TestWithClient_DisconnectErrorOnly(t *testing.T) {
-	mock := &mockTransportWithClient{
-		closeShouldErr: true,
-	}
+	mock := newMockTransportWithClient()
+	mock.closeShouldErr = true
 	opts := []types.Option{
 		types.WithTransport(mock),
 	}
