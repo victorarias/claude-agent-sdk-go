@@ -312,7 +312,7 @@ func TestEndInput(t *testing.T) {
 // TestEndInput_NotConnected tests EndInput before connection
 func TestEndInput_NotConnected(t *testing.T) {
 	opts := types.DefaultOptions()
-	transport := NewSubprocessTransport(opts)
+	transport := NewStreamingTransport(opts)
 
 	// Should not panic when called before Connect
 	if err := transport.EndInput(); err != nil {
