@@ -178,6 +178,11 @@ func TestHandleControlRequest_HookCallback_TypedStruct(t *testing.T) {
 		t.Error("Hook callback was not invoked")
 	}
 
+	// Wait for response to be written
+	if !transport.WaitForWrite(time.Second) {
+		t.Fatal("timeout waiting for response to be written")
+	}
+
 	// Verify response was sent
 	written := transport.Written()
 	if len(written) == 0 {
@@ -251,6 +256,11 @@ func TestHandleControlRequest_CanUseTool_TypedStruct(t *testing.T) {
 		// Success - callback was invoked
 	case <-time.After(time.Second):
 		t.Error("Permission callback was not invoked")
+	}
+
+	// Wait for response to be written
+	if !transport.WaitForWrite(time.Second) {
+		t.Fatal("timeout waiting for permission response to be written")
 	}
 
 	// Verify response was sent
