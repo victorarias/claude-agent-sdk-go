@@ -417,6 +417,13 @@ func WithTools(tools ...string) Option {
 	}
 }
 
+// WithToolsPreset sets a tools preset configuration.
+func WithToolsPreset(preset ToolsPreset) Option {
+	return func(o *Options) {
+		o.Tools = preset
+	}
+}
+
 // WithAllowedTools specifies allowed tools.
 func WithAllowedTools(tools ...string) Option {
 	return func(o *Options) {

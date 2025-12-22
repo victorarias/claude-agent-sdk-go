@@ -70,3 +70,41 @@ func NewSessionStartOutput(additionalContext string) *HookOutput {
 		HookSpecific: hookSpecific,
 	}
 }
+
+// NewStopOutput creates a HookOutput for Stop events with hook-specific fields.
+func NewStopOutput() *HookOutput {
+	hookSpecific := map[string]any{
+		"hookEventName": "Stop",
+	}
+
+	return &HookOutput{
+		HookSpecific: hookSpecific,
+	}
+}
+
+// NewSubagentStopOutput creates a HookOutput for SubagentStop events with hook-specific fields.
+func NewSubagentStopOutput() *HookOutput {
+	hookSpecific := map[string]any{
+		"hookEventName": "SubagentStop",
+	}
+
+	return &HookOutput{
+		HookSpecific: hookSpecific,
+	}
+}
+
+// NewPreCompactOutput creates a HookOutput for PreCompact events with hook-specific fields.
+// The customInstructions parameter is optional and provides additional instructions for compacting.
+func NewPreCompactOutput(customInstructions string) *HookOutput {
+	hookSpecific := map[string]any{
+		"hookEventName": "PreCompact",
+	}
+
+	if customInstructions != "" {
+		hookSpecific["customInstructions"] = customInstructions
+	}
+
+	return &HookOutput{
+		HookSpecific: hookSpecific,
+	}
+}
