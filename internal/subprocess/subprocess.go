@@ -56,6 +56,28 @@ func ValidatePath(path string) error {
 	return nil
 }
 
+// ValidatePathOptions validates all path-related options for security issues.
+// It checks AddDirs and Plugin paths for path traversal attacks.
+func ValidatePathOptions(opts *types.Options) error {
+	// Validate AddDirs
+	for _, dir := range opts.AddDirs {
+		if err := ValidatePath(dir); err != nil {
+			return fmt.Errorf("invalid AddDirs path %q: %w", dir, err)
+		}
+	}
+
+	// Validate Plugin paths
+	for _, plugin := range opts.Plugins {
+		if plugin.Type == "local" {
+			if err := ValidatePath(plugin.Path); err != nil {
+				return fmt.Errorf("invalid plugin path %q: %w", plugin.Path, err)
+			}
+		}
+	}
+
+	return nil
+}
+
 // parseVersionOutput extracts a semver version from CLI output.
 func parseVersionOutput(output string) (string, error) {
 	output = strings.TrimSpace(output)
