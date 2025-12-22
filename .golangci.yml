@@ -37,9 +37,6 @@ linters-settings:
   unused:
     check-exported: false
 
-  gosimple:
-    checks: ["all"]
-
   gofmt:
     simplify: true
 
