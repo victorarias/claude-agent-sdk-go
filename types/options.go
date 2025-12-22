@@ -543,6 +543,31 @@ func WithTransport(t Transport) Option {
 	}
 }
 
+// NewMCPStdioServer creates a stdio MCP server configuration.
+func NewMCPStdioServer(command string, args []string) MCPServerConfig {
+	return MCPServerConfig{
+		Type:    "stdio",
+		Command: command,
+		Args:    args,
+	}
+}
+
+// NewMCPSSEServer creates an SSE MCP server configuration.
+func NewMCPSSEServer(url string) MCPServerConfig {
+	return MCPServerConfig{
+		Type: "sse",
+		URL:  url,
+	}
+}
+
+// NewMCPHTTPServer creates an HTTP MCP server configuration.
+func NewMCPHTTPServer(url string) MCPServerConfig {
+	return MCPServerConfig{
+		Type: "http",
+		URL:  url,
+	}
+}
+
 // MCPServerBuilder provides a fluent API for building MCP servers.
 type MCPServerBuilder struct {
 	name    string
