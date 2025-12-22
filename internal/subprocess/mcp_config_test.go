@@ -214,3 +214,63 @@ func TestMixedMCPServersOnlyExternalPassedToCLI(t *testing.T) {
 		t.Error("SDK servers should be filtered from mcp-config")
 	}
 }
+
+// TestStdioMCPServerWithoutTypeFieldDefaultsToStdio verifies that stdio MCP
+// server configs without an explicit type field default to "stdio" for backwards
+// compatibility with the Python SDK.
+func TestStdioMCPServerWithoutTypeFieldDefaultsToStdio(t *testing.T) {
+	opts := types.DefaultOptions()
+	// Use map[string]any to simulate a config without the Type field
+	opts.MCPServers = map[string]any{
+		"filesystem": map[string]any{
+			// No "type" field - should default to "stdio"
+			"command": "npx",
+			"args":    []string{"-y", "@modelcontextprotocol/server-filesystem", "/tmp"},
+		},
+	}
+
+	cmd := buildCommand("/path/to/claude", "", opts, true)
+
+	// Find the --mcp-config flag
+	var mcpConfigValue string
+	for i, arg := range cmd {
+		if arg == "--mcp-config" && i+1 < len(cmd) {
+			mcpConfigValue = cmd[i+1]
+			break
+		}
+	}
+
+	if mcpConfigValue == "" {
+		t.Fatal("Expected --mcp-config flag in command")
+	}
+
+	// Parse the config
+	var config map[string]any
+	if err := json.Unmarshal([]byte(mcpConfigValue), &config); err != nil {
+		t.Fatalf("Failed to parse mcp-config: %v", err)
+	}
+
+	servers, ok := config["mcpServers"].(map[string]any)
+	if !ok {
+		t.Fatal("Expected mcpServers in config")
+	}
+
+	server, ok := servers["filesystem"].(map[string]any)
+	if !ok {
+		t.Fatal("Expected filesystem in mcpServers")
+	}
+
+	// The server should have type "stdio" even though we didn't specify it
+	serverType, ok := server["type"].(string)
+	if !ok {
+		t.Error("Expected type field to be present in server config")
+	}
+	if serverType != "stdio" {
+		t.Errorf("Expected type to default to 'stdio', got %v", serverType)
+	}
+
+	// Verify command and args are preserved
+	if server["command"] != "npx" {
+		t.Errorf("Expected command 'npx', got %v", server["command"])
+	}
+}
