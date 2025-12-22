@@ -35,7 +35,7 @@ func NewMCPServerTransport(server *types.MCPServer, input io.Reader, output io.W
 	}
 }
 
-// Run processes messages until context is cancelled or input is closed.
+// Run processes messages until context is canceled or input is closed.
 func (t *MCPServerTransport) Run(ctx context.Context) error {
 	// Use a channel to signal when a line is ready
 	lineCh := make(chan []byte, 1)
