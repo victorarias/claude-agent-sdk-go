@@ -597,11 +597,11 @@ func (r *SDKControlInterruptRequest) ControlRequestType() string {
 
 // SDKControlPermissionRequest requests permission for a tool.
 type SDKControlPermissionRequest struct {
-	Subtype               string              `json:"subtype"`
-	ToolName              string              `json:"tool_name"`
-	Input                 map[string]any      `json:"input"`
-	PermissionSuggestions []PermissionUpdate  `json:"permission_suggestions,omitempty"`
-	BlockedPath           *string             `json:"blocked_path,omitempty"`
+	Subtype               string             `json:"subtype"`
+	ToolName              string             `json:"tool_name"`
+	Input                 map[string]any     `json:"input"`
+	PermissionSuggestions []PermissionUpdate `json:"permission_suggestions,omitempty"`
+	BlockedPath           *string            `json:"blocked_path,omitempty"`
 }
 
 // ControlRequestType returns the request subtype.
@@ -611,8 +611,8 @@ func (r *SDKControlPermissionRequest) ControlRequestType() string {
 
 // SDKControlInitializeRequest initializes the SDK session.
 type SDKControlInitializeRequest struct {
-	Subtype string              `json:"subtype"`
-	Hooks   map[HookEvent]any   `json:"hooks,omitempty"`
+	Subtype string            `json:"subtype"`
+	Hooks   map[HookEvent]any `json:"hooks,omitempty"`
 }
 
 // ControlRequestType returns the request subtype.

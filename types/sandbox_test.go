@@ -95,10 +95,10 @@ func TestSandboxIgnoreViolations_Fields(t *testing.T) {
 func TestSandboxSettings_JSONSerialization(t *testing.T) {
 	httpPort := 8080
 	original := SandboxSettings{
-		Enabled:                   true,
-		AutoAllowBashIfSandboxed:  true,
-		ExcludedCommands:          []string{"git", "docker"},
-		AllowUnsandboxedCommands:  false,
+		Enabled:                  true,
+		AutoAllowBashIfSandboxed: true,
+		ExcludedCommands:         []string{"git", "docker"},
+		AllowUnsandboxedCommands: false,
 		Network: &SandboxNetworkConfig{
 			AllowUnixSockets:    []string{"/var/run/docker.sock"},
 			AllowAllUnixSockets: false,
@@ -283,10 +283,10 @@ func TestSandboxSettings_FullConfig(t *testing.T) {
 	socksPort := 1080
 
 	settings := SandboxSettings{
-		Enabled:                   true,
-		AutoAllowBashIfSandboxed:  true,
-		ExcludedCommands:          []string{"git", "docker", "kubectl"},
-		AllowUnsandboxedCommands:  true,
+		Enabled:                  true,
+		AutoAllowBashIfSandboxed: true,
+		ExcludedCommands:         []string{"git", "docker", "kubectl"},
+		AllowUnsandboxedCommands: true,
 		Network: &SandboxNetworkConfig{
 			AllowUnixSockets:    []string{"/var/run/docker.sock", "/tmp/agent.sock"},
 			AllowAllUnixSockets: false,

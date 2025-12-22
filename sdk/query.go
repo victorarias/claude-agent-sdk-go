@@ -737,7 +737,7 @@ func (q *Query) handleCancelRequest(raw map[string]any) {
 	if respChan, exists := q.pendingRequests[requestID]; exists {
 		// Send cancellation signal
 		select {
-		case respChan <- map[string]any{"cancelled": true}:
+		case respChan <- map[string]any{"canceled": true}:
 		default:
 		}
 	}
@@ -791,8 +791,8 @@ func (q *Query) sendControlRequest(request map[string]any, timeout time.Duration
 		if errMsg, ok := resp["error"].(string); ok {
 			return nil, fmt.Errorf("control request error: %s", errMsg)
 		}
-		if resp["cancelled"] == true {
-			return nil, fmt.Errorf("control request cancelled")
+		if resp["canceled"] == true {
+			return nil, fmt.Errorf("control request canceled")
 		}
 		return resp, nil
 	case <-time.After(timeout):

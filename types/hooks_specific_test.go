@@ -19,8 +19,8 @@ func TestHookOutputPreToolUseSpecific(t *testing.T) {
 			name: "PreToolUse with permission decision allow",
 			output: &HookOutput{
 				HookSpecific: map[string]any{
-					"hookEventName":       "PreToolUse",
-					"permissionDecision":  "allow",
+					"hookEventName":      "PreToolUse",
+					"permissionDecision": "allow",
 				},
 			},
 			expected: `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}`,
@@ -29,9 +29,9 @@ func TestHookOutputPreToolUseSpecific(t *testing.T) {
 			name: "PreToolUse with permission decision deny and reason",
 			output: &HookOutput{
 				HookSpecific: map[string]any{
-					"hookEventName":              "PreToolUse",
-					"permissionDecision":         "deny",
-					"permissionDecisionReason":   "Unsafe operation",
+					"hookEventName":            "PreToolUse",
+					"permissionDecision":       "deny",
+					"permissionDecisionReason": "Unsafe operation",
 				},
 			},
 			expected: `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Unsafe operation"}}`,
@@ -40,8 +40,8 @@ func TestHookOutputPreToolUseSpecific(t *testing.T) {
 			name: "PreToolUse with updated input",
 			output: &HookOutput{
 				HookSpecific: map[string]any{
-					"hookEventName":       "PreToolUse",
-					"permissionDecision":  "allow",
+					"hookEventName":      "PreToolUse",
+					"permissionDecision": "allow",
 					"updatedInput": map[string]any{
 						"modified_param": "new_value",
 					},
@@ -165,8 +165,8 @@ func TestHookOutputWithBothCommonAndSpecificFields(t *testing.T) {
 		Decision:       "block",
 		SystemMessage:  "Operation blocked",
 		HookSpecific: map[string]any{
-			"hookEventName":       "PreToolUse",
-			"permissionDecision":  "deny",
+			"hookEventName":            "PreToolUse",
+			"permissionDecision":       "deny",
 			"permissionDecisionReason": "Security policy violation",
 		},
 	}
@@ -272,35 +272,35 @@ func TestHookOutputSpecificUnmarshaling(t *testing.T) {
 // TestNewPreToolUseOutput tests the helper function for creating PreToolUse hook outputs.
 func TestNewPreToolUseOutput(t *testing.T) {
 	tests := []struct {
-		name              string
-		decision          string
-		reason            string
-		updatedInput      map[string]any
-		wantDecision      string
-		wantReason        bool
-		wantUpdatedInput  bool
+		name             string
+		decision         string
+		reason           string
+		updatedInput     map[string]any
+		wantDecision     string
+		wantReason       bool
+		wantUpdatedInput bool
 	}{
 		{
-			name:         "allow without reason or updated input",
-			decision:     "allow",
-			wantDecision: "allow",
-			wantReason:   false,
+			name:             "allow without reason or updated input",
+			decision:         "allow",
+			wantDecision:     "allow",
+			wantReason:       false,
 			wantUpdatedInput: false,
 		},
 		{
-			name:         "deny with reason",
-			decision:     "deny",
-			reason:       "Security violation",
-			wantDecision: "deny",
-			wantReason:   true,
+			name:             "deny with reason",
+			decision:         "deny",
+			reason:           "Security violation",
+			wantDecision:     "deny",
+			wantReason:       true,
 			wantUpdatedInput: false,
 		},
 		{
-			name:         "allow with updated input",
-			decision:     "allow",
-			updatedInput: map[string]any{"param": "modified"},
-			wantDecision: "allow",
-			wantReason:   false,
+			name:             "allow with updated input",
+			decision:         "allow",
+			updatedInput:     map[string]any{"param": "modified"},
+			wantDecision:     "allow",
+			wantReason:       false,
 			wantUpdatedInput: true,
 		},
 	}
@@ -347,19 +347,19 @@ func TestNewPreToolUseOutput(t *testing.T) {
 // TestNewPostToolUseOutput tests the helper function for creating PostToolUse hook outputs.
 func TestNewPostToolUseOutput(t *testing.T) {
 	tests := []struct {
-		name               string
-		additionalContext  string
-		wantContext        bool
+		name              string
+		additionalContext string
+		wantContext       bool
 	}{
 		{
-			name:        "with additional context",
+			name:              "with additional context",
 			additionalContext: "Tool completed successfully",
-			wantContext: true,
+			wantContext:       true,
 		},
 		{
-			name:        "without additional context",
+			name:              "without additional context",
 			additionalContext: "",
-			wantContext: false,
+			wantContext:       false,
 		},
 	}
 
@@ -390,19 +390,19 @@ func TestNewPostToolUseOutput(t *testing.T) {
 // TestNewSessionStartOutput tests the helper function for creating SessionStart hook outputs.
 func TestNewSessionStartOutput(t *testing.T) {
 	tests := []struct {
-		name               string
-		additionalContext  string
-		wantContext        bool
+		name              string
+		additionalContext string
+		wantContext       bool
 	}{
 		{
-			name:        "with additional context",
+			name:              "with additional context",
 			additionalContext: "Session initialized with custom settings",
-			wantContext: true,
+			wantContext:       true,
 		},
 		{
-			name:        "without additional context",
+			name:              "without additional context",
 			additionalContext: "",
-			wantContext: false,
+			wantContext:       false,
 		},
 	}
 
@@ -437,19 +437,19 @@ func TestNewSessionStartOutput(t *testing.T) {
 // TestNewSessionStartOutputJSON tests that NewSessionStartOutput produces correct JSON serialization.
 func TestNewSessionStartOutputJSON(t *testing.T) {
 	tests := []struct {
-		name               string
-		additionalContext  string
-		expected           string
+		name              string
+		additionalContext string
+		expected          string
 	}{
 		{
-			name:        "with additional context",
+			name:              "with additional context",
 			additionalContext: "Session context",
-			expected: `{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"Session context"}}`,
+			expected:          `{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"Session context"}}`,
 		},
 		{
-			name:        "without additional context",
+			name:              "without additional context",
 			additionalContext: "",
-			expected: `{"hookSpecificOutput":{"hookEventName":"SessionStart"}}`,
+			expected:          `{"hookSpecificOutput":{"hookEventName":"SessionStart"}}`,
 		},
 	}
 
