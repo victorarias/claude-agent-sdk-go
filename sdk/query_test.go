@@ -605,11 +605,15 @@ func TestQuery_HandleCanUseTool(t *testing.T) {
 	query := NewQuery(transport, true)
 
 	var called atomic.Bool
-	var wg sync.WaitGroup
-	wg.Add(1)
+	done := make(chan struct{})
 	query.SetCanUseTool(func(toolName string, input map[string]any, ctx *types.ToolPermissionContext) (types.PermissionResult, error) {
 		called.Store(true)
-		wg.Done()
+		// Signal after callback completes
+		go func() {
+			// Wait a bit for the response to be written
+			time.Sleep(10 * time.Millisecond)
+			close(done)
+		}()
 		return &types.PermissionResultAllow{Behavior: "allow"}, nil
 	})
 
@@ -630,7 +634,7 @@ func TestQuery_HandleCanUseTool(t *testing.T) {
 		},
 	})
 
-	wg.Wait()
+	<-done
 
 	if !called.Load() {
 		t.Error("canUseTool callback was not called")
