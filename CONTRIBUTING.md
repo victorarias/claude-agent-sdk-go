@@ -245,24 +245,12 @@ Please report security vulnerabilities privately to the maintainers rather than 
 
 ### Task Tracking
 
-The project uses `bd` (beads) for internal task tracking and development planning. External contributors should use GitHub Issues for feature requests and bug reports. The maintainers will create corresponding beads for tracking internal work.
-
-### Implementation Plans
-
-Detailed implementation plans are available in `docs/plans/`. These provide context for architectural decisions and ongoing work:
-
-- `01-types-interfaces.md` - Core types and interfaces
-- `02-transport-layer.md` - Subprocess and CLI communication
-- `03-query-protocol.md` - Message parsing and control protocol
-- `04-client-api.md` - Client API design
-- `05-integration.md` - Examples and integration tests
-- `06-mcp-servers.md` - MCP server support
+External contributors should use GitHub Issues for feature requests and bug reports.
 
 ## Getting Help
 
 - **Documentation**: Check the [README](README.md) and [examples](examples/)
 - **Issues**: Search existing issues or create a new one
-- **Code**: Review the implementation plans in `docs/plans/`
 
 ## License
 
