@@ -1,29 +1,33 @@
 .PHONY: all test lint fmt build clean install-tools help
 
+# Tool versions
+GOTESTSUM_VERSION := latest
+GOLANGCI_LINT_VERSION := v2.7.2
+
 # Default target
 all: fmt lint test build
 
 # Install development tools
 install-tools:
-	go install gotest.tools/gotestsum@latest
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.7.2
+	go install gotest.tools/gotestsum@$(GOTESTSUM_VERSION)
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
 # Run tests with gotestsum for clear output
 test:
-	gotestsum --format testname -- ./... -race
+	go run gotest.tools/gotestsum@$(GOTESTSUM_VERSION) --format testname -- ./... -race
 
 # Run tests with short format (CI-friendly)
 test-ci:
-	gotestsum --format pkgname --junitfile test-results.xml -- ./... -race
+	go run gotest.tools/gotestsum@$(GOTESTSUM_VERSION) --format pkgname --junitfile test-results.xml -- ./... -race
 
 # Run tests with coverage
 test-coverage:
-	gotestsum --format testname -- ./... -race -coverprofile=coverage.out
+	go run gotest.tools/gotestsum@$(GOTESTSUM_VERSION) --format testname -- ./... -race -coverprofile=coverage.out
 	go tool cover -html=coverage.out -o coverage.html
 
 # Run linter
 lint:
-	golangci-lint run ./internal/... ./sdk/... ./types/...
+	go run github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./internal/... ./sdk/... ./types/...
 
 # Format code
 fmt:
