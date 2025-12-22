@@ -272,7 +272,3 @@ func TestHookBuilderUserPromptSubmit(t *testing.T) {
 		t.Errorf("expected prompt='Hello, Claude!', got %s", capturedPrompt)
 	}
 }
-
-func boolPtr(b bool) *bool {
-	return &b
-}
