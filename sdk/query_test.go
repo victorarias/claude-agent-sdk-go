@@ -1033,7 +1033,10 @@ func TestQuery_MCPToolCall_ToolNotFound(t *testing.T) {
 		},
 	})
 
-	time.Sleep(100 * time.Millisecond)
+	// Wait for error response to be written
+	if !transport.WaitForWrite(time.Second) {
+		t.Fatal("timeout waiting for tool not found error response")
+	}
 
 	written := transport.Written()
 	if len(written) == 0 {

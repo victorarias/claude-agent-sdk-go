@@ -619,7 +619,25 @@ func (q *Query) UnregisterMCPServer(name string) {
 	delete(q.mcpServers, name)
 }
 
-// handleMCPToolCall handles MCP tool call requests.
+// handleMCPToolCallTyped handles MCP tool call requests using typed request.
+func (q *Query) handleMCPToolCallTyped(req *types.SDKControlMcpToolCallRequest) (map[string]any, error) {
+	q.mcpServersMu.RLock()
+	server, exists := q.mcpServers[req.ServerName]
+	q.mcpServersMu.RUnlock()
+
+	if !exists {
+		return nil, fmt.Errorf("MCP server not found: %s", req.ServerName)
+	}
+
+	result, err := server.CallTool(req.ToolName, req.Input)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]any{"result": result}, nil
+}
+
+// handleMCPToolCall handles MCP tool call requests (legacy, kept for backward compatibility).
 func (q *Query) handleMCPToolCall(request map[string]any) (map[string]any, error) {
 	serverName, _ := request["server_name"].(string)
 	toolName, _ := request["tool_name"].(string)
