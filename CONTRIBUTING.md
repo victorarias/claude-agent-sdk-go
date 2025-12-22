@@ -44,7 +44,7 @@ Thank you for your interest in contributing to the Claude Agent SDK Go! This doc
 
 2. **Make your changes** following the code style guidelines below
 
-3. **Run tests** to ensure everything works:
+3. **Run tests and linter** to ensure everything works:
    ```bash
    # Run all tests
    go test ./...
@@ -52,14 +52,19 @@ Thank you for your interest in contributing to the Claude Agent SDK Go! This doc
    # Run tests with race detection
    go test -race ./...
 
-   # Run tests with coverage
-   go test -cover ./...
+   # Run linter
+   make lint
+
+   # Run all checks (format, lint, test, build)
+   make all
    ```
 
 4. **Commit your changes** with clear, descriptive messages:
    ```bash
    git commit -m "Add feature: brief description"
    ```
+
+**Important**: Always run the linter before committing to ensure your code passes CI checks.
 
 ## Code Style
 

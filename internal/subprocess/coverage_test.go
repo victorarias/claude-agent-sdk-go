@@ -323,9 +323,11 @@ func TestEndInput_NotConnected(t *testing.T) {
 // TestOptimizeCommandLength_ShortCommand tests that short commands aren't optimized
 func TestOptimizeCommandLength_ShortCommand(t *testing.T) {
 	opts := types.DefaultOptions()
-	opts.Agents = []string{"agent1"}
+	opts.Agents = map[string]types.AgentDefinition{
+		"agent1": {Name: "agent1"},
+	}
 
-	cmd := []string{"claude", "run", "--agents", `["agent1"]`}
+	cmd := []string{"claude", "run", "--agents", `{"agent1":{"name":"agent1"}}`}
 	optimized := optimizeCommandLength(cmd, opts)
 
 	// Command should remain unchanged

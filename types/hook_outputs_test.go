@@ -110,6 +110,98 @@ func TestNewSubagentStopOutputJSON(t *testing.T) {
 	}
 }
 
+// TestNewUserPromptSubmitOutput tests the helper function for creating UserPromptSubmit hook outputs.
+func TestNewUserPromptSubmitOutput(t *testing.T) {
+	tests := []struct {
+		name              string
+		additionalContext string
+		wantContext       bool
+	}{
+		{
+			name:              "with additional context",
+			additionalContext: "User asked about weather",
+			wantContext:       true,
+		},
+		{
+			name:              "without additional context",
+			additionalContext: "",
+			wantContext:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output := NewUserPromptSubmitOutput(tt.additionalContext)
+
+			if output.HookSpecific == nil {
+				t.Fatal("HookSpecific is nil")
+			}
+
+			if output.HookSpecific["hookEventName"] != "UserPromptSubmit" {
+				t.Errorf("hookEventName: got %v, want 'UserPromptSubmit'", output.HookSpecific["hookEventName"])
+			}
+
+			if tt.wantContext {
+				if _, ok := output.HookSpecific["additionalContext"]; !ok {
+					t.Error("expected additionalContext to be present")
+				}
+				if output.HookSpecific["additionalContext"] != tt.additionalContext {
+					t.Errorf("additionalContext: got %v, want %v", output.HookSpecific["additionalContext"], tt.additionalContext)
+				}
+			} else {
+				if _, ok := output.HookSpecific["additionalContext"]; ok {
+					t.Error("expected additionalContext to be absent")
+				}
+			}
+		})
+	}
+}
+
+// TestNewUserPromptSubmitOutputJSON tests that NewUserPromptSubmitOutput produces correct JSON serialization.
+func TestNewUserPromptSubmitOutputJSON(t *testing.T) {
+	tests := []struct {
+		name              string
+		additionalContext string
+		expected          string
+	}{
+		{
+			name:              "with additional context",
+			additionalContext: "User context",
+			expected:          `{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"User context"}}`,
+		},
+		{
+			name:              "without additional context",
+			additionalContext: "",
+			expected:          `{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit"}}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output := NewUserPromptSubmitOutput(tt.additionalContext)
+
+			data, err := json.Marshal(output)
+			if err != nil {
+				t.Fatalf("failed to marshal HookOutput: %v", err)
+			}
+
+			// Parse both to compare as maps to avoid field ordering issues
+			var got, want map[string]any
+			if err := json.Unmarshal(data, &got); err != nil {
+				t.Fatalf("failed to unmarshal result: %v", err)
+			}
+			if err := json.Unmarshal([]byte(tt.expected), &want); err != nil {
+				t.Fatalf("failed to unmarshal expected: %v", err)
+			}
+
+			// Compare nested structures
+			if !deepMapsEqual(got, want) {
+				t.Errorf("JSON mismatch:\ngot:  %s\nwant: %s", string(data), tt.expected)
+			}
+		})
+	}
+}
+
 // TestNewPreCompactOutput tests the helper function for creating PreCompact hook outputs.
 func TestNewPreCompactOutput(t *testing.T) {
 	tests := []struct {
