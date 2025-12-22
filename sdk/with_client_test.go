@@ -214,9 +214,8 @@ func TestWithClient_PanicReraise(t *testing.T) {
 // TestWithClient_ConnectError tests that function is not called if connect fails
 func TestWithClient_ConnectError(t *testing.T) {
 	connectErr := errors.New("connect failed")
-	mock := &mockTransportWithClient{
-		connectErr: connectErr,
-	}
+	mock := newMockTransportWithClient()
+	mock.connectErr = connectErr
 	opts := []types.Option{
 		types.WithTransport(mock),
 	}
@@ -241,9 +240,8 @@ func TestWithClient_ConnectError(t *testing.T) {
 
 // TestWithClient_DisconnectError tests error aggregation when both function and disconnect fail
 func TestWithClient_DisconnectError(t *testing.T) {
-	mock := &mockTransportWithClient{
-		closeShouldErr: true,
-	}
+	mock := newMockTransportWithClient()
+	mock.closeShouldErr = true
 	opts := []types.Option{
 		types.WithTransport(mock),
 	}
