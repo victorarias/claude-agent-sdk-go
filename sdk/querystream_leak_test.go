@@ -45,9 +45,8 @@ func TestQueryStream_NoGoroutineLeak(t *testing.T) {
 		// Never send result - keep transport "alive"
 	}()
 
-	// Use a context with timeout to eventually clean up
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
+	// Use a cancellable context
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// Call QueryStream but ABANDON the channels without consuming
 	// This simulates a caller that starts the stream but doesn't read from it
@@ -59,6 +58,12 @@ func TestQueryStream_NoGoroutineLeak(t *testing.T) {
 
 	// Give the goroutine time to fill the buffer and block
 	time.Sleep(300 * time.Millisecond)
+
+	// Now cancel the context to signal abandonment
+	cancel()
+
+	// Give time for the goroutine to exit after cancellation
+	time.Sleep(100 * time.Millisecond)
 
 	// Force GC again
 	runtime.GC()
