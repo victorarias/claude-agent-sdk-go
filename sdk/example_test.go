@@ -5,6 +5,7 @@ package sdk_test
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/victorarias/claude-agent-sdk-go/sdk"
 	"github.com/victorarias/claude-agent-sdk-go/types"
@@ -64,9 +65,9 @@ func ExampleNewClient_withPermissionMode() {
 		types.WithPermissionMode(types.PermissionDefault),
 	)
 
-	// AcceptEdits mode - auto-approves file edits
-	clientAcceptEdits := sdk.NewClient(
-		types.WithPermissionMode(types.PermissionAcceptEdits),
+	// Accept mode - auto-approves file edits
+	clientAccept := sdk.NewClient(
+		types.WithPermissionMode(types.PermissionAccept),
 	)
 
 	// Bypass mode - auto-approves everything (use with caution)
@@ -75,27 +76,28 @@ func ExampleNewClient_withPermissionMode() {
 	)
 
 	fmt.Println("Default mode:", clientDefault.Options().PermissionMode)
-	fmt.Println("AcceptEdits mode:", clientAcceptEdits.Options().PermissionMode)
+	fmt.Println("Accept mode:", clientAccept.Options().PermissionMode)
 	fmt.Println("Bypass mode:", clientBypass.Options().PermissionMode)
 
 	// Output:
 	// Default mode: default
-	// AcceptEdits mode: acceptEdits
+	// Accept mode: acceptEdits
 	// Bypass mode: bypassPermissions
 }
 
-// ExampleWithToolUseHook demonstrates registering a tool use hook.
-func ExampleWithToolUseHook() {
+// ExampleWithPreToolUseHook demonstrates registering a pre-tool-use hook.
+func ExampleWithPreToolUseHook() {
 	toolCalls := 0
 
 	client := sdk.NewClient(
-		sdk.WithToolUseHook(func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
-			toolCalls++
-			// Allow all tool calls
-			return &types.HookOutput{
-				Decision: types.PermissionAllow{},
-			}, nil
-		}),
+		sdk.WithPreToolUseHook(
+			map[string]any{"tool_name": "Bash"}, // matcher for Bash tool only
+			func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
+				toolCalls++
+				cont := true
+				return &types.HookOutput{Continue: &cont}, nil
+			},
+		),
 	)
 
 	// Verify hook is registered
@@ -105,21 +107,23 @@ func ExampleWithToolUseHook() {
 	// Client created with hook: true
 }
 
-// ExampleWithStderrCallback demonstrates capturing stderr output.
-func ExampleWithStderrCallback() {
-	var stderrOutput string
-
+// ExampleWithPostToolUseHook demonstrates registering a post-tool-use hook.
+func ExampleWithPostToolUseHook() {
 	client := sdk.NewClient(
-		sdk.WithStderrCallback(func(line string) {
-			stderrOutput += line + "\n"
-		}),
+		sdk.WithPostToolUseHook(
+			map[string]any{"tool_name": "Read"}, // matcher for Read tool only
+			func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
+				// Process after tool execution
+				return &types.HookOutput{SuppressOutput: false}, nil
+			},
+		),
 	)
 
 	// Verify client is created
-	fmt.Println("Client created with stderr callback:", client != nil)
+	fmt.Println("Client created with post-tool hook:", client != nil)
 
 	// Output:
-	// Client created with stderr callback: true
+	// Client created with post-tool hook: true
 }
 
 // ExampleOptions demonstrates creating options with multiple settings.
@@ -183,7 +187,7 @@ func Example_errors() {
 	fmt.Println("Process error:", processErr.Error())
 
 	// Output:
-	// Timeout error: operation 'connect' timed out after 30s
+	// Timeout error: timeout after 30s: connect
 	// Closed error: resource closed: session
 	// Process error: process exited with code 1: command failed
 }
@@ -199,9 +203,12 @@ func Example_mcpServers() {
 		},
 	})(opts)
 
-	fmt.Println("MCP servers configured:", len(opts.MCPServers))
-	if server, ok := opts.MCPServers["filesystem"]; ok {
-		fmt.Println("Filesystem server command:", server.Command)
+	// MCPServers is type any, so we need type assertion to access it
+	if servers, ok := opts.MCPServers.(map[string]types.MCPServerConfig); ok {
+		fmt.Println("MCP servers configured:", len(servers))
+		if server, ok := servers["filesystem"]; ok {
+			fmt.Println("Filesystem server command:", server.Command)
+		}
 	}
 
 	// Output:
