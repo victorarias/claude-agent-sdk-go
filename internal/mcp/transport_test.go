@@ -62,7 +62,7 @@ func TestMCPServerTransport_ProcessOne(t *testing.T) {
 func TestMCPServerTransport_ToolsCall(t *testing.T) {
 	server := types.NewMCPServerBuilder("test").
 		WithTool("greet", "Greet someone", nil, func(input map[string]any) (*types.MCPToolResult, error) {
-			name := input["name"].(string)
+			name, _ := input["name"].(string) //nolint:errcheck // Test code
 			return &types.MCPToolResult{
 				Content: []types.MCPContent{{Type: "text", Text: "Hello, " + name + "!"}},
 			}, nil
