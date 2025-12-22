@@ -30,13 +30,11 @@ func TestConnectChecksCLIVersion(t *testing.T) {
 
 	// If we get here without error, the version check passed
 	// If error is a version error, that's the expected behavior for old CLI
-	if err != nil {
-		if _, ok := err.(*types.CLIVersionError); ok {
-			// Expected - CLI is too old
-			return
-		}
-		// Other errors might be connection errors, which is fine
+	if _, ok := err.(*types.CLIVersionError); ok {
+		// Expected - CLI is too old
+		return
 	}
+	// Other errors (including nil) are fine - connection errors or success
 
 	// Clean up
 	transport.Close()
