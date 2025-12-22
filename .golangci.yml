@@ -13,7 +13,7 @@ run:
   tests: true
   build-tags: []
   exclude-dirs:
-    - examples  # Examples are for demonstration, not production code
+    - ^examples$  # Examples are for demonstration, not production code
 
 linters:
   default: none
