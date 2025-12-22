@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -602,9 +604,12 @@ func TestQuery_HandleCanUseTool(t *testing.T) {
 	transport := NewMockTransport()
 	query := NewQuery(transport, true)
 
-	called := false
+	var called atomic.Bool
+	var wg sync.WaitGroup
+	wg.Add(1)
 	query.SetCanUseTool(func(toolName string, input map[string]any, ctx *types.ToolPermissionContext) (types.PermissionResult, error) {
-		called = true
+		called.Store(true)
+		wg.Done()
 		return &types.PermissionResultAllow{Behavior: "allow"}, nil
 	})
 
@@ -625,9 +630,9 @@ func TestQuery_HandleCanUseTool(t *testing.T) {
 		},
 	})
 
-	time.Sleep(100 * time.Millisecond)
+	wg.Wait()
 
-	if !called {
+	if !called.Load() {
 		t.Error("canUseTool callback was not called")
 	}
 
