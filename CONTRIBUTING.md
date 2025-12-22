@@ -59,10 +59,26 @@ Thank you for your interest in contributing to the Claude Agent SDK Go! This doc
    make all
    ```
 
-4. **Commit your changes** with clear, descriptive messages:
+4. **Commit your changes** using [Conventional Commits](https://www.conventionalcommits.org/) format:
    ```bash
-   git commit -m "Add feature: brief description"
+   # Format: <type>(<scope>): <description>
+
+   # Features (bumps minor version)
+   git commit -m "feat: add streaming support"
+   git commit -m "feat(hooks): add pre-compact hook type"
+
+   # Bug fixes (bumps patch version)
+   git commit -m "fix: handle nil pointer in parser"
+
+   # Other types: docs, test, refactor, perf, chore, ci, build
+   git commit -m "docs: update README examples"
+   git commit -m "test(sdk): add coverage for edge cases"
+
+   # Breaking changes (bumps major version)
+   git commit -m "feat!: change Client.Query signature"
    ```
+
+   See [docs/RELEASING.md](docs/RELEASING.md) for full details on commit types and versioning.
 
 **Important**: Always run the linter before committing to ensure your code passes CI checks.
 
