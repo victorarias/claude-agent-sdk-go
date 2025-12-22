@@ -912,16 +912,6 @@ func (a *jsonAccumulator) addLine(line string) (map[string]any, error) {
 	return result, nil
 }
 
-// reset clears the accumulator.
-func (a *jsonAccumulator) reset() {
-	a.buffer.Reset()
-}
-
-// len returns the current buffer length.
-func (a *jsonAccumulator) len() int {
-	return a.buffer.Len()
-}
-
 const maxBufferSize = 1024 * 1024 // 1MB
 
 // readMessages reads JSON messages from stdout with speculative parsing.
