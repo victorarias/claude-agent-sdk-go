@@ -405,8 +405,12 @@ func TestStreamEvent(t *testing.T) {
 
 // TestPermissionResult tests permission result types.
 func TestPermissionResult(t *testing.T) {
-	t.Run("PermissionResultAllow serialization", func(t *testing.T) {
-		result := PermissionResultAllow{}
+	t.Run("PermissionResultAllow implements interface", func(t *testing.T) {
+		var _ PermissionResult = &PermissionResultAllow{}
+		// Test basic serialization
+		result := PermissionResultAllow{
+			Behavior: "allow",
+		}
 		data, err := json.Marshal(result)
 		if err != nil {
 			t.Fatalf("Failed to marshal PermissionResultAllow: %v", err)
@@ -417,13 +421,18 @@ func TestPermissionResult(t *testing.T) {
 			t.Fatalf("Failed to unmarshal: %v", err)
 		}
 
-		if decoded["decision"] != "allow" {
-			t.Errorf("Expected decision 'allow', got %v", decoded["decision"])
+		if decoded["behavior"] != "allow" {
+			t.Errorf("Expected behavior 'allow', got %v", decoded["behavior"])
 		}
 	})
 
-	t.Run("PermissionResultDeny serialization", func(t *testing.T) {
-		result := PermissionResultDeny{}
+	t.Run("PermissionResultDeny implements interface", func(t *testing.T) {
+		var _ PermissionResult = &PermissionResultDeny{}
+		// Test basic serialization
+		result := PermissionResultDeny{
+			Behavior: "deny",
+			Message:  "unauthorized",
+		}
 		data, err := json.Marshal(result)
 		if err != nil {
 			t.Fatalf("Failed to marshal PermissionResultDeny: %v", err)
@@ -434,8 +443,11 @@ func TestPermissionResult(t *testing.T) {
 			t.Fatalf("Failed to unmarshal: %v", err)
 		}
 
-		if decoded["decision"] != "deny" {
-			t.Errorf("Expected decision 'deny', got %v", decoded["decision"])
+		if decoded["behavior"] != "deny" {
+			t.Errorf("Expected behavior 'deny', got %v", decoded["behavior"])
+		}
+		if decoded["message"] != "unauthorized" {
+			t.Errorf("Expected message 'unauthorized', got %v", decoded["message"])
 		}
 	})
 }
