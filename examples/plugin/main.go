@@ -45,38 +45,26 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	// Configure options with plugin
-	options := &types.Options{
-		// Load a local plugin by path
-		Plugins: []types.Plugin{
-			{
-				Type: "local",
-				Path: pluginPath,
-			},
-		},
-		// Limit to one turn for quick demo
-		MaxTurns: intPtr(1),
-	}
+	// Configure plugin using functional options
+	pluginOpt := types.WithPlugins(types.PluginConfig{
+		Type: "local",
+		Path: pluginPath,
+	})
+
+	// Limit to one turn for quick demo
+	maxTurnsOpt := types.WithMaxTurns(1)
 
 	fmt.Println("Checking for loaded plugins in system initialization...")
 
-	// Create a client to check if the plugin loaded successfully
-	client, err := sdk.NewClient(ctx, options)
+	// Send a simple query and check the system message for plugin info
+	messages, err := sdk.RunQuery(ctx, "Hello!", pluginOpt, maxTurnsOpt)
 	if err != nil {
 		handleError(err)
 		os.Exit(1)
 	}
-	defer client.Close()
 
 	// Track if we found plugin information
 	foundPluginInfo := false
-
-	// Send a simple query and check the system message for plugin info
-	messages, err := client.RunQuery(ctx, "Hello!")
-	if err != nil {
-		handleError(err)
-		os.Exit(1)
-	}
 
 	// Look for plugin information in messages
 	for _, msg := range messages {
@@ -175,9 +163,4 @@ func handleError(err error) {
 	default:
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 	}
-}
-
-// intPtr is a helper to create an int pointer
-func intPtr(i int) *int {
-	return &i
 }
