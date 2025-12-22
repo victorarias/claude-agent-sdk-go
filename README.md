@@ -202,8 +202,30 @@ if err != nil {
 ### Running Tests
 
 ```bash
+# Run all tests
 go test ./...
+
+# Run with race detector
+go test -race ./...
+
+# Run with coverage
+go test -cover ./...
 ```
+
+### Code Quality
+
+```bash
+# Format code
+make fmt
+
+# Run linter
+make lint
+
+# Full check (format, lint, test, build)
+make all
+```
+
+See [docs/LINTING.md](docs/LINTING.md) for detailed linting configuration.
 
 ### Project Structure
 
