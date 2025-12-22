@@ -27,7 +27,7 @@ Instead, please use one of the following methods:
    - Provide detailed information about the vulnerability
 
 2. **Email**
-   - Send details to: [security contact needed]
+   - Send details to: victorcodes@proton.me
    - Include "SECURITY" in the subject line
    - Encrypt sensitive details using our PGP key (if available)
 
@@ -60,7 +60,7 @@ When reporting a vulnerability, please include:
 For security-related questions or concerns:
 
 - **GitHub:** [@victorarias](https://github.com/victorarias)
-- **Email:** [security contact needed]
+- **Email:** victorcodes@proton.me
 
 ## Security Best Practices
 
