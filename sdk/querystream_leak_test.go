@@ -107,9 +107,19 @@ func TestQueryStream_WithContextCancellation(t *testing.T) {
 
 	// Create a transport that will keep sending messages
 	transport := NewMockTransport()
+
+	// Create a cancellable context
+	ctx, cancel := context.WithCancel(context.Background())
+
 	go func() {
-		// Send messages continuously
+		// Send messages continuously until context is cancelled
 		for i := 0; i < 100; i++ {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
 			transport.SendMessage(map[string]any{
 				"type": "assistant",
 				"message": map[string]any{
@@ -121,9 +131,6 @@ func TestQueryStream_WithContextCancellation(t *testing.T) {
 			time.Sleep(5 * time.Millisecond)
 		}
 	}()
-
-	// Create a cancellable context
-	ctx, cancel := context.WithCancel(context.Background())
 
 	// Call QueryStream
 	msgChan, errChan := QueryStream(ctx, "Hello", types.WithTransport(transport))
