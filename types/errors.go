@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // Sentinel errors for error checking with errors.Is
@@ -130,4 +131,31 @@ func (e *CLIVersionError) Error() string {
 
 func (e *CLIVersionError) Is(target error) bool {
 	return target == ErrCLIVersion
+}
+
+// TimeoutError is returned when an operation times out.
+type TimeoutError struct {
+	Operation string        // What operation timed out
+	Duration  time.Duration // How long we waited
+}
+
+func (e *TimeoutError) Error() string {
+	return fmt.Sprintf("timeout after %v: %s", e.Duration, e.Operation)
+}
+
+func (e *TimeoutError) Is(target error) bool {
+	return target == ErrTimeout
+}
+
+// ClosedError is returned when an operation is attempted on a closed resource.
+type ClosedError struct {
+	Resource string // What resource was closed
+}
+
+func (e *ClosedError) Error() string {
+	return fmt.Sprintf("resource closed: %s", e.Resource)
+}
+
+func (e *ClosedError) Is(target error) bool {
+	return target == ErrClosed
 }

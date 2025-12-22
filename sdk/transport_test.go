@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/victorarias/claude-agent-sdk-go/types"
 )
@@ -21,6 +22,7 @@ type MockTransport struct {
 	writeErr     error
 	closeErr     error
 	endInputErr  error
+	writeChan    chan struct{} // Notifies when a write occurs
 }
 
 // NewMockTransport creates a new MockTransport.
@@ -28,6 +30,7 @@ func NewMockTransport() *MockTransport {
 	return &MockTransport{
 		messageChan: make(chan map[string]any, 100),
 		errorChan:   make(chan error, 1),
+		writeChan:   make(chan struct{}, 100), // Buffered to avoid blocking writes
 	}
 }
 
@@ -73,6 +76,11 @@ func (m *MockTransport) Write(data string) error {
 		return m.writeErr
 	}
 	m.written = append(m.written, data)
+	// Notify that a write occurred (non-blocking)
+	select {
+	case m.writeChan <- struct{}{}:
+	default:
+	}
 	return nil
 }
 
@@ -122,6 +130,33 @@ func (m *MockTransport) SetWriteError(err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.writeErr = err
+}
+
+// WaitForWrite waits for a write to occur, with a timeout.
+// Returns true if a write occurred, false if timeout.
+func (m *MockTransport) WaitForWrite(timeout time.Duration) bool {
+	select {
+	case <-m.writeChan:
+		return true
+	case <-time.After(timeout):
+		return false
+	}
+}
+
+// WaitForWrites waits for n writes to occur, with a timeout.
+// Returns true if n writes occurred, false if timeout.
+func (m *MockTransport) WaitForWrites(n int, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for i := 0; i < n; i++ {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return false
+		}
+		if !m.WaitForWrite(remaining) {
+			return false
+		}
+	}
+	return true
 }
 
 func TestTransportInterface(t *testing.T) {

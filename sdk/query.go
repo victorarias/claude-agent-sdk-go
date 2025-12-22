@@ -16,6 +16,16 @@ import (
 // before closing stdin when hooks or MCP servers are active.
 const DefaultStreamCloseTimeout = 60 * time.Second
 
+// MessageChannelBuffer is the buffer size for the parsed messages channel.
+// A buffer of 100 provides sufficient capacity to handle message bursts without
+// blocking the message router, while preventing unbounded memory growth.
+const MessageChannelBuffer = 100
+
+// RawMessageChannelBuffer is the buffer size for the raw messages channel.
+// A buffer of 100 matches the parsed messages channel capacity, ensuring
+// consistent buffering behavior for both message processing paths.
+const RawMessageChannelBuffer = 100
+
 // Query handles the bidirectional control protocol.
 type Query struct {
 	transport types.Transport
@@ -72,8 +82,8 @@ func NewQuery(transport types.Transport, streaming bool) *Query {
 		pendingRequests:    make(map[string]chan map[string]any),
 		hookCallbacks:      make(map[string]types.HookCallback),
 		mcpServers:         make(map[string]*types.MCPServer),
-		messages:           make(chan types.Message, 100),
-		rawMessages:        make(chan map[string]any, 100),
+		messages:           make(chan types.Message, MessageChannelBuffer),
+		rawMessages:        make(chan map[string]any, RawMessageChannelBuffer),
 		errors:             make(chan error, 1),
 		firstResultChan:    make(chan struct{}),
 		streamCloseTimeout: DefaultStreamCloseTimeout,

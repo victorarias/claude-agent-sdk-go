@@ -131,7 +131,12 @@ func TestQuery_SendControlRequest(t *testing.T) {
 
 	// Simulate response in background
 	go func() {
-		time.Sleep(10 * time.Millisecond)
+		// Wait for the control request to be written
+		if !transport.WaitForWrite(time.Second) {
+			t.Error("timeout waiting for control request write")
+			return
+		}
+
 		written := transport.Written()
 		if len(written) > 0 {
 			var req map[string]any
@@ -193,7 +198,12 @@ func TestQuery_SendControlRequest_Error(t *testing.T) {
 	defer query.Close()
 
 	go func() {
-		time.Sleep(10 * time.Millisecond)
+		// Wait for the control request to be written
+		if !transport.WaitForWrite(time.Second) {
+			t.Error("timeout waiting for control request write")
+			return
+		}
+
 		written := transport.Written()
 		if len(written) > 0 {
 			var req map[string]any
@@ -1017,3 +1027,4 @@ func TestQuery_SendControlResponse_MarshalError(t *testing.T) {
 		t.Errorf("expected no data written when marshal fails, got %d items", len(written))
 	}
 }
+
