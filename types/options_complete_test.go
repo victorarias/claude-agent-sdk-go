@@ -17,90 +17,86 @@ func TestOptionsCompleteness(t *testing.T) {
 
 	// Python ClaudeAgentOptions fields that should exist in Go Options.
 	// Based on reference/src/claude_agent_sdk/types.py lines 617-681
+	// Format: GoFieldName -> PythonFieldName
 	requiredFields := map[string]string{
-		// Core functionality
-		"Model":                     "model",
-		"MaxTurns":                  "max_turns",
-		"MaxThinkingTokens":         "max_thinking_tokens",
-		"SystemPrompt":              "system_prompt",
-		"AppendSystemPrompt":        "append_system_prompt",
-
-		// Tools configuration
-		"Tools":                     "tools",
-		"AllowedTools":              "allowed_tools",
-		"DisallowedTools":           "disallowed_tools",
-
-		// MCP servers
-		"MCPServers":                "mcp_servers",
-
-		// Permission settings
-		"PermissionMode":            "permission_mode",
-		"PermissionPromptToolName":  "permission_prompt_tool_name",
-		"CanUseTool":                "can_use_tool",
-
-		// Hooks
-		"Hooks":                     "hooks",
-
-		// Environment and paths
-		"Env":                       "env",
-		"Cwd":                       "cwd",
-		"CLIPath":                   "cli_path",
-		"AddDirs":                   "add_dirs",
-
-		// Session management
-		"Resume":                    "resume",
-		"ForkSession":               "fork_session",
-		"ContinueConversation":      "continue_conversation",
-
-		// File checkpointing
-		"EnableFileCheckpointing":   "enable_file_checkpointing",
-
-		// Sandbox
-		"Sandbox":                   "sandbox",
-
-		// Custom agents
-		"Agents":                    "agents",
-
-		// Plugins
-		"Plugins":                   "plugins",
-
-		// Beta features
-		"Betas":                     "betas",
-
-		// Settings
-		"SettingSources":            "setting_sources",
-		"Settings":                  "settings",
-
-		// User identifier
-		"User":                      "user",
-
-		// Additional limits
-		"MaxBudgetUSD":              "max_budget_usd",
-
-		// Output format
-		"OutputFormat":              "output_format",
-
-		// Extra args
-		"ExtraArgs":                 "extra_args",
-
-		// Buffer size
-		"MaxBufferSize":             "max_buffer_size",
-
-		// Streaming
-		"IncludePartialMessages":    "include_partial_messages",
-
-		// Fallback model
-		"FallbackModel":             "fallback_model",
-
-		// Stderr callback (Python has both debug_stderr and stderr)
-		"StderrCallback":            "stderr",
+		// Line 620: tools: list[str] | ToolsPreset | None = None
+		"Tools": "tools",
+		// Line 621: allowed_tools: list[str] = field(default_factory=list)
+		"AllowedTools": "allowed_tools",
+		// Line 622: system_prompt: str | SystemPromptPreset | None = None
+		"SystemPrompt": "system_prompt",
+		// Line 623: mcp_servers: dict[str, McpServerConfig] | str | Path = field(default_factory=dict)
+		"MCPServers": "mcp_servers",
+		// Line 624: permission_mode: PermissionMode | None = None
+		"PermissionMode": "permission_mode",
+		// Line 625: continue_conversation: bool = False
+		"ContinueConversation": "continue_conversation",
+		// Line 626: resume: str | None = None
+		"Resume": "resume",
+		// Line 627: max_turns: int | None = None
+		"MaxTurns": "max_turns",
+		// Line 628: max_budget_usd: float | None = None
+		"MaxBudgetUSD": "max_budget_usd",
+		// Line 629: disallowed_tools: list[str] = field(default_factory=list)
+		"DisallowedTools": "disallowed_tools",
+		// Line 630: model: str | None = None
+		"Model": "model",
+		// Line 631: fallback_model: str | None = None
+		"FallbackModel": "fallback_model",
+		// Line 633: betas: list[SdkBeta] = field(default_factory=list)
+		"Betas": "betas",
+		// Line 634: permission_prompt_tool_name: str | None = None
+		"PermissionPromptToolName": "permission_prompt_tool_name",
+		// Line 635: cwd: str | Path | None = None
+		"Cwd": "cwd",
+		// Line 636: cli_path: str | Path | None = None
+		"CLIPath": "cli_path",
+		// Line 637: settings: str | None = None
+		"Settings": "settings",
+		// Line 638: add_dirs: list[str | Path] = field(default_factory=list)
+		"AddDirs": "add_dirs",
+		// Line 639: env: dict[str, str] = field(default_factory=dict)
+		"Env": "env",
+		// Line 640-642: extra_args: dict[str, str | None] = field(default_factory=dict)
+		"ExtraArgs": "extra_args",
+		// Line 643: max_buffer_size: int | None = None
+		"MaxBufferSize": "max_buffer_size",
+		// Line 647: stderr: Callable[[str], None] | None = None
+		"StderrCallback": "stderr",
+		// Line 650: can_use_tool: CanUseTool | None = None
+		"CanUseTool": "can_use_tool",
+		// Line 653: hooks: dict[HookEvent, list[HookMatcher]] | None = None
+		"Hooks": "hooks",
+		// Line 655: user: str | None = None
+		"User": "user",
+		// Line 658: include_partial_messages: bool = False
+		"IncludePartialMessages": "include_partial_messages",
+		// Line 661: fork_session: bool = False
+		"ForkSession": "fork_session",
+		// Line 663: agents: dict[str, AgentDefinition] | None = None
+		"Agents": "agents",
+		// Line 665: setting_sources: list[SettingSource] | None = None
+		"SettingSources": "setting_sources",
+		// Line 669: sandbox: SandboxSettings | None = None
+		"Sandbox": "sandbox",
+		// Line 671: plugins: list[SdkPluginConfig] = field(default_factory=list)
+		"Plugins": "plugins",
+		// Line 673: max_thinking_tokens: int | None = None
+		"MaxThinkingTokens": "max_thinking_tokens",
+		// Line 676: output_format: dict[str, Any] | None = None
+		"OutputFormat": "output_format",
+		// Line 680: enable_file_checkpointing: bool = False
+		"EnableFileCheckpointing": "enable_file_checkpointing",
 	}
+
+	// Track missing fields
+	missingFields := []string{}
 
 	// Check that each required field exists
 	for goFieldName, pythonFieldName := range requiredFields {
 		field, found := optType.FieldByName(goFieldName)
 		if !found {
-			t.Errorf("Field %s (Python: %s) not found in Options struct", goFieldName, pythonFieldName)
+			missingFields = append(missingFields, goFieldName+" (Python: "+pythonFieldName+")")
 			continue
 		}
 
@@ -114,6 +110,16 @@ func TestOptionsCompleteness(t *testing.T) {
 		// For serializable fields, verify the JSON tag matches Python field name
 		if jsonTag == "" && field.Type.Kind() != reflect.Func {
 			t.Errorf("Field %s should have a json tag", goFieldName)
+		}
+	}
+
+	// Report all missing fields at once
+	if len(missingFields) > 0 {
+		t.Errorf("Missing %d fields in Options struct:\n  - %s",
+			len(missingFields),
+			missingFields[0])
+		for i := 1; i < len(missingFields); i++ {
+			t.Errorf("  - %s", missingFields[i])
 		}
 	}
 }
