@@ -152,9 +152,10 @@ func TestStdioMCPServerConfigPassedToCLI(t *testing.T) {
 	}
 }
 
-// TestSDKMCPServersNotPassedToCLI verifies that SDK MCP servers (in-process)
-// are NOT passed to the CLI - they are handled via control protocol.
-func TestSDKMCPServersNotPassedToCLI(t *testing.T) {
+// TestSDKMCPServersPassedToCLI verifies that SDK MCP servers (in-process)
+// ARE passed to the CLI so it knows about available tools.
+// The actual tool execution is handled via control protocol.
+func TestSDKMCPServersPassedToCLI(t *testing.T) {
 	opts := types.DefaultOptions()
 	opts.MCPServers = map[string]types.MCPServerConfig{
 		"sdk-server": {
@@ -164,20 +165,27 @@ func TestSDKMCPServersNotPassedToCLI(t *testing.T) {
 
 	cmd := buildCommand("/path/to/claude", "", opts, true)
 
-	// Should NOT have --mcp-config flag (SDK servers are filtered out)
+	// Should have --mcp-config flag with SDK server
+	var mcpConfigValue string
 	for i, arg := range cmd {
-		if arg == "--mcp-config" {
-			mcpConfigValue := cmd[i+1]
-			if strings.Contains(mcpConfigValue, "sdk-server") {
-				t.Error("SDK MCP servers should not be passed to CLI")
-			}
+		if arg == "--mcp-config" && i+1 < len(cmd) {
+			mcpConfigValue = cmd[i+1]
+			break
 		}
+	}
+
+	if mcpConfigValue == "" {
+		t.Fatal("Expected --mcp-config flag in command")
+	}
+
+	if !strings.Contains(mcpConfigValue, "sdk-server") {
+		t.Error("SDK MCP servers should be passed to CLI")
 	}
 }
 
-// TestMixedMCPServersOnlyExternalPassedToCLI verifies that mixed configs
-// only pass external servers to CLI, not SDK servers.
-func TestMixedMCPServersOnlyExternalPassedToCLI(t *testing.T) {
+// TestMixedMCPServersBothPassedToCLI verifies that mixed configs
+// pass both external and SDK servers to CLI.
+func TestMixedMCPServersBothPassedToCLI(t *testing.T) {
 	opts := types.DefaultOptions()
 	opts.MCPServers = map[string]types.MCPServerConfig{
 		"external-sse": {
@@ -209,9 +217,9 @@ func TestMixedMCPServersOnlyExternalPassedToCLI(t *testing.T) {
 		t.Error("Expected mcp-config to contain 'external-sse'")
 	}
 
-	// Should NOT contain SDK server
-	if strings.Contains(mcpConfigValue, "internal-sdk") {
-		t.Error("SDK servers should be filtered from mcp-config")
+	// Should also contain SDK server (CLI needs to know about it for tool discovery)
+	if !strings.Contains(mcpConfigValue, "internal-sdk") {
+		t.Error("SDK servers should be included in mcp-config")
 	}
 }
 
@@ -294,5 +302,112 @@ func TestStdioMCPServerWithoutTypeFieldDefaultsToStdio(t *testing.T) {
 				t.Errorf("Expected command 'npx', got %v", server["command"])
 			}
 		})
+	}
+}
+
+// TestSDKMCPServersMapPassedToCLI verifies that SDK MCP servers from the
+// SDKMCPServers map are properly passed to the CLI via --mcp-config flag.
+func TestSDKMCPServersMapPassedToCLI(t *testing.T) {
+	opts := types.DefaultOptions()
+	opts.SDKMCPServers = map[string]*types.MCPServer{
+		"calculator": {
+			Name:    "calculator",
+			Version: "1.0.0",
+			Tools: []*types.MCPTool{
+				{
+					Name:        "add",
+					Description: "Add two numbers",
+				},
+			},
+		},
+	}
+
+	cmd := buildCommand("/path/to/claude", "", opts, true)
+
+	// Find the --mcp-config flag
+	var mcpConfigValue string
+	for i, arg := range cmd {
+		if arg == "--mcp-config" && i+1 < len(cmd) {
+			mcpConfigValue = cmd[i+1]
+			break
+		}
+	}
+
+	if mcpConfigValue == "" {
+		t.Fatal("Expected --mcp-config flag in command")
+	}
+
+	// Parse the config
+	var config map[string]any
+	if err := json.Unmarshal([]byte(mcpConfigValue), &config); err != nil {
+		t.Fatalf("Failed to parse mcp-config: %v", err)
+	}
+
+	servers, ok := config["mcpServers"].(map[string]any)
+	if !ok {
+		t.Fatal("Expected mcpServers in config")
+	}
+
+	server, ok := servers["calculator"].(map[string]any)
+	if !ok {
+		t.Fatal("Expected calculator in mcpServers")
+	}
+
+	// Verify it's marked as SDK type
+	if server["type"] != "sdk" {
+		t.Errorf("Expected type 'sdk', got %v", server["type"])
+	}
+}
+
+// TestSDKMCPServersAndExternalMerged verifies that SDK MCP servers and
+// external MCP servers are both included in the --mcp-config flag.
+func TestSDKMCPServersAndExternalMerged(t *testing.T) {
+	opts := types.DefaultOptions()
+	opts.SDKMCPServers = map[string]*types.MCPServer{
+		"calculator": {
+			Name:    "calculator",
+			Version: "1.0.0",
+		},
+	}
+	opts.MCPServers = map[string]types.MCPServerConfig{
+		"filesystem": {
+			Type:    "stdio",
+			Command: "npx",
+			Args:    []string{"-y", "@modelcontextprotocol/server-filesystem"},
+		},
+	}
+
+	cmd := buildCommand("/path/to/claude", "", opts, true)
+
+	// Find the --mcp-config flag
+	var mcpConfigValue string
+	for i, arg := range cmd {
+		if arg == "--mcp-config" && i+1 < len(cmd) {
+			mcpConfigValue = cmd[i+1]
+			break
+		}
+	}
+
+	if mcpConfigValue == "" {
+		t.Fatal("Expected --mcp-config flag in command")
+	}
+
+	// Parse the config
+	var config map[string]any
+	if err := json.Unmarshal([]byte(mcpConfigValue), &config); err != nil {
+		t.Fatalf("Failed to parse mcp-config: %v", err)
+	}
+
+	servers, ok := config["mcpServers"].(map[string]any)
+	if !ok {
+		t.Fatal("Expected mcpServers in config")
+	}
+
+	// Should have both servers
+	if _, ok := servers["calculator"]; !ok {
+		t.Error("Expected calculator (SDK server) in mcpServers")
+	}
+	if _, ok := servers["filesystem"]; !ok {
+		t.Error("Expected filesystem (external server) in mcpServers")
 	}
 }

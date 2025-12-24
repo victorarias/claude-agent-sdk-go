@@ -436,16 +436,25 @@ func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) [
 		cmd = append(cmd, "--add-dir", dir)
 	}
 
-	// MCP servers - filter out SDK-hosted servers (type: "sdk")
-	// SDK MCP servers are handled internally via control protocol, not via CLI config
+	// MCP servers - include all servers (external AND SDK-hosted)
+	// SDK MCP servers need to be passed to CLI so it knows about the tools,
+	// the actual tool execution is handled via control protocol.
+	allServers := make(map[string]any)
+
+	// First, add SDK MCP servers (from SDKMCPServers map)
+	for name, server := range opts.SDKMCPServers {
+		allServers[name] = map[string]any{
+			"type": "sdk",
+			"name": server.Name,
+		}
+	}
+
+	// Then, add external MCP servers (from MCPServers)
 	if opts.MCPServers != nil {
-		filteredServers := make(map[string]any)
 		switch servers := opts.MCPServers.(type) {
 		case map[string]types.MCPServerConfig:
 			for name, server := range servers {
-				if server.Type != "sdk" {
-					filteredServers[name] = server
-				}
+				allServers[name] = server
 			}
 		case map[string]any:
 			for name, server := range servers {
@@ -459,23 +468,21 @@ func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) [
 							serverCopy[k] = v
 						}
 						serverCopy["type"] = "stdio"
-						// When type is missing/empty, it defaults to stdio (not sdk), so include it
-						filteredServers[name] = serverCopy
-					} else if serverType != "sdk" {
-						// Explicit type that's not "sdk" - include it
-						filteredServers[name] = server
+						allServers[name] = serverCopy
+					} else {
+						allServers[name] = server
 					}
-					// If serverType == "sdk", we skip it (don't add to filteredServers)
 				} else {
-					filteredServers[name] = server
+					allServers[name] = server
 				}
 			}
 		}
-		if len(filteredServers) > 0 {
-			config := map[string]any{"mcpServers": filteredServers}
-			if data, err := json.Marshal(config); err == nil {
-				cmd = append(cmd, "--mcp-config", string(data))
-			}
+	}
+
+	if len(allServers) > 0 {
+		config := map[string]any{"mcpServers": allServers}
+		if data, err := json.Marshal(config); err == nil {
+			cmd = append(cmd, "--mcp-config", string(data))
 		}
 	}
 

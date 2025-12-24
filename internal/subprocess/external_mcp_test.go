@@ -5,6 +5,7 @@ package subprocess
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/victorarias/claude-agent-sdk-go/types"
@@ -189,9 +190,10 @@ func TestExternalMCPServerTransport_HTTP(t *testing.T) {
 	}
 }
 
-// TestExternalMCPServerTransport_SDKExcluded verifies that SDK MCP servers
-// are EXCLUDED from the --mcp-config flag (handled separately via control protocol).
-func TestExternalMCPServerTransport_SDKExcluded(t *testing.T) {
+// TestExternalMCPServerTransport_SDKIncluded verifies that SDK MCP servers
+// ARE included in the --mcp-config flag so CLI knows about available tools.
+// Tool execution is handled via control protocol.
+func TestExternalMCPServerTransport_SDKIncluded(t *testing.T) {
 	opts := types.DefaultOptions()
 	opts.MCPServers = map[string]types.MCPServerConfig{
 		"in-process": {
@@ -201,11 +203,21 @@ func TestExternalMCPServerTransport_SDKExcluded(t *testing.T) {
 
 	cmd := buildCommand("/path/to/claude", "", opts, true)
 
-	// Should NOT have --mcp-config flag when only SDK servers are present
+	// Should have --mcp-config flag with SDK server
+	var mcpConfigValue string
 	for i, arg := range cmd {
-		if arg == "--mcp-config" {
-			t.Errorf("Expected NO --mcp-config flag when only SDK servers present, but found at index %d", i)
+		if arg == "--mcp-config" && i+1 < len(cmd) {
+			mcpConfigValue = cmd[i+1]
+			break
 		}
+	}
+
+	if mcpConfigValue == "" {
+		t.Fatal("Expected --mcp-config flag when SDK servers are present")
+	}
+
+	if !strings.Contains(mcpConfigValue, "in-process") {
+		t.Error("Expected mcp-config to contain SDK server 'in-process'")
 	}
 }
 
@@ -242,7 +254,7 @@ func TestExternalMCPServerTransport_NilServers(t *testing.T) {
 }
 
 // TestExternalMCPServerTransport_MixedServers verifies that when both
-// SDK and external servers are present, only external servers are included
+// SDK and external servers are present, all servers are included
 // in --mcp-config.
 func TestExternalMCPServerTransport_MixedServers(t *testing.T) {
 	opts := types.DefaultOptions()
@@ -291,14 +303,14 @@ func TestExternalMCPServerTransport_MixedServers(t *testing.T) {
 		t.Fatal("Expected mcpServers in config")
 	}
 
-	// Should have 3 external servers
-	if len(servers) != 3 {
-		t.Errorf("Expected 3 servers, got %d", len(servers))
+	// Should have all 4 servers (including SDK server)
+	if len(servers) != 4 {
+		t.Errorf("Expected 4 servers, got %d", len(servers))
 	}
 
-	// Should NOT have sdk-server
-	if _, exists := servers["sdk-server"]; exists {
-		t.Error("SDK server should not be included in --mcp-config")
+	// Should have sdk-server (CLI needs to know about it for tool discovery)
+	if _, exists := servers["sdk-server"]; !exists {
+		t.Error("SDK server should be included in --mcp-config")
 	}
 
 	// Should have stdio-server
