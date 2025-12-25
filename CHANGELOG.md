@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1](https://github.com/victorarias/claude-agent-sdk-go/compare/v0.1.0...v0.1.1) (2025-12-25)
+
+
+### Bug Fixes
+
+* pass SDK MCP servers to CLI for tool discovery ([cc72bb1](https://github.com/victorarias/claude-agent-sdk-go/commit/cc72bb1702fc698392d26d936f85ade36fd75d70))
+* set last-release-sha to v0.1.0 commit ([eb75822](https://github.com/victorarias/claude-agent-sdk-go/commit/eb75822ae2e8c970b39aac37f0e86884d1abe18c))
+
+
+### Documentation
+
+* add experimental warning to README ([4c25d07](https://github.com/victorarias/claude-agent-sdk-go/commit/4c25d07b5bd9f5db1bc4a999a346f3658c471d76))
+
+
+### Miscellaneous
+
+* remove reference SDK folder ([1413810](https://github.com/victorarias/claude-agent-sdk-go/commit/141381024d202092df926fe3b319207311f4ea5e))
+
+
+### Continuous Integration
+
+* add workflow_dispatch trigger to release-please ([0cd6278](https://github.com/victorarias/claude-agent-sdk-go/commit/0cd627851cc177a1338012a4a97f33778802331a))
+* use explicit config-file and manifest-file for release-please ([a23fae5](https://github.com/victorarias/claude-agent-sdk-go/commit/a23fae56083a7417b0b88debd732de7cc30839ad))
+
 ## [Unreleased]
 
 ## [0.1.0] - 2025-12-22
@@ -60,4 +84,3 @@ Initial release of the Claude Agent SDK Go, a Go implementation of the Claude Ag
 - **MCP Protocol**: Complete MCP protocol implementation for tool definitions and invocations
 - **Control Protocol**: Approval flow, hook handling, and session management
 - **Transport Layer**: Stdio-based communication with the Claude CLI process
-
