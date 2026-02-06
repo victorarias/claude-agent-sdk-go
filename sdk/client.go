@@ -5,6 +5,7 @@ package sdk
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strconv"
 	"sync"
@@ -290,9 +291,15 @@ func (c *Client) ConnectWithPrompt(ctx context.Context, prompt string) error {
 	}
 
 	if err := q.SendUserMessage(prompt, ""); err != nil {
+		if closeErr := c.Close(); closeErr != nil {
+			return fmt.Errorf("failed to send initial prompt: %w (cleanup failed: %v)", err, closeErr)
+		}
 		return err
 	}
 	if err := transport.EndInput(); err != nil {
+		if closeErr := c.Close(); closeErr != nil {
+			return fmt.Errorf("failed to close input after initial prompt: %w (cleanup failed: %v)", err, closeErr)
+		}
 		return err
 	}
 	return nil
@@ -467,7 +474,19 @@ func QueryStream(ctx context.Context, prompt string, opts ...types.Option) (<-ch
 			errChan <- err
 			return
 		}
-		if err := query.SendUserMessage(prompt, ""); err != nil {
+		input := make(chan map[string]any, 1)
+		input <- map[string]any{
+			"type": "user",
+			"message": map[string]any{
+				"role":    "user",
+				"content": prompt,
+			},
+			"parent_tool_use_id": nil,
+			"session_id":         "",
+		}
+		close(input)
+
+		if err := query.StreamInputWithWait(input); err != nil {
 			errChan <- err
 			return
 		}
