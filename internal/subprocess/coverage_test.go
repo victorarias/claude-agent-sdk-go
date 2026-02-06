@@ -326,70 +326,18 @@ func TestEndInput_NotConnected(t *testing.T) {
 	}
 }
 
-// TestOptimizeCommandLength_ShortCommand tests that short commands aren't optimized
-func TestOptimizeCommandLength_ShortCommand(t *testing.T) {
+// TestBuildCommand_NoAgentsArg verifies agents are sent via initialize, not CLI args.
+func TestBuildCommand_NoAgentsArg(t *testing.T) {
 	opts := types.DefaultOptions()
 	opts.Agents = map[string]types.AgentDefinition{
 		"agent1": {Description: "Test agent", Prompt: "test"},
 	}
 
-	cmd := []string{"claude", "run", "--agents", `{"agent1":{"description":"Test agent","prompt":"test"}}`}
-	optimized := optimizeCommandLength(cmd, opts)
-
-	// Command should remain unchanged
-	if len(optimized) != len(cmd) {
-		t.Errorf("Short command was modified")
-	}
-}
-
-// TestOptimizeCommandLength_LongCommand tests temp file fallback for long commands
-func TestOptimizeCommandLength_LongCommand(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("Command length optimization only applies on Windows (8000 char limit)")
-	}
-
-	opts := types.DefaultOptions()
-	// Create a very long agents map to exceed command length limit
-	longAgents := make(map[string]types.AgentDefinition, 1000)
-	for i := 0; i < 1000; i++ {
-		name := "very-long-agent-name-that-takes-up-space"
-		longAgents[name] = types.AgentDefinition{Description: "desc", Prompt: "prompt"}
-	}
-	opts.Agents = longAgents
-
-	cmd := []string{"claude", "run", "--agents"}
-	// Build a long JSON string
-	longJSON := `{`
-	first := true
-	for name := range longAgents {
-		if !first {
-			longJSON += `,`
+	cmd := buildCommand("/usr/bin/claude", "Hello", opts, false)
+	for _, arg := range cmd {
+		if arg == "--agents" {
+			t.Fatalf("did not expect --agents in command: %v", cmd)
 		}
-		first = false
-		longJSON += `"` + name + `":{"name":"` + name + `"}`
-	}
-	longJSON += `}`
-	cmd = append(cmd, longJSON)
-
-	optimized := optimizeCommandLength(cmd, opts)
-
-	// Should have replaced with temp file reference
-	found := false
-	for _, arg := range optimized {
-		if len(arg) > 0 && arg[0] == '@' {
-			found = true
-			// Verify temp file exists
-			tempPath := arg[1:]
-			if _, err := os.Stat(tempPath); os.IsNotExist(err) {
-				t.Errorf("Temp file %q does not exist", tempPath)
-			}
-			// Clean up
-			os.Remove(tempPath)
-		}
-	}
-
-	if !found {
-		t.Error("Command was not optimized with temp file reference")
 	}
 }
 

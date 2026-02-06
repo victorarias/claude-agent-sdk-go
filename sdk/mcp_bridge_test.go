@@ -117,12 +117,15 @@ func TestHandleMCPMessage_NotificationsInitialized(t *testing.T) {
 
 // TestHandleMCPMessage_ToolsList tests tools/list request
 func TestHandleMCPMessage_ToolsList(t *testing.T) {
+	readOnly := true
 	server := types.NewMCPServerBuilder("test-server").
-		WithTool("greet", "Greets someone", map[string]any{
+		WithToolWithAnnotations("greet", "Greets someone", map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"name": map[string]any{"type": "string"},
 			},
+		}, &types.MCPToolAnnotations{
+			ReadOnlyHint: &readOnly,
 		}, func(args map[string]any) (*types.MCPToolResult, error) {
 			return &types.MCPToolResult{
 				Content: []types.MCPContent{{Type: "text", Text: "Hello!"}},
@@ -191,6 +194,14 @@ func TestHandleMCPMessage_ToolsList(t *testing.T) {
 
 	if tool0["description"] != "Greets someone" {
 		t.Errorf("expected description, got %v", tool0["description"])
+	}
+
+	annotations, ok := tool0["annotations"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected annotations map, got %T", tool0["annotations"])
+	}
+	if annotations["readOnlyHint"] != true {
+		t.Errorf("expected readOnlyHint=true, got %v", annotations["readOnlyHint"])
 	}
 }
 

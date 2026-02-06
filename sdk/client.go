@@ -5,9 +5,12 @@ package sdk
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"strconv"
 	"sync"
+	"time"
 
-	"github.com/victorarias/claude-agent-sdk-go/internal/parser"
 	"github.com/victorarias/claude-agent-sdk-go/internal/subprocess"
 	"github.com/victorarias/claude-agent-sdk-go/types"
 )
@@ -141,6 +144,19 @@ func WithPostToolUseHook(matcher map[string]any, callback types.HookCallback) ty
 	}
 }
 
+// WithPostToolUseFailureHook adds a post-tool-use-failure hook.
+func WithPostToolUseFailureHook(matcher map[string]any, callback types.HookCallback) types.Option {
+	return func(o *types.Options) {
+		if o.Hooks == nil {
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
+		}
+		o.Hooks[types.HookPostToolUseFailure] = append(o.Hooks[types.HookPostToolUseFailure], types.HookMatcher{
+			Matcher: matcher,
+			Hooks:   []types.HookCallback{callback},
+		})
+	}
+}
+
 // WithStopHook adds a stop hook.
 func WithStopHook(matcher map[string]any, callback types.HookCallback) types.Option {
 	return func(o *types.Options) {
@@ -174,6 +190,45 @@ func WithSubagentStopHook(callback types.HookCallback) types.Option {
 			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
 		}
 		o.Hooks[types.HookSubagentStop] = append(o.Hooks[types.HookSubagentStop], types.HookMatcher{
+			Matcher: nil,
+			Hooks:   []types.HookCallback{callback},
+		})
+	}
+}
+
+// WithNotificationHook adds a notification hook.
+func WithNotificationHook(callback types.HookCallback) types.Option {
+	return func(o *types.Options) {
+		if o.Hooks == nil {
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
+		}
+		o.Hooks[types.HookNotification] = append(o.Hooks[types.HookNotification], types.HookMatcher{
+			Matcher: nil,
+			Hooks:   []types.HookCallback{callback},
+		})
+	}
+}
+
+// WithSubagentStartHook adds a subagent-start hook.
+func WithSubagentStartHook(callback types.HookCallback) types.Option {
+	return func(o *types.Options) {
+		if o.Hooks == nil {
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
+		}
+		o.Hooks[types.HookSubagentStart] = append(o.Hooks[types.HookSubagentStart], types.HookMatcher{
+			Matcher: nil,
+			Hooks:   []types.HookCallback{callback},
+		})
+	}
+}
+
+// WithPermissionRequestHook adds a permission-request hook.
+func WithPermissionRequestHook(callback types.HookCallback) types.Option {
+	return func(o *types.Options) {
+		if o.Hooks == nil {
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
+		}
+		o.Hooks[types.HookPermissionRequest] = append(o.Hooks[types.HookPermissionRequest], types.HookMatcher{
 			Matcher: nil,
 			Hooks:   []types.HookCallback{callback},
 		})
@@ -216,16 +271,42 @@ func WithCanUseTool(callback types.CanUseToolCallback) types.Option {
 
 // Connect establishes a connection to Claude in streaming mode.
 func (c *Client) Connect(ctx context.Context) error {
-	return c.connect(ctx, "", true)
+	return c.connect(ctx)
 }
 
-// ConnectWithPrompt establishes a connection with an initial prompt (non-streaming).
+// ConnectWithPrompt establishes a connection and sends an initial prompt.
+// Internally this uses streaming mode to match the Python SDK behavior.
 func (c *Client) ConnectWithPrompt(ctx context.Context, prompt string) error {
-	return c.connect(ctx, prompt, false)
+	if err := c.connect(ctx); err != nil {
+		return err
+	}
+
+	c.mu.Lock()
+	q := c.query
+	transport := c.transport
+	c.mu.Unlock()
+
+	if q == nil || transport == nil {
+		return &types.ConnectionError{Message: "not connected"}
+	}
+
+	if err := q.SendUserMessage(prompt, ""); err != nil {
+		if closeErr := c.Close(); closeErr != nil {
+			return fmt.Errorf("failed to send initial prompt: %w (cleanup failed: %v)", err, closeErr)
+		}
+		return err
+	}
+	if err := transport.EndInput(); err != nil {
+		if closeErr := c.Close(); closeErr != nil {
+			return fmt.Errorf("failed to close input after initial prompt: %w (cleanup failed: %v)", err, closeErr)
+		}
+		return err
+	}
+	return nil
 }
 
 // connect is the internal connection method.
-func (c *Client) connect(ctx context.Context, prompt string, streaming bool) error {
+func (c *Client) connect(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -240,11 +321,7 @@ func (c *Client) connect(ctx context.Context, prompt string, streaming bool) err
 
 	// Create transport if not provided (for testing)
 	if c.transport == nil {
-		if streaming {
-			c.transport = subprocess.NewStreamingTransport(c.options)
-		} else {
-			c.transport = subprocess.NewSubprocessTransport(prompt, c.options)
-		}
+		c.transport = subprocess.NewStreamingTransport(c.options)
 	}
 
 	// Connect transport
@@ -253,7 +330,9 @@ func (c *Client) connect(ctx context.Context, prompt string, streaming bool) err
 	}
 
 	// Create query
-	c.query = NewQuery(c.transport, streaming)
+	c.query = NewQuery(c.transport, true)
+	c.query.SetAgents(c.options.Agents)
+	c.query.SetInitializeTimeout(resolveInitializeTimeout())
 
 	// Set permission callback
 	if c.canUseTool != nil {
@@ -271,24 +350,38 @@ func (c *Client) connect(ctx context.Context, prompt string, streaming bool) err
 		return err
 	}
 
-	// Initialize if streaming
-	if streaming {
-		result, err := c.query.Initialize(c.hooks)
-		if err != nil {
-			c.transport.Close()
-			return err
-		}
+	result, err := c.query.Initialize(c.hooks)
+	if err != nil {
+		c.transport.Close()
+		return err
+	}
 
-		// Extract session ID from init response
-		if result != nil {
-			if sid, ok := result["session_id"].(string); ok {
-				c.sessionID = sid
-			}
+	// Extract session ID from init response
+	if result != nil {
+		if sid, ok := result["session_id"].(string); ok {
+			c.sessionID = sid
 		}
 	}
 
 	c.connected = true
 	return nil
+}
+
+func resolveInitializeTimeout() time.Duration {
+	defaultTimeout := 60 * time.Second
+	raw := os.Getenv("CLAUDE_CODE_STREAM_CLOSE_TIMEOUT")
+	if raw == "" {
+		return defaultTimeout
+	}
+	ms, err := strconv.Atoi(raw)
+	if err != nil || ms < 0 {
+		return defaultTimeout
+	}
+	timeout := time.Duration(ms) * time.Millisecond
+	if timeout < defaultTimeout {
+		return defaultTimeout
+	}
+	return timeout
 }
 
 // Disconnect closes the connection.
@@ -326,40 +419,14 @@ func (c *Client) Close() error {
 
 // RunQuery performs a one-shot query and returns all messages.
 func RunQuery(ctx context.Context, prompt string, opts ...types.Option) ([]types.Message, error) {
-	options := types.DefaultOptions()
-	types.ApplyOptions(options, opts...)
-
-	// Extract transport if provided
-	var transport types.Transport
-	if options.CustomTransport() != nil {
-		transport = options.CustomTransport()
-	} else {
-		transport = subprocess.NewSubprocessTransport(prompt, options)
-	}
-
-	// Connect
-	if err := transport.Connect(ctx); err != nil {
-		return nil, err
-	}
-	defer transport.Close()
-
-	// Collect messages
+	msgChan, errChan := QueryStream(ctx, prompt, opts...)
 	var messages []types.Message
-
-	for msg := range transport.Messages() {
-		parsed, err := parser.ParseMessage(msg)
-		if err != nil {
-			// Skip unparseable messages
-			continue
-		}
-		messages = append(messages, parsed)
-
-		// Stop on result
-		if _, ok := parsed.(*types.ResultMessage); ok {
-			break
-		}
+	for msg := range msgChan {
+		messages = append(messages, msg)
 	}
-
+	if err, ok := <-errChan; ok && err != nil {
+		return messages, err
+	}
 	return messages, nil
 }
 
@@ -379,7 +446,7 @@ func QueryStream(ctx context.Context, prompt string, opts ...types.Option) (<-ch
 		if options.CustomTransport() != nil {
 			transport = options.CustomTransport()
 		} else {
-			transport = subprocess.NewSubprocessTransport(prompt, options)
+			transport = subprocess.NewStreamingTransport(options)
 		}
 
 		if err := transport.Connect(ctx); err != nil {
@@ -388,31 +455,68 @@ func QueryStream(ctx context.Context, prompt string, opts ...types.Option) (<-ch
 		}
 		defer transport.Close()
 
-		// Read from transport with context cancellation support
+		query := NewQuery(transport, true)
+		query.SetAgents(options.Agents)
+		query.SetInitializeTimeout(resolveInitializeTimeout())
+		if options.CanUseTool != nil {
+			query.SetCanUseTool(options.CanUseTool)
+		}
+		for _, server := range options.SDKMCPServers {
+			query.RegisterMCPServer(server)
+		}
+		if err := query.Start(ctx); err != nil {
+			errChan <- err
+			return
+		}
+		defer query.Close()
+
+		if _, err := query.Initialize(options.Hooks); err != nil {
+			errChan <- err
+			return
+		}
+		input := make(chan map[string]any, 1)
+		input <- map[string]any{
+			"type": "user",
+			"message": map[string]any{
+				"role":    "user",
+				"content": prompt,
+			},
+			"parent_tool_use_id": nil,
+			"session_id":         "",
+		}
+		close(input)
+
+		if err := query.StreamInputWithWait(input); err != nil {
+			errChan <- err
+			return
+		}
+		if err := transport.EndInput(); err != nil {
+			errChan <- err
+			return
+		}
+
 		for {
 			select {
 			case <-ctx.Done():
 				errChan <- ctx.Err()
 				return
-			case msg, ok := <-transport.Messages():
-				if !ok {
-					// Transport closed
+			case err := <-query.Errors():
+				if err != nil {
+					errChan <- err
 					return
 				}
-
-				parsed, err := parser.ParseMessage(msg)
-				if err != nil {
-					continue
+			case msg, ok := <-query.Messages():
+				if !ok {
+					return
 				}
-
 				select {
-				case msgChan <- parsed:
+				case msgChan <- msg:
 				case <-ctx.Done():
 					errChan <- ctx.Err()
 					return
 				}
 
-				if _, ok := parsed.(*types.ResultMessage); ok {
+				if _, ok := msg.(*types.ResultMessage); ok {
 					return
 				}
 			}
@@ -537,6 +641,19 @@ func (c *Client) RewindFiles(userMessageID string) error {
 	c.mu.Unlock()
 
 	return q.RewindFiles(userMessageID)
+}
+
+// GetMCPStatus returns current MCP server connection status.
+func (c *Client) GetMCPStatus() (map[string]any, error) {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		return nil, &types.ConnectionError{Message: "not connected"}
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	return q.GetMCPStatus()
 }
 
 // ServerInfo returns the initialization info.

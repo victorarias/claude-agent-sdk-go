@@ -6,6 +6,7 @@ package sdk
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -217,7 +218,38 @@ func TestClient_ConnectWithPrompt(t *testing.T) {
 	transport := NewMockTransport()
 	client := NewClient(types.WithTransport(transport))
 
-	// Non-streaming mode doesn't require Initialize
+	go func() {
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			if req["type"] != "control_request" {
+				continue
+			}
+			reqID, ok := req["request_id"].(string)
+			if !ok {
+				continue
+			}
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{"session_id": "test_session_123"},
+				},
+			})
+			return
+		}
+	}()
+
 	ctx := context.Background()
 	err := client.ConnectWithPrompt(ctx, "Hello Claude!")
 	if err != nil {
@@ -227,8 +259,125 @@ func TestClient_ConnectWithPrompt(t *testing.T) {
 	if !client.IsConnected() {
 		t.Error("client should be connected")
 	}
+	if !transport.inputEnded {
+		t.Error("expected ConnectWithPrompt to close stdin after sending initial prompt")
+	}
 
 	client.Close()
+}
+
+func TestClient_ConnectWithPrompt_CleansUpOnSendFailure(t *testing.T) {
+	transport := NewMockTransport()
+	client := NewClient(types.WithTransport(transport))
+
+	go func() {
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			if req["type"] != "control_request" {
+				continue
+			}
+			reqID, ok := req["request_id"].(string)
+			if !ok {
+				continue
+			}
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{"session_id": "test_session_123"},
+				},
+			})
+
+			transport.mu.Lock()
+			transport.writeErr = errors.New("send failed")
+			transport.mu.Unlock()
+			return
+		}
+	}()
+
+	ctx := context.Background()
+	err := client.ConnectWithPrompt(ctx, "Hello Claude!")
+	if err == nil {
+		t.Fatal("expected ConnectWithPrompt error")
+	}
+
+	if client.IsConnected() {
+		t.Error("client should be disconnected after prompt send failure")
+	}
+	if client.query != nil {
+		t.Error("query should be cleared after cleanup")
+	}
+	if client.transport != nil {
+		t.Error("transport should be cleared after cleanup")
+	}
+}
+
+func TestClient_ConnectWithPrompt_CleansUpOnEndInputFailure(t *testing.T) {
+	transport := NewMockTransport()
+	client := NewClient(types.WithTransport(transport))
+
+	go func() {
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			if req["type"] != "control_request" {
+				continue
+			}
+			reqID, ok := req["request_id"].(string)
+			if !ok {
+				continue
+			}
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{"session_id": "test_session_123"},
+				},
+			})
+
+			transport.mu.Lock()
+			transport.endInputErr = errors.New("end input failed")
+			transport.mu.Unlock()
+			return
+		}
+	}()
+
+	ctx := context.Background()
+	err := client.ConnectWithPrompt(ctx, "Hello Claude!")
+	if err == nil {
+		t.Fatal("expected ConnectWithPrompt error")
+	}
+
+	if client.IsConnected() {
+		t.Error("client should be disconnected after end-input failure")
+	}
+	if client.query != nil {
+		t.Error("query should be cleared after cleanup")
+	}
+	if client.transport != nil {
+		t.Error("transport should be cleared after cleanup")
+	}
 }
 
 func TestClient_Resume(t *testing.T) {
@@ -286,25 +435,53 @@ func TestClient_Resume(t *testing.T) {
 func TestQuery_OneShot(t *testing.T) {
 	transport := NewMockTransport()
 	go func() {
-		transport.SendMessage(map[string]any{
-			"type": "assistant",
-			"message": map[string]any{
-				"content": []any{
-					map[string]any{"type": "text", "text": "Hello!"},
-				},
-				"model": "claude-test",
-			},
-		})
-		transport.SendMessage(map[string]any{
-			"type":            "result",
-			"subtype":         "success",
-			"duration_ms":     float64(100),
-			"duration_api_ms": float64(80),
-			"is_error":        false,
-			"num_turns":       float64(1),
-			"session_id":      "test_123",
-			"total_cost_usd":  float64(0.001),
-		})
+		seen := 0
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			for seen < len(written) {
+				var req map[string]any
+				if err := json.Unmarshal([]byte(written[seen]), &req); err != nil {
+					seen++
+					continue
+				}
+				seen++
+
+				switch req["type"] {
+				case "control_request":
+					reqID, _ := req["request_id"].(string)
+					transport.SendMessage(map[string]any{
+						"type": "control_response",
+						"response": map[string]any{
+							"subtype":    "success",
+							"request_id": reqID,
+							"response":   map[string]any{"session_id": "test_123"},
+						},
+					})
+				case "user":
+					transport.SendMessage(map[string]any{
+						"type": "assistant",
+						"message": map[string]any{
+							"content": []any{
+								map[string]any{"type": "text", "text": "Hello!"},
+							},
+							"model": "claude-test",
+						},
+					})
+					transport.SendMessage(map[string]any{
+						"type":            "result",
+						"subtype":         "success",
+						"duration_ms":     float64(100),
+						"duration_api_ms": float64(80),
+						"is_error":        false,
+						"num_turns":       float64(1),
+						"session_id":      "test_123",
+						"total_cost_usd":  float64(0.001),
+					})
+					return
+				}
+			}
+		}
 	}()
 
 	ctx := context.Background()
@@ -343,23 +520,51 @@ func TestQuery_OneShot(t *testing.T) {
 func TestQueryStream(t *testing.T) {
 	transport := NewMockTransport()
 	go func() {
-		transport.SendMessage(map[string]any{
-			"type": "assistant",
-			"message": map[string]any{
-				"content": []any{
-					map[string]any{"type": "text", "text": "Hello!"},
-				},
-				"model": "claude-test",
-			},
-		})
-		transport.SendMessage(map[string]any{
-			"type":        "result",
-			"subtype":     "success",
-			"duration_ms": float64(100),
-			"is_error":    false,
-			"num_turns":   float64(1),
-			"session_id":  "test_123",
-		})
+		seen := 0
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			for seen < len(written) {
+				var req map[string]any
+				if err := json.Unmarshal([]byte(written[seen]), &req); err != nil {
+					seen++
+					continue
+				}
+				seen++
+
+				switch req["type"] {
+				case "control_request":
+					reqID, _ := req["request_id"].(string)
+					transport.SendMessage(map[string]any{
+						"type": "control_response",
+						"response": map[string]any{
+							"subtype":    "success",
+							"request_id": reqID,
+							"response":   map[string]any{"session_id": "test_123"},
+						},
+					})
+				case "user":
+					transport.SendMessage(map[string]any{
+						"type": "assistant",
+						"message": map[string]any{
+							"content": []any{
+								map[string]any{"type": "text", "text": "Hello!"},
+							},
+							"model": "claude-test",
+						},
+					})
+					transport.SendMessage(map[string]any{
+						"type":        "result",
+						"subtype":     "success",
+						"duration_ms": float64(100),
+						"is_error":    false,
+						"num_turns":   float64(1),
+						"session_id":  "test_123",
+					})
+					return
+				}
+			}
+		}
 	}()
 
 	ctx := context.Background()
@@ -383,21 +588,132 @@ func TestQueryStream(t *testing.T) {
 	}
 }
 
+func TestQueryStream_WaitsToCloseInputWhenHooksActive(t *testing.T) {
+	transport := NewMockTransport()
+	go func() {
+		seen := 0
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			for seen < len(written) {
+				var req map[string]any
+				if err := json.Unmarshal([]byte(written[seen]), &req); err != nil {
+					seen++
+					continue
+				}
+				seen++
+
+				switch req["type"] {
+				case "control_request":
+					reqID, _ := req["request_id"].(string)
+					transport.SendMessage(map[string]any{
+						"type": "control_response",
+						"response": map[string]any{
+							"subtype":    "success",
+							"request_id": reqID,
+							"response":   map[string]any{"session_id": "test_123"},
+						},
+					})
+				case "user":
+					time.Sleep(100 * time.Millisecond)
+					if transport.inputEnded {
+						t.Error("stdin closed before first result while hooks were active")
+					}
+
+					transport.SendMessage(map[string]any{
+						"type": "assistant",
+						"message": map[string]any{
+							"content": []any{
+								map[string]any{"type": "text", "text": "Hello!"},
+							},
+							"model": "claude-test",
+						},
+					})
+					transport.SendMessage(map[string]any{
+						"type":        "result",
+						"subtype":     "success",
+						"duration_ms": float64(100),
+						"is_error":    false,
+						"num_turns":   float64(1),
+						"session_id":  "test_123",
+					})
+					return
+				}
+			}
+		}
+	}()
+
+	ctx := context.Background()
+	msgChan, errChan := QueryStream(ctx, "Hello",
+		types.WithTransport(transport),
+		WithPreToolUseHook(nil, func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
+			return &types.HookOutput{}, nil
+		}),
+	)
+
+	var messages []types.Message
+	for msg := range msgChan {
+		messages = append(messages, msg)
+	}
+
+	select {
+	case err := <-errChan:
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	default:
+	}
+
+	if len(messages) != 2 {
+		t.Fatalf("expected 2 messages, got %d", len(messages))
+	}
+	if !transport.inputEnded {
+		t.Fatal("expected input to be closed after first result")
+	}
+}
+
 func TestQueryStream_Cancellation(t *testing.T) {
 	transport := NewMockTransport()
 	go func() {
-		// Send a message but no result - let context cancel
-		transport.SendMessage(map[string]any{
-			"type": "assistant",
-			"message": map[string]any{
-				"content": []any{
-					map[string]any{"type": "text", "text": "Hello!"},
-				},
-			},
-		})
-		// Wait then close to simulate connection dropping
-		time.Sleep(100 * time.Millisecond)
-		transport.Close()
+		seen := 0
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			for seen < len(written) {
+				var req map[string]any
+				if err := json.Unmarshal([]byte(written[seen]), &req); err != nil {
+					seen++
+					continue
+				}
+				seen++
+
+				switch req["type"] {
+				case "control_request":
+					reqID, _ := req["request_id"].(string)
+					transport.SendMessage(map[string]any{
+						"type": "control_response",
+						"response": map[string]any{
+							"subtype":    "success",
+							"request_id": reqID,
+							"response":   map[string]any{"session_id": "test_123"},
+						},
+					})
+				case "user":
+					// Send a message but no result - let context cancel.
+					transport.SendMessage(map[string]any{
+						"type": "assistant",
+						"message": map[string]any{
+							"content": []any{
+								map[string]any{"type": "text", "text": "Hello!"},
+							},
+						},
+					})
+					time.Sleep(100 * time.Millisecond)
+					transport.Close()
+					return
+				}
+			}
+		}
 	}()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
@@ -885,20 +1201,50 @@ func TestClient_GetServerInfo_NotConnected(t *testing.T) {
 	}
 }
 
-func TestClient_GetServerInfo_NonStreaming(t *testing.T) {
+func TestClient_GetServerInfo_WithPromptConnect(t *testing.T) {
 	transport := NewMockTransport()
 	client := NewClient(types.WithTransport(transport))
 
-	// Connect in non-streaming mode
+	go func() {
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			if req["type"] != "control_request" {
+				continue
+			}
+			reqID, _ := req["request_id"].(string)
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{"session_id": "test_prompt_session"},
+				},
+			})
+			return
+		}
+	}()
+
 	ctx := context.Background()
 	if err := client.ConnectWithPrompt(ctx, "Hello"); err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
 
-	// Should return nil in non-streaming mode (no initialization)
+	// Prompt connect now initializes via streaming protocol, so server info is available.
 	info := client.GetServerInfo()
-	if info != nil {
-		t.Errorf("expected nil from GetServerInfo in non-streaming mode, got %v", info)
+	if info == nil {
+		t.Fatal("expected non-nil server info after ConnectWithPrompt")
+	}
+	if sessionID, ok := info["session_id"].(string); !ok || sessionID != "test_prompt_session" {
+		t.Errorf("expected session_id 'test_prompt_session', got %v", info["session_id"])
 	}
 }

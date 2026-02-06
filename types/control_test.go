@@ -80,6 +80,12 @@ func TestSDKControlInitializeRequest(t *testing.T) {
 	req := &SDKControlInitializeRequest{
 		Subtype: "initialize",
 		Hooks:   hooks,
+		Agents: map[string]map[string]any{
+			"researcher": {
+				"description": "Research assistant",
+				"prompt":      "Gather evidence",
+			},
+		},
 	}
 
 	// Test that it implements SDKControlRequest interface
@@ -297,7 +303,7 @@ func TestParseSDKControlRequest(t *testing.T) {
 		},
 		{
 			name: "initialize",
-			json: `{"subtype":"initialize","hooks":null}`,
+			json: `{"subtype":"initialize","hooks":null,"agents":{"researcher":{"description":"Research assistant","prompt":"Gather evidence"}}}`,
 			expected: &SDKControlInitializeRequest{
 				Subtype: "initialize",
 			},

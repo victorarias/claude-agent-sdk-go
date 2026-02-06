@@ -63,6 +63,31 @@ func TestMCPServerBuilder_WithTool(t *testing.T) {
 		}
 	})
 
+	t.Run("WithToolWithAnnotations stores annotations", func(t *testing.T) {
+		builder := NewMCPServerBuilder("test-server")
+		readOnly := true
+		handler := func(args map[string]any) (*MCPToolResult, error) { return nil, nil }
+
+		builder.WithToolWithAnnotations(
+			"reader",
+			"Reads data",
+			map[string]any{"type": "object"},
+			&MCPToolAnnotations{ReadOnlyHint: &readOnly},
+			handler,
+		)
+		server := builder.Build()
+
+		if len(server.Tools) != 1 {
+			t.Fatalf("Expected 1 tool, got %d", len(server.Tools))
+		}
+		if server.Tools[0].Annotations == nil || server.Tools[0].Annotations.ReadOnlyHint == nil {
+			t.Fatal("expected annotations to be set")
+		}
+		if !*server.Tools[0].Annotations.ReadOnlyHint {
+			t.Fatal("expected readOnlyHint=true")
+		}
+	})
+
 	t.Run("WithTool returns builder for chaining", func(t *testing.T) {
 		builder := NewMCPServerBuilder("test")
 		handler := func(args map[string]any) (*MCPToolResult, error) { return nil, nil }

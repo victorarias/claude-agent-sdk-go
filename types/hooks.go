@@ -8,6 +8,11 @@ package types
 // The reason parameter is optional and provides context for the decision.
 // The updatedInput parameter is optional and allows modifying tool input parameters.
 func NewPreToolUseOutput(decision, reason string, updatedInput map[string]any) *HookOutput {
+	return NewPreToolUseOutputWithContext(decision, reason, updatedInput, "")
+}
+
+// NewPreToolUseOutputWithContext creates a HookOutput for PreToolUse events with optional additional context.
+func NewPreToolUseOutputWithContext(decision, reason string, updatedInput map[string]any, additionalContext string) *HookOutput {
 	hookSpecific := map[string]any{
 		"hookEventName":      "PreToolUse",
 		"permissionDecision": decision,
@@ -20,6 +25,9 @@ func NewPreToolUseOutput(decision, reason string, updatedInput map[string]any) *
 	if updatedInput != nil {
 		hookSpecific["updatedInput"] = updatedInput
 	}
+	if additionalContext != "" {
+		hookSpecific["additionalContext"] = additionalContext
+	}
 
 	return &HookOutput{
 		HookSpecific: hookSpecific,
@@ -29,8 +37,31 @@ func NewPreToolUseOutput(decision, reason string, updatedInput map[string]any) *
 // NewPostToolUseOutput creates a HookOutput for PostToolUse events with hook-specific fields.
 // The additionalContext parameter is optional and provides context about the tool execution.
 func NewPostToolUseOutput(additionalContext string) *HookOutput {
+	return NewPostToolUseOutputWithUpdate(additionalContext, nil)
+}
+
+// NewPostToolUseOutputWithUpdate creates a HookOutput for PostToolUse with optional updated MCP tool output.
+func NewPostToolUseOutputWithUpdate(additionalContext string, updatedMCPToolOutput any) *HookOutput {
 	hookSpecific := map[string]any{
 		"hookEventName": "PostToolUse",
+	}
+
+	if additionalContext != "" {
+		hookSpecific["additionalContext"] = additionalContext
+	}
+	if updatedMCPToolOutput != nil {
+		hookSpecific["updatedMCPToolOutput"] = updatedMCPToolOutput
+	}
+
+	return &HookOutput{
+		HookSpecific: hookSpecific,
+	}
+}
+
+// NewPostToolUseFailureOutput creates a HookOutput for PostToolUseFailure events.
+func NewPostToolUseFailureOutput(additionalContext string) *HookOutput {
+	hookSpecific := map[string]any{
+		"hookEventName": "PostToolUseFailure",
 	}
 
 	if additionalContext != "" {
@@ -89,6 +120,51 @@ func NewStopOutput() *HookOutput {
 func NewSubagentStopOutput() *HookOutput {
 	hookSpecific := map[string]any{
 		"hookEventName": "SubagentStop",
+	}
+
+	return &HookOutput{
+		HookSpecific: hookSpecific,
+	}
+}
+
+// NewNotificationOutput creates a HookOutput for Notification events.
+func NewNotificationOutput(additionalContext string) *HookOutput {
+	hookSpecific := map[string]any{
+		"hookEventName": "Notification",
+	}
+
+	if additionalContext != "" {
+		hookSpecific["additionalContext"] = additionalContext
+	}
+
+	return &HookOutput{
+		HookSpecific: hookSpecific,
+	}
+}
+
+// NewSubagentStartOutput creates a HookOutput for SubagentStart events.
+func NewSubagentStartOutput(additionalContext string) *HookOutput {
+	hookSpecific := map[string]any{
+		"hookEventName": "SubagentStart",
+	}
+
+	if additionalContext != "" {
+		hookSpecific["additionalContext"] = additionalContext
+	}
+
+	return &HookOutput{
+		HookSpecific: hookSpecific,
+	}
+}
+
+// NewPermissionRequestOutput creates a HookOutput for PermissionRequest events.
+func NewPermissionRequestOutput(decision map[string]any) *HookOutput {
+	hookSpecific := map[string]any{
+		"hookEventName": "PermissionRequest",
+	}
+
+	if decision != nil {
+		hookSpecific["decision"] = decision
 	}
 
 	return &HookOutput{
