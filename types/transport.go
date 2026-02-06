@@ -27,3 +27,20 @@ type Transport interface {
 	// IsReady returns true if the transport is connected and ready.
 	IsReady() bool
 }
+
+// ErrorTransport is an optional transport extension for asynchronous transport errors.
+//
+// Implement this on custom transports to propagate transport-level errors (e.g. parser
+// or subprocess failures) to Query and Client error streams.
+type ErrorTransport interface {
+	Errors() <-chan error
+}
+
+// LegacyTransport represents the transitional interface shape where Transport also
+// included Errors(). It is kept as a compatibility shim.
+//
+// Deprecated: implement Transport and optionally ErrorTransport instead.
+type LegacyTransport interface {
+	Transport
+	ErrorTransport
+}

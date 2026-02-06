@@ -130,6 +130,9 @@ func parseUserMessage(raw map[string]any) (*types.UserMessage, error) {
 	if parentID, ok := raw["parent_tool_use_id"].(string); ok {
 		msg.ParentToolUseID = &parentID
 	}
+	if toolUseResult, ok := raw["tool_use_result"].(map[string]any); ok {
+		msg.ToolUseResult = toolUseResult
+	}
 
 	if msgData, ok := raw["message"].(map[string]any); ok {
 		msg.Role = getString(msgData, "role")

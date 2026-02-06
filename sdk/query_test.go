@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -364,6 +365,62 @@ func TestQuery_Initialize_WithHooks(t *testing.T) {
 	}
 }
 
+func TestQuery_Initialize_WithAgents(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+	query.SetAgents(map[string]types.AgentDefinition{
+		"researcher": {
+			Description: "Research assistant",
+			Prompt:      "Gather facts",
+			Tools:       []string{"Read"},
+			Model:       types.AgentModelSonnet,
+		},
+	})
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	go func() {
+		if !transport.WaitForWrite(time.Second) {
+			t.Error("timeout waiting for init request write")
+			return
+		}
+		written := transport.Written()
+		if len(written) == 0 {
+			t.Error("expected at least one write")
+			return
+		}
+
+		var req map[string]any
+		if err := json.Unmarshal([]byte(written[0]), &req); err != nil {
+			t.Errorf("failed to parse request: %v", err)
+			return
+		}
+		reqID := req["request_id"].(string)
+		request := req["request"].(map[string]any)
+		agents, ok := request["agents"].(map[string]any)
+		if !ok || len(agents) != 1 {
+			t.Errorf("expected agents payload in initialize request, got %v", request["agents"])
+		}
+
+		transport.SendMessage(map[string]any{
+			"type": "control_response",
+			"response": map[string]any{
+				"subtype":    "success",
+				"request_id": reqID,
+				"response":   map[string]any{},
+			},
+		})
+	}()
+
+	if _, err := query.Initialize(nil); err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+}
+
 func TestQuery_Initialize_NonStreaming(t *testing.T) {
 	transport := NewMockTransport()
 	query := NewQuery(transport, false) // non-streaming
@@ -553,6 +610,153 @@ func TestQuery_RewindFiles(t *testing.T) {
 	err := query.RewindFiles("msg_123")
 	if err != nil {
 		t.Errorf("RewindFiles failed: %v", err)
+	}
+}
+
+func TestQuery_GetMCPStatus(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	go func() {
+		if !transport.WaitForWrite(time.Second) {
+			t.Error("timeout waiting for mcp status request write")
+			return
+		}
+
+		written := transport.Written()
+		if len(written) == 0 {
+			t.Error("expected mcp status request")
+			return
+		}
+
+		var req map[string]any
+		if err := json.Unmarshal([]byte(written[0]), &req); err != nil {
+			t.Errorf("failed to parse request: %v", err)
+			return
+		}
+		reqID := req["request_id"].(string)
+
+		transport.SendMessage(map[string]any{
+			"type": "control_response",
+			"response": map[string]any{
+				"subtype":    "success",
+				"request_id": reqID,
+				"response": map[string]any{
+					"mcpServers": []any{
+						map[string]any{"name": "calc", "status": "connected"},
+					},
+				},
+			},
+		})
+	}()
+
+	status, err := query.GetMCPStatus()
+	if err != nil {
+		t.Fatalf("GetMCPStatus failed: %v", err)
+	}
+	if status["mcpServers"] == nil {
+		t.Errorf("expected mcpServers in response, got %v", status)
+	}
+}
+
+func TestQuery_SendControlRequest_FailFastWhenTransportCloses(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := query.sendControlRequest(map[string]any{
+			"subtype": "interrupt",
+		}, 5*time.Second)
+		errCh <- err
+	}()
+
+	if !transport.WaitForWrite(time.Second) {
+		t.Fatal("timeout waiting for control request write")
+	}
+
+	_ = transport.Close()
+
+	select {
+	case err := <-errCh:
+		if err == nil {
+			t.Fatal("expected error when transport closes")
+		}
+		if !strings.Contains(err.Error(), "transport message stream closed") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("control request did not fail fast")
+	}
+}
+
+func TestQuery_TransportErrorDoesNotAbortRouting(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	transport.SendError(fmt.Errorf("transient transport parse error"))
+
+	select {
+	case err := <-query.Errors():
+		if err == nil || !strings.Contains(err.Error(), "transient transport parse error") {
+			t.Fatalf("unexpected routed error: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected transport error to be surfaced")
+	}
+
+	go func() {
+		if !transport.WaitForWrite(time.Second) {
+			t.Error("timeout waiting for control request write")
+			return
+		}
+		written := transport.Written()
+		if len(written) == 0 {
+			t.Error("expected control request write")
+			return
+		}
+		var req map[string]any
+		if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+			t.Errorf("failed to parse request: %v", err)
+			return
+		}
+		reqID, _ := req["request_id"].(string)
+		transport.SendMessage(map[string]any{
+			"type": "control_response",
+			"response": map[string]any{
+				"subtype":    "success",
+				"request_id": reqID,
+				"response":   map[string]any{"ok": true},
+			},
+		})
+	}()
+
+	resp, err := query.sendControlRequest(map[string]any{
+		"subtype": "interrupt",
+	}, 2*time.Second)
+	if err != nil {
+		t.Fatalf("expected control request success after transport error, got: %v", err)
+	}
+	if resp["ok"] != true {
+		t.Fatalf("expected success response, got: %v", resp)
 	}
 }
 

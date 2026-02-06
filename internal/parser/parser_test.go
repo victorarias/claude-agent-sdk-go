@@ -189,6 +189,37 @@ func TestParseMessage_WithParentToolUseID(t *testing.T) {
 	}
 }
 
+func TestParseMessage_UserWithToolUseResult(t *testing.T) {
+	raw := map[string]any{
+		"type": "user",
+		"message": map[string]any{
+			"role":    "user",
+			"content": "Done",
+		},
+		"tool_use_result": map[string]any{
+			"tool_name": "Bash",
+			"exit_code": float64(0),
+		},
+	}
+
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+
+	user, ok := msg.(*types.UserMessage)
+	if !ok {
+		t.Fatalf("expected *UserMessage, got %T", msg)
+	}
+
+	if user.ToolUseResult == nil {
+		t.Fatal("expected tool_use_result to be parsed")
+	}
+	if user.ToolUseResult["tool_name"] != "Bash" {
+		t.Errorf("got tool_name %v, want Bash", user.ToolUseResult["tool_name"])
+	}
+}
+
 func TestParseContentBlock(t *testing.T) {
 	tests := []struct {
 		name string

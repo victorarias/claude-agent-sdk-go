@@ -5,6 +5,7 @@ package sdk
 
 import (
 	"context"
+	"encoding/json"
 	"runtime"
 	"testing"
 	"time"
@@ -47,6 +48,34 @@ func TestQueryStream_NoGoroutineLeak(t *testing.T) {
 
 	// Use a cancellable context
 	ctx, cancel := context.WithCancel(context.Background())
+
+	// Respond to initialize request so QueryStream can start.
+	go func() {
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			if req["type"] != "control_request" {
+				continue
+			}
+			reqID, _ := req["request_id"].(string)
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{"session_id": "leak_test"},
+				},
+			})
+			return
+		}
+	}()
 
 	// Call QueryStream but ABANDON the channels without consuming
 	// This simulates a caller that starts the stream but doesn't read from it
@@ -113,6 +142,34 @@ func TestQueryStream_WithContextCancellation(t *testing.T) {
 
 	// Create a cancellable context
 	ctx, cancel := context.WithCancel(context.Background())
+
+	// Respond to initialize request so QueryStream can start.
+	go func() {
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			if req["type"] != "control_request" {
+				continue
+			}
+			reqID, _ := req["request_id"].(string)
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{"session_id": "leak_test"},
+				},
+			})
+			return
+		}
+	}()
 
 	// Call QueryStream
 	msgChan, errChan := QueryStream(ctx, "Hello", types.WithTransport(transport))

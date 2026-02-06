@@ -484,6 +484,82 @@ func TestClient_RewindFiles_NotConnected(t *testing.T) {
 	}
 }
 
+func TestClient_GetMCPStatus(t *testing.T) {
+	transport := NewMockTransport()
+	client := NewClient(types.WithTransport(transport))
+
+	done := make(chan bool)
+	go func() {
+		defer close(done)
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			reqID, ok := req["request_id"].(string)
+			if !ok {
+				continue
+			}
+
+			responseData := map[string]any{"session_id": "test_session"}
+			if requestData, ok := req["request"].(map[string]any); ok {
+				if requestData["subtype"] == "mcp_status" {
+					responseData = map[string]any{
+						"mcpServers": []any{
+							map[string]any{"name": "calc", "status": "connected"},
+						},
+					}
+				}
+			}
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   responseData,
+				},
+			})
+
+			if requestData, ok := req["request"].(map[string]any); ok && requestData["subtype"] == "mcp_status" {
+				return
+			}
+		}
+	}()
+
+	ctx := context.Background()
+	if err := client.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	status, err := client.GetMCPStatus()
+	if err != nil {
+		t.Fatalf("GetMCPStatus failed: %v", err)
+	}
+	if status["mcpServers"] == nil {
+		t.Fatalf("expected mcpServers response, got %v", status)
+	}
+	<-done
+}
+
+func TestClient_GetMCPStatus_NotConnected(t *testing.T) {
+	client := NewClient()
+	_, err := client.GetMCPStatus()
+	if err == nil {
+		t.Fatal("expected error when fetching MCP status on disconnected client")
+	}
+	if _, ok := err.(*types.ConnectionError); !ok {
+		t.Errorf("expected ConnectionError, got %T", err)
+	}
+}
+
 func TestClient_ServerInfo(t *testing.T) {
 	transport := NewMockTransport()
 	client := NewClient(types.WithTransport(transport))

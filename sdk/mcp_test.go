@@ -112,6 +112,7 @@ func TestMCPServer_CallTool_NotFound(t *testing.T) {
 }
 
 func TestMCPServer_ToConfig(t *testing.T) {
+	readOnly := true
 	server := &types.MCPServer{
 		Name:    "test-server",
 		Version: "1.0.0",
@@ -125,6 +126,7 @@ func TestMCPServer_ToConfig(t *testing.T) {
 						"name": map[string]any{"type": "string"},
 					},
 				},
+				Annotations: &types.MCPToolAnnotations{ReadOnlyHint: &readOnly},
 			},
 		},
 	}
@@ -144,6 +146,9 @@ func TestMCPServer_ToConfig(t *testing.T) {
 	}
 	if tools[0]["name"] != "greet" {
 		t.Errorf("expected tool name greet, got %v", tools[0]["name"])
+	}
+	if tools[0]["annotations"] == nil {
+		t.Errorf("expected tool annotations, got nil")
 	}
 }
 

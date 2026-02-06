@@ -243,15 +243,6 @@ func findCLI(explicitPath, bundledPath string) (string, error) {
 // WindowsMaxCommandLength is the maximum command line length on Windows.
 const WindowsMaxCommandLength = 8191
 
-// cmdLengthLimit is the command line length limit (8000 on Windows, 100000 on Unix).
-// Matches Python SDK _CMD_LENGTH_LIMIT.
-func cmdLengthLimit() int {
-	if runtime.GOOS == "windows" {
-		return 8000 // Safety margin below Windows limit of 8191
-	}
-	return 100000 // Unix systems have much higher limits
-}
-
 // buildSettingsValue merges sandbox settings into settings JSON.
 // Matches Python SDK behavior in subprocess_cli.py:118-170.
 func buildSettingsValue(opts *types.Options) (string, error) {
@@ -509,13 +500,6 @@ func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) [
 		}
 	}
 
-	// Agents - custom agent definitions
-	if len(opts.Agents) > 0 {
-		if agentsJSON, err := json.Marshal(opts.Agents); err == nil {
-			cmd = append(cmd, "--agents", string(agentsJSON))
-		}
-	}
-
 	// Plugins - add plugin directories
 	for _, plugin := range opts.Plugins {
 		if plugin.Type == "local" {
@@ -537,68 +521,6 @@ func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) [
 		cmd = append(cmd, "--input-format", "stream-json")
 	} else {
 		cmd = append(cmd, "--print", "--", prompt)
-	}
-
-	// Optimize command length if needed (temp file fallback for agents)
-	cmd = optimizeCommandLength(cmd, opts)
-
-	return cmd
-}
-
-// getCmdLength calculates total command line length.
-func getCmdLength(cmd []string) int {
-	totalLen := 0
-	for _, arg := range cmd {
-		totalLen += len(arg) + 1 // +1 for space separator
-	}
-	return totalLen
-}
-
-// optimizeCommandLength optimizes command length using temp file fallback for agents.
-// Returns modified command and temp file path (if created).
-// Matches Python SDK behavior in subprocess_cli.py:336-366.
-func optimizeCommandLength(cmd []string, opts *types.Options) []string {
-	// Only optimize if agents are present
-	if len(opts.Agents) == 0 {
-		return cmd
-	}
-
-	// Check if command exceeds length limit
-	cmdStr := strings.Join(cmd, " ")
-	limit := cmdLengthLimit()
-	if len(cmdStr) <= limit {
-		return cmd
-	}
-
-	// Find --agents argument and replace with temp file reference
-	for i := 0; i < len(cmd)-1; i++ {
-		if cmd[i] == "--agents" {
-			agentsJSON := cmd[i+1]
-
-			// Create temp file
-			tempFile, err := os.CreateTemp("", "claude-agents-*.json")
-			if err != nil {
-				// If temp file creation fails, log but continue with original command
-				// The command length check will catch it later if it's truly too long
-				return cmd
-			}
-
-			// Write agents JSON to temp file
-			if _, err := tempFile.WriteString(agentsJSON); err != nil {
-				tempFile.Close()
-				os.Remove(tempFile.Name())
-				return cmd
-			}
-			tempFile.Close()
-
-			// Replace agents JSON with @filepath reference
-			cmd[i+1] = "@" + tempFile.Name()
-
-			// Note: temp file cleanup is handled by transport.Close()
-			// The transport will track this via AddTempFile() when it detects the @ prefix
-
-			break
-		}
 	}
 
 	return cmd
@@ -759,16 +681,6 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 
 	// Build command
 	args := buildCommand(cliPath, t.prompt, t.options, t.streaming)
-
-	// Track temp files created during command optimization
-	// If --agents arg starts with @, it's a temp file reference
-	for i := 0; i < len(args)-1; i++ {
-		if args[i] == "--agents" && strings.HasPrefix(args[i+1], "@") {
-			tempFilePath := strings.TrimPrefix(args[i+1], "@")
-			t.AddTempFile(tempFilePath)
-			break
-		}
-	}
 
 	// Check command length on Windows
 	if err := checkCommandLength(args); err != nil {

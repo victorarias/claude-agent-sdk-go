@@ -119,7 +119,17 @@ type MCPTool struct {
 	Name        string
 	Description string
 	Schema      map[string]any
+	Annotations *MCPToolAnnotations
 	Handler     MCPToolHandler
+}
+
+// MCPToolAnnotations describes optional hints for MCP tools.
+// These map to the MCP/Claude tool annotation fields.
+type MCPToolAnnotations struct {
+	ReadOnlyHint    *bool `json:"readOnlyHint,omitempty"`
+	DestructiveHint *bool `json:"destructiveHint,omitempty"`
+	IdempotentHint  *bool `json:"idempotentHint,omitempty"`
+	OpenWorldHint   *bool `json:"openWorldHint,omitempty"`
 }
 
 // MCPToolHandler is the function signature for MCP tool handlers.
@@ -214,11 +224,30 @@ func (s *MCPServer) CallTool(name string, input map[string]any) (*MCPToolResult,
 func (s *MCPServer) ToConfig() map[string]any {
 	tools := make([]map[string]any, len(s.Tools))
 	for i, tool := range s.Tools {
-		tools[i] = map[string]any{
+		toolConfig := map[string]any{
 			"name":        tool.Name,
 			"description": tool.Description,
 			"inputSchema": tool.Schema,
 		}
+		if tool.Annotations != nil {
+			annotations := map[string]any{}
+			if tool.Annotations.ReadOnlyHint != nil {
+				annotations["readOnlyHint"] = *tool.Annotations.ReadOnlyHint
+			}
+			if tool.Annotations.DestructiveHint != nil {
+				annotations["destructiveHint"] = *tool.Annotations.DestructiveHint
+			}
+			if tool.Annotations.IdempotentHint != nil {
+				annotations["idempotentHint"] = *tool.Annotations.IdempotentHint
+			}
+			if tool.Annotations.OpenWorldHint != nil {
+				annotations["openWorldHint"] = *tool.Annotations.OpenWorldHint
+			}
+			if len(annotations) > 0 {
+				toolConfig["annotations"] = annotations
+			}
+		}
+		tools[i] = toolConfig
 	}
 
 	return map[string]any{
@@ -640,10 +669,22 @@ func (b *MCPServerBuilder) WithTool(
 	schema map[string]any,
 	handler MCPToolHandler,
 ) *MCPServerBuilder {
+	return b.WithToolWithAnnotations(name, description, schema, nil, handler)
+}
+
+// WithToolWithAnnotations adds a tool with MCP annotations to the server.
+func (b *MCPServerBuilder) WithToolWithAnnotations(
+	name string,
+	description string,
+	schema map[string]any,
+	annotations *MCPToolAnnotations,
+	handler MCPToolHandler,
+) *MCPServerBuilder {
 	b.tools = append(b.tools, &MCPTool{
 		Name:        name,
 		Description: description,
 		Schema:      schema,
+		Annotations: annotations,
 		Handler:     handler,
 	})
 	return b

@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -67,6 +68,10 @@ type Query struct {
 
 	// Stream close timeout for waiting for first result
 	streamCloseTimeout time.Duration
+	// Initialize request timeout
+	initializeTimeout time.Duration
+	// Agent definitions to send in initialize request
+	agents map[string]types.AgentDefinition
 
 	// Lifecycle
 	ctx    context.Context
@@ -92,12 +97,17 @@ func NewQuery(transport types.Transport, streaming bool) *Query {
 		errors:             make(chan error, 1),
 		firstResultChan:    make(chan struct{}),
 		streamCloseTimeout: DefaultStreamCloseTimeout,
+		initializeTimeout:  60 * time.Second,
+		agents:             make(map[string]types.AgentDefinition),
 	}
 }
 
 // Start begins processing messages from the transport.
 func (q *Query) Start(ctx context.Context) error {
 	q.ctx, q.cancel = context.WithCancel(ctx)
+	if _, ok := q.transport.(types.ErrorTransport); !ok {
+		log.Printf("WARNING: transport does not implement types.ErrorTransport; async transport errors won't be surfaced (compat mode, may be removed in a future major release)")
+	}
 
 	// Start message router
 	q.wg.Add(1)
@@ -155,13 +165,31 @@ func (q *Query) Close() error {
 // routeMessages reads from transport and routes control vs SDK messages.
 func (q *Query) routeMessages() {
 	defer q.wg.Done()
+	var transportErrors <-chan error
+	if withErrors, ok := q.transport.(types.ErrorTransport); ok {
+		transportErrors = withErrors.Errors()
+	}
 
 	for {
 		select {
 		case <-q.ctx.Done():
+			q.failPendingRequests(q.ctx.Err())
 			return
+		case err, ok := <-transportErrors:
+			if !ok {
+				transportErrors = nil
+				continue
+			}
+			if err == nil {
+				continue
+			}
+			select {
+			case q.errors <- err:
+			default:
+			}
 		case raw, ok := <-q.transport.Messages():
 			if !ok {
+				q.failPendingRequests(fmt.Errorf("transport message stream closed"))
 				return
 			}
 
@@ -178,6 +206,21 @@ func (q *Query) routeMessages() {
 				// Parse and route regular messages
 				q.handleSDKMessage(raw)
 			}
+		}
+	}
+}
+
+// failPendingRequests unblocks all pending control requests with an error.
+func (q *Query) failPendingRequests(err error) {
+	if err == nil {
+		err = fmt.Errorf("transport closed")
+	}
+	q.pendingMu.Lock()
+	defer q.pendingMu.Unlock()
+	for _, respChan := range q.pendingRequests {
+		select {
+		case respChan <- map[string]any{"error": err.Error()}:
+		default:
 		}
 	}
 }
@@ -529,6 +572,27 @@ func (q *Query) SetStreamCloseTimeout(timeout time.Duration) {
 	q.streamCloseTimeout = timeout
 }
 
+// SetInitializeTimeout sets the timeout used for the initialize control request.
+func (q *Query) SetInitializeTimeout(timeout time.Duration) {
+	if timeout <= 0 {
+		return
+	}
+	q.initializeTimeout = timeout
+}
+
+// SetAgents sets agent definitions to be sent in the initialize control request.
+func (q *Query) SetAgents(agents map[string]types.AgentDefinition) {
+	if len(agents) == 0 {
+		q.agents = make(map[string]types.AgentDefinition)
+		return
+	}
+	copied := make(map[string]types.AgentDefinition, len(agents))
+	for name, def := range agents {
+		copied[name] = def
+	}
+	q.agents = copied
+}
+
 // WaitForFirstResult returns a channel that is closed when the first result is received.
 func (q *Query) WaitForFirstResult() <-chan struct{} {
 	return q.firstResultChan
@@ -643,11 +707,30 @@ func (q *Query) handleMCPMessage(serverName string, message map[string]any) (any
 			if schema == nil {
 				schema = map[string]any{"type": "object"}
 			}
-			tools = append(tools, map[string]any{
+			toolData := map[string]any{
 				"name":        tool.Name,
 				"description": tool.Description,
 				"inputSchema": schema,
-			})
+			}
+			if tool.Annotations != nil {
+				annotations := map[string]any{}
+				if tool.Annotations.ReadOnlyHint != nil {
+					annotations["readOnlyHint"] = *tool.Annotations.ReadOnlyHint
+				}
+				if tool.Annotations.DestructiveHint != nil {
+					annotations["destructiveHint"] = *tool.Annotations.DestructiveHint
+				}
+				if tool.Annotations.IdempotentHint != nil {
+					annotations["idempotentHint"] = *tool.Annotations.IdempotentHint
+				}
+				if tool.Annotations.OpenWorldHint != nil {
+					annotations["openWorldHint"] = *tool.Annotations.OpenWorldHint
+				}
+				if len(annotations) > 0 {
+					toolData["annotations"] = annotations
+				}
+			}
+			tools = append(tools, toolData)
 		}
 		return map[string]any{
 			"jsonrpc": "2.0",
@@ -817,8 +900,11 @@ func (q *Query) Initialize(hooks map[types.HookEvent][]types.HookMatcher) (map[s
 	if len(hooksConfig) > 0 {
 		request["hooks"] = hooksConfig
 	}
+	if agents := buildInitializeAgents(q.agents); len(agents) > 0 {
+		request["agents"] = agents
+	}
 
-	result, err := q.sendControlRequest(request, 60*time.Second)
+	result, err := q.sendControlRequest(request, q.initializeTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -828,6 +914,27 @@ func (q *Query) Initialize(hooks map[types.HookEvent][]types.HookMatcher) (map[s
 	q.initMu.Unlock()
 
 	return result, nil
+}
+
+func buildInitializeAgents(agents map[string]types.AgentDefinition) map[string]any {
+	if len(agents) == 0 {
+		return nil
+	}
+	result := make(map[string]any, len(agents))
+	for name, agent := range agents {
+		agentConfig := map[string]any{
+			"description": agent.Description,
+			"prompt":      agent.Prompt,
+		}
+		if len(agent.Tools) > 0 {
+			agentConfig["tools"] = agent.Tools
+		}
+		if agent.Model != "" {
+			agentConfig["model"] = string(agent.Model)
+		}
+		result[name] = agentConfig
+	}
+	return result
 }
 
 // buildHooksConfig builds the hooks configuration for initialization.
@@ -909,4 +1016,11 @@ func (q *Query) RewindFiles(userMessageID string) error {
 		"user_message_id": userMessageID,
 	}, 30*time.Second)
 	return err
+}
+
+// GetMCPStatus returns current MCP server connection status.
+func (q *Query) GetMCPStatus() (map[string]any, error) {
+	return q.sendControlRequest(map[string]any{
+		"subtype": "mcp_status",
+	}, 30*time.Second)
 }

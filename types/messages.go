@@ -142,6 +142,7 @@ type UserMessage struct {
 	Role            string         `json:"role,omitempty"`
 	UUID            string         `json:"uuid,omitempty"`
 	ParentToolUseID *string        `json:"parent_tool_use_id,omitempty"`
+	ToolUseResult   map[string]any `json:"tool_use_result,omitempty"`
 }
 
 func (m *UserMessage) MessageType() string { return "user" }
@@ -291,6 +292,9 @@ const (
 	// inspection or modification of tool results before they are returned to Claude.
 	HookPostToolUse HookEvent = "PostToolUse"
 
+	// HookPostToolUseFailure is triggered when a tool invocation fails.
+	HookPostToolUseFailure HookEvent = "PostToolUseFailure"
+
 	// HookUserPromptSubmit is triggered when a user submits a prompt. This allows
 	// inspection or modification of user input before it is sent to Claude.
 	HookUserPromptSubmit HookEvent = "UserPromptSubmit"
@@ -306,6 +310,15 @@ const (
 	// HookPreCompact is triggered before the conversation history is compacted.
 	// This allows inspection or archival of messages before they are removed.
 	HookPreCompact HookEvent = "PreCompact"
+
+	// HookNotification is triggered for CLI/user-facing notifications.
+	HookNotification HookEvent = "Notification"
+
+	// HookSubagentStart is triggered when a subagent starts.
+	HookSubagentStart HookEvent = "SubagentStart"
+
+	// HookPermissionRequest is triggered for permission request hook events.
+	HookPermissionRequest HookEvent = "PermissionRequest"
 )
 
 // HookContext provides context for hook callbacks.
@@ -327,6 +340,7 @@ type PreToolUseHookInput struct {
 	BaseHookInput
 	ToolName  string         `json:"tool_name"`
 	ToolInput map[string]any `json:"tool_input"`
+	ToolUseID string         `json:"tool_use_id"`
 }
 
 // PostToolUseHookInput is the input for PostToolUse hooks.
@@ -335,6 +349,17 @@ type PostToolUseHookInput struct {
 	ToolName     string         `json:"tool_name"`
 	ToolInput    map[string]any `json:"tool_input"`
 	ToolResponse any            `json:"tool_response"`
+	ToolUseID    string         `json:"tool_use_id"`
+}
+
+// PostToolUseFailureHookInput is the input for PostToolUseFailure hooks.
+type PostToolUseFailureHookInput struct {
+	BaseHookInput
+	ToolName    string         `json:"tool_name"`
+	ToolInput   map[string]any `json:"tool_input"`
+	ToolUseID   string         `json:"tool_use_id"`
+	Error       string         `json:"error"`
+	IsInterrupt *bool          `json:"is_interrupt,omitempty"`
 }
 
 // UserPromptSubmitHookInput is the input for UserPromptSubmit hooks.
@@ -352,7 +377,10 @@ type StopHookInput struct {
 // SubagentStopHookInput is the input for SubagentStop hooks.
 type SubagentStopHookInput struct {
 	BaseHookInput
-	StopHookActive bool `json:"stop_hook_active"`
+	StopHookActive      bool   `json:"stop_hook_active"`
+	AgentID             string `json:"agent_id"`
+	AgentTranscriptPath string `json:"agent_transcript_path"`
+	AgentType           string `json:"agent_type"`
 }
 
 // PreCompactHookInput is the input for PreCompact hooks.
@@ -360,6 +388,29 @@ type PreCompactHookInput struct {
 	BaseHookInput
 	Trigger            string  `json:"trigger"`
 	CustomInstructions *string `json:"custom_instructions,omitempty"`
+}
+
+// NotificationHookInput is the input for Notification hooks.
+type NotificationHookInput struct {
+	BaseHookInput
+	Message          string  `json:"message"`
+	Title            *string `json:"title,omitempty"`
+	NotificationType string  `json:"notification_type"`
+}
+
+// SubagentStartHookInput is the input for SubagentStart hooks.
+type SubagentStartHookInput struct {
+	BaseHookInput
+	AgentID   string `json:"agent_id"`
+	AgentType string `json:"agent_type"`
+}
+
+// PermissionRequestHookInput is the input for PermissionRequest hooks.
+type PermissionRequestHookInput struct {
+	BaseHookInput
+	ToolName              string         `json:"tool_name"`
+	ToolInput             map[string]any `json:"tool_input"`
+	PermissionSuggestions []any          `json:"permission_suggestions,omitempty"`
 }
 
 // HookOutput is the output from a hook callback.
@@ -387,6 +438,9 @@ type PreToolUseCallback func(input *PreToolUseHookInput, toolUseID *string, ctx 
 // PostToolUseCallback is a type-safe callback for PostToolUse hooks.
 type PostToolUseCallback func(input *PostToolUseHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error)
 
+// PostToolUseFailureCallback is a type-safe callback for PostToolUseFailure hooks.
+type PostToolUseFailureCallback func(input *PostToolUseFailureHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error)
+
 // UserPromptSubmitCallback is a type-safe callback for UserPromptSubmit hooks.
 type UserPromptSubmitCallback func(input *UserPromptSubmitHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error)
 
@@ -398,6 +452,15 @@ type SubagentStopCallback func(input *SubagentStopHookInput, toolUseID *string, 
 
 // PreCompactCallback is a type-safe callback for PreCompact hooks.
 type PreCompactCallback func(input *PreCompactHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error)
+
+// NotificationCallback is a type-safe callback for Notification hooks.
+type NotificationCallback func(input *NotificationHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error)
+
+// SubagentStartCallback is a type-safe callback for SubagentStart hooks.
+type SubagentStartCallback func(input *SubagentStartHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error)
+
+// PermissionRequestCallback is a type-safe callback for PermissionRequest hooks.
+type PermissionRequestCallback func(input *PermissionRequestHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error)
 
 // ToGenericCallback converts a type-safe callback to a generic HookCallback.
 // This allows using type-safe callbacks with the existing hook infrastructure.
@@ -478,6 +541,8 @@ func (b *HookBuilder) WithCallback(callback any) *HookBuilder {
 		genericCallback = ToGenericCallback[PreToolUseHookInput](cb)
 	case PostToolUseCallback:
 		genericCallback = ToGenericCallback[PostToolUseHookInput](cb)
+	case PostToolUseFailureCallback:
+		genericCallback = ToGenericCallback[PostToolUseFailureHookInput](cb)
 	case UserPromptSubmitCallback:
 		genericCallback = ToGenericCallback[UserPromptSubmitHookInput](cb)
 	case StopCallback:
@@ -486,6 +551,12 @@ func (b *HookBuilder) WithCallback(callback any) *HookBuilder {
 		genericCallback = ToGenericCallback[SubagentStopHookInput](cb)
 	case PreCompactCallback:
 		genericCallback = ToGenericCallback[PreCompactHookInput](cb)
+	case NotificationCallback:
+		genericCallback = ToGenericCallback[NotificationHookInput](cb)
+	case SubagentStartCallback:
+		genericCallback = ToGenericCallback[SubagentStartHookInput](cb)
+	case PermissionRequestCallback:
+		genericCallback = ToGenericCallback[PermissionRequestHookInput](cb)
 	case HookCallback:
 		// Already a generic callback
 		genericCallback = cb
@@ -496,6 +567,8 @@ func (b *HookBuilder) WithCallback(callback any) *HookBuilder {
 			genericCallback = ToGenericCallback[PreToolUseHookInput](fn)
 		} else if fn, ok := callback.(func(*PostToolUseHookInput, *string, *HookContext) (*HookOutput, error)); ok {
 			genericCallback = ToGenericCallback[PostToolUseHookInput](fn)
+		} else if fn, ok := callback.(func(*PostToolUseFailureHookInput, *string, *HookContext) (*HookOutput, error)); ok {
+			genericCallback = ToGenericCallback[PostToolUseFailureHookInput](fn)
 		} else if fn, ok := callback.(func(*UserPromptSubmitHookInput, *string, *HookContext) (*HookOutput, error)); ok {
 			genericCallback = ToGenericCallback[UserPromptSubmitHookInput](fn)
 		} else if fn, ok := callback.(func(*StopHookInput, *string, *HookContext) (*HookOutput, error)); ok {
@@ -504,6 +577,12 @@ func (b *HookBuilder) WithCallback(callback any) *HookBuilder {
 			genericCallback = ToGenericCallback[SubagentStopHookInput](fn)
 		} else if fn, ok := callback.(func(*PreCompactHookInput, *string, *HookContext) (*HookOutput, error)); ok {
 			genericCallback = ToGenericCallback[PreCompactHookInput](fn)
+		} else if fn, ok := callback.(func(*NotificationHookInput, *string, *HookContext) (*HookOutput, error)); ok {
+			genericCallback = ToGenericCallback[NotificationHookInput](fn)
+		} else if fn, ok := callback.(func(*SubagentStartHookInput, *string, *HookContext) (*HookOutput, error)); ok {
+			genericCallback = ToGenericCallback[SubagentStartHookInput](fn)
+		} else if fn, ok := callback.(func(*PermissionRequestHookInput, *string, *HookContext) (*HookOutput, error)); ok {
+			genericCallback = ToGenericCallback[PermissionRequestHookInput](fn)
 		} else {
 			panic(fmt.Sprintf("unsupported callback type: %T", callback))
 		}
@@ -611,8 +690,9 @@ func (r *SDKControlPermissionRequest) ControlRequestType() string {
 
 // SDKControlInitializeRequest initializes the SDK session.
 type SDKControlInitializeRequest struct {
-	Subtype string            `json:"subtype"`
-	Hooks   map[HookEvent]any `json:"hooks,omitempty"`
+	Subtype string                    `json:"subtype"`
+	Hooks   map[HookEvent]any         `json:"hooks,omitempty"`
+	Agents  map[string]map[string]any `json:"agents,omitempty"`
 }
 
 // ControlRequestType returns the request subtype.

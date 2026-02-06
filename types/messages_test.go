@@ -226,6 +226,36 @@ func TestUserMessage(t *testing.T) {
 			t.Errorf("Expected empty string, got %q", msg.Text())
 		}
 	})
+
+	t.Run("tool_use_result marshals and unmarshals", func(t *testing.T) {
+		msg := &UserMessage{
+			Content: []ContentBlock{
+				&TextBlock{TextContent: "ok"},
+			},
+			ToolUseResult: map[string]any{
+				"tool_name": "Bash",
+				"exit_code": float64(0),
+			},
+		}
+
+		data, err := json.Marshal(msg)
+		if err != nil {
+			t.Fatalf("marshal failed: %v", err)
+		}
+
+		var decoded map[string]any
+		if err := json.Unmarshal(data, &decoded); err != nil {
+			t.Fatalf("unmarshal failed: %v", err)
+		}
+
+		toolUseResult, ok := decoded["tool_use_result"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected tool_use_result map, got %T", decoded["tool_use_result"])
+		}
+		if toolUseResult["tool_name"] != "Bash" {
+			t.Errorf("got tool_name %v, want Bash", toolUseResult["tool_name"])
+		}
+	})
 }
 
 // TestAssistantMessage tests AssistantMessage methods.

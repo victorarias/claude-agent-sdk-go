@@ -160,14 +160,18 @@ func TestHookEvent(t *testing.T) {
 	events := []types.HookEvent{
 		types.HookPreToolUse,
 		types.HookPostToolUse,
+		types.HookPostToolUseFailure,
 		types.HookUserPromptSubmit,
 		types.HookStop,
 		types.HookSubagentStop,
 		types.HookPreCompact,
+		types.HookNotification,
+		types.HookSubagentStart,
+		types.HookPermissionRequest,
 	}
 
-	if len(events) != 6 {
-		t.Errorf("expected 6 hook events, got %d", len(events))
+	if len(events) != 10 {
+		t.Errorf("expected 10 hook events, got %d", len(events))
 	}
 }
 
@@ -181,6 +185,7 @@ func TestHookInput(t *testing.T) {
 		},
 		ToolName:  "Bash",
 		ToolInput: map[string]any{"command": "ls"},
+		ToolUseID: "tool_123",
 	}
 
 	if input.SessionID != "sess_123" {
