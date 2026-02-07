@@ -99,7 +99,6 @@ The project uses a carefully selected set of linters:
 
 ### Excluded Directories
 The following directories are excluded from linting:
-- `.beads/` - Task tracking
 - `.github/` - GitHub workflows
 - `.claude/` - Claude configuration
 

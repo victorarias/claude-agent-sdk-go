@@ -253,6 +253,9 @@ make test
 
 # Run with coverage report
 make test-coverage
+
+# Run a real Claude CLI smoke test
+make smoke
 ```
 
 ### Code Quality
@@ -274,6 +277,7 @@ make all
 make help          # Show all available targets
 make all           # Format, lint, test, and build
 make test          # Run tests with gotestsum
+make smoke         # Run real Claude CLI smoke test
 make lint          # Run golangci-lint
 make build         # Build all packages
 make build-examples # Build example applications

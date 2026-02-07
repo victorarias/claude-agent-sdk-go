@@ -1,4 +1,4 @@
-.PHONY: all test lint fmt build clean install-tools help
+.PHONY: all test lint fmt build clean install-tools help smoke
 
 # Tool versions
 GOTESTSUM_VERSION := latest
@@ -24,6 +24,10 @@ test-ci:
 test-coverage:
 	go run gotest.tools/gotestsum@$(GOTESTSUM_VERSION) --format testname -- ./... -race -coverprofile=coverage.out
 	go tool cover -html=coverage.out -o coverage.html
+
+# Run a real CLI smoke test (requires Claude CLI auth/session or API key env)
+smoke:
+	CLAUDE_TEST_INTEGRATION=1 CLAUDE_TEST_TIMEOUT=3m go test -tags=integration ./sdk -run TestIntegration_SimpleQuery -count=1 -v
 
 # Run linter
 lint:
@@ -53,6 +57,7 @@ help:
 	@echo "  all            - Format, lint, test, and build (default)"
 	@echo "  install-tools  - Install gotestsum and golangci-lint"
 	@echo "  test           - Run tests with gotestsum"
+	@echo "  smoke          - Run real Claude CLI smoke test"
 	@echo "  test-ci        - Run tests with JUnit output for CI"
 	@echo "  test-coverage  - Run tests with coverage report"
 	@echo "  lint           - Run golangci-lint"

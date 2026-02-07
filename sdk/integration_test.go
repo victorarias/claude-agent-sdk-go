@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/victorarias/claude-agent-sdk-go/types"
 )
 
 // Integration tests require the Claude CLI to be installed.
@@ -55,10 +57,10 @@ func TestIntegration_SimpleQuery(t *testing.T) {
 	var responseText string
 	for _, msg := range messages {
 		switch m := msg.(type) {
-		case *AssistantMessage:
+		case *types.AssistantMessage:
 			gotAssistant = true
 			responseText = m.Text()
-		case *ResultMessage:
+		case *types.ResultMessage:
 			gotResult = true
 			if !m.IsSuccess() {
 				t.Errorf("Result indicates failure: %s", m.Subtype)
@@ -86,7 +88,7 @@ func TestIntegration_StreamingConversation(t *testing.T) {
 	defer cancel()
 
 	client := NewClient(
-		WithMaxTurns(2),
+		types.WithMaxTurns(2),
 	)
 
 	if err := client.Connect(ctx); err != nil {
@@ -110,7 +112,7 @@ func TestIntegration_StreamingConversation(t *testing.T) {
 
 	// Verify we got a result
 	lastMsg := messages[len(messages)-1]
-	result, ok := lastMsg.(*ResultMessage)
+	result, ok := lastMsg.(*types.ResultMessage)
 	if !ok {
 		t.Errorf("Expected ResultMessage, got %T", lastMsg)
 	} else if !result.IsSuccess() {
@@ -125,7 +127,7 @@ func TestIntegration_MultiTurnConversation(t *testing.T) {
 	defer cancel()
 
 	client := NewClient(
-		WithMaxTurns(5),
+		types.WithMaxTurns(5),
 	)
 
 	if err := client.Connect(ctx); err != nil {
@@ -154,7 +156,7 @@ func TestIntegration_MultiTurnConversation(t *testing.T) {
 	// Check that Claude remembers the name
 	var responseText string
 	for _, msg := range messages {
-		if m, ok := msg.(*AssistantMessage); ok {
+		if m, ok := msg.(*types.AssistantMessage); ok {
 			responseText += m.Text()
 		}
 	}
@@ -171,9 +173,9 @@ func TestIntegration_QueryWithOptions(t *testing.T) {
 	defer cancel()
 
 	messages, err := RunQuery(ctx, "Say hello",
-		WithModel("claude-sonnet-4-5"),
-		WithMaxTurns(1),
-		WithSystemPrompt("You are a test assistant. Be very brief."),
+		types.WithModel("claude-sonnet-4-5"),
+		types.WithMaxTurns(1),
+		types.WithSystemPrompt("You are a test assistant. Be very brief."),
 	)
 	if err != nil {
 		t.Fatalf("QueryWithOptions failed: %v", err)
@@ -186,7 +188,7 @@ func TestIntegration_QueryWithOptions(t *testing.T) {
 	// Verify result
 	var gotResult bool
 	for _, msg := range messages {
-		if result, ok := msg.(*ResultMessage); ok {
+		if result, ok := msg.(*types.ResultMessage); ok {
 			gotResult = true
 			if !result.IsSuccess() {
 				t.Errorf("Result indicates failure: %s", result.Subtype)
@@ -214,7 +216,7 @@ func TestIntegration_ToolUse(t *testing.T) {
 	// Check that tools were used
 	var usedTools bool
 	for _, msg := range messages {
-		if m, ok := msg.(*AssistantMessage); ok {
+		if m, ok := msg.(*types.AssistantMessage); ok {
 			if m.HasToolCalls() {
 				usedTools = true
 				for _, tc := range m.ToolCalls() {
@@ -251,9 +253,9 @@ func TestIntegration_ChannelIteration(t *testing.T) {
 	for msg := range client.Messages() {
 		messageCount++
 		switch m := msg.(type) {
-		case *AssistantMessage:
+		case *types.AssistantMessage:
 			t.Logf("Assistant: %s", m.Text())
-		case *ResultMessage:
+		case *types.ResultMessage:
 			t.Logf("Result: success=%v", m.IsSuccess())
 		}
 	}
@@ -282,7 +284,7 @@ func TestIntegration_SessionResume(t *testing.T) {
 
 	var sessionID string
 	for msg := range client1.Messages() {
-		if result, ok := msg.(*ResultMessage); ok {
+		if result, ok := msg.(*types.ResultMessage); ok {
 			sessionID = result.SessionID
 		}
 	}
@@ -295,7 +297,7 @@ func TestIntegration_SessionResume(t *testing.T) {
 
 	// Second session: resume and verify context
 	client2 := NewClient(
-		WithResume(sessionID),
+		types.WithResume(sessionID),
 	)
 	if err := client2.Connect(ctx); err != nil {
 		t.Fatalf("Connect 2 failed: %v", err)
@@ -308,7 +310,7 @@ func TestIntegration_SessionResume(t *testing.T) {
 
 	var responseText string
 	for msg := range client2.Messages() {
-		if m, ok := msg.(*AssistantMessage); ok {
+		if m, ok := msg.(*types.AssistantMessage); ok {
 			responseText += m.Text()
 		}
 	}
