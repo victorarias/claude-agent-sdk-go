@@ -10,7 +10,7 @@ all: fmt lint test build
 # Install development tools
 install-tools:
 	go install gotest.tools/gotestsum@$(GOTESTSUM_VERSION)
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
 # Run tests with gotestsum for clear output
 test:
@@ -31,7 +31,7 @@ smoke:
 
 # Run linter
 lint:
-	go run github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./internal/... ./sdk/... ./types/...
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./internal/... ./sdk/... ./types/...
 
 # Format code
 fmt:

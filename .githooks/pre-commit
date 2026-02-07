@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "[pre-commit] Running lint..."
+make lint
+
+echo "[pre-commit] Running tests..."
+go test ./...

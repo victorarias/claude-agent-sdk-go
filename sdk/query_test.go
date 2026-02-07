@@ -390,55 +390,66 @@ func TestQuery_Initialize_WithAgents(t *testing.T) {
 	}
 	defer query.Close()
 
+	errCh := make(chan error, 1)
 	go func() {
 		if !transport.WaitForWrite(time.Second) {
-			t.Error("timeout waiting for init request write")
+			errCh <- fmt.Errorf("timeout waiting for init request write")
 			return
 		}
 		written := transport.Written()
 		if len(written) == 0 {
-			t.Error("expected at least one write")
+			errCh <- fmt.Errorf("expected at least one write")
 			return
 		}
 
 		var req map[string]any
 		if err := json.Unmarshal([]byte(written[0]), &req); err != nil {
-			t.Errorf("failed to parse request: %v", err)
+			errCh <- fmt.Errorf("failed to parse request: %w", err)
 			return
 		}
 		reqID := req["request_id"].(string)
 		request := req["request"].(map[string]any)
 		agents, ok := request["agents"].(map[string]any)
 		if !ok || len(agents) != 1 {
-			t.Errorf("expected agents payload in initialize request, got %v", request["agents"])
+			errCh <- fmt.Errorf("expected agents payload in initialize request, got %v", request["agents"])
+			return
 		}
 		researcher, ok := agents["researcher"].(map[string]any)
 		if !ok {
-			t.Fatalf("expected researcher agent in payload, got %v", agents["researcher"])
+			errCh <- fmt.Errorf("expected researcher agent in payload, got %v", agents["researcher"])
+			return
 		}
 		if researcher["description"] != "Research assistant" {
-			t.Errorf("expected description in payload, got %v", researcher["description"])
+			errCh <- fmt.Errorf("expected description in payload, got %v", researcher["description"])
+			return
 		}
 		if researcher["prompt"] != "Gather facts" {
-			t.Errorf("expected prompt in payload, got %v", researcher["prompt"])
+			errCh <- fmt.Errorf("expected prompt in payload, got %v", researcher["prompt"])
+			return
 		}
 		if researcher["model"] != string(types.AgentModelSonnet) {
-			t.Errorf("expected model in payload, got %v", researcher["model"])
+			errCh <- fmt.Errorf("expected model in payload, got %v", researcher["model"])
+			return
 		}
 		if _, ok := researcher["disallowedTools"]; !ok {
-			t.Error("expected disallowedTools in payload")
+			errCh <- fmt.Errorf("expected disallowedTools in payload")
+			return
 		}
 		if _, ok := researcher["mcpServers"]; !ok {
-			t.Error("expected mcpServers in payload")
+			errCh <- fmt.Errorf("expected mcpServers in payload")
+			return
 		}
 		if researcher["criticalSystemReminder_EXPERIMENTAL"] != "Stay on mission" {
-			t.Errorf("expected criticalSystemReminder_EXPERIMENTAL in payload, got %v", researcher["criticalSystemReminder_EXPERIMENTAL"])
+			errCh <- fmt.Errorf("expected criticalSystemReminder_EXPERIMENTAL in payload, got %v", researcher["criticalSystemReminder_EXPERIMENTAL"])
+			return
 		}
 		if _, ok := researcher["skills"]; !ok {
-			t.Error("expected skills in payload")
+			errCh <- fmt.Errorf("expected skills in payload")
+			return
 		}
 		if maxTurns, ok := researcher["maxTurns"].(float64); !ok || maxTurns != 3 {
-			t.Errorf("expected maxTurns=3 in payload, got %v", researcher["maxTurns"])
+			errCh <- fmt.Errorf("expected maxTurns=3 in payload, got %v", researcher["maxTurns"])
+			return
 		}
 
 		transport.SendMessage(map[string]any{
@@ -449,10 +460,15 @@ func TestQuery_Initialize_WithAgents(t *testing.T) {
 				"response":   map[string]any{},
 			},
 		})
+
+		errCh <- nil
 	}()
 
 	if _, err := query.Initialize(nil); err != nil {
 		t.Fatalf("Initialize failed: %v", err)
+	}
+	if err := <-errCh; err != nil {
+		t.Fatal(err)
 	}
 }
 

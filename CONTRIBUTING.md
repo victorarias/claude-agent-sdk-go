@@ -33,6 +33,11 @@ Thank you for your interest in contributing to the Claude Agent SDK Go! This doc
    go test ./...
    ```
 
+5. **Enable local git hooks** (runs lint + tests before each commit):
+   ```bash
+   git config core.hooksPath .githooks
+   ```
+
 ## Development Workflow
 
 ### Making Changes
