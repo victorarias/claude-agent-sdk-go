@@ -1,4 +1,4 @@
-.PHONY: all test lint fmt build clean install-tools help smoke
+.PHONY: all test lint fmt build clean install-tools help smoke fuzz-parser
 
 # Tool versions
 GOTESTSUM_VERSION := latest
@@ -29,6 +29,12 @@ test-coverage:
 smoke:
 	CLAUDE_TEST_INTEGRATION=1 CLAUDE_TEST_TIMEOUT=3m go test -tags=integration ./sdk -run TestIntegration_SimpleQuery -count=1 -v
 
+# Run parser fuzz tests (bounded). Override FUZZTIME as needed, e.g. FUZZTIME=2m.
+FUZZTIME ?= 30s
+fuzz-parser:
+	go test ./internal/parser -run=^$$ -fuzz=FuzzParseMessage_NoPanic -fuzztime=$(FUZZTIME)
+	go test ./internal/parser -run=^$$ -fuzz=FuzzParseContentBlock_NoPanic -fuzztime=$(FUZZTIME)
+
 # Run linter
 lint:
 	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./internal/... ./sdk/... ./types/...
@@ -58,6 +64,7 @@ help:
 	@echo "  install-tools  - Install gotestsum and golangci-lint"
 	@echo "  test           - Run tests with gotestsum"
 	@echo "  smoke          - Run real Claude CLI smoke test"
+	@echo "  fuzz-parser    - Run bounded parser fuzz tests (FUZZTIME=30s default)"
 	@echo "  test-ci        - Run tests with JUnit output for CI"
 	@echo "  test-coverage  - Run tests with coverage report"
 	@echo "  lint           - Run golangci-lint"

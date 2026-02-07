@@ -6,6 +6,7 @@ package sdk
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -408,6 +409,83 @@ func TestClient_SetModel_NotConnected(t *testing.T) {
 	err := client.SetModel("claude-opus-4")
 	if err == nil {
 		t.Error("expected error when setting model on disconnected client")
+	}
+
+	if _, ok := err.(*types.ConnectionError); !ok {
+		t.Errorf("expected ConnectionError, got %T", err)
+	}
+}
+
+func TestClient_ClearModel(t *testing.T) {
+	transport := NewMockTransport()
+	client := NewClient(types.WithTransport(transport))
+
+	done := make(chan error, 1)
+	go func() {
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			reqID, ok := req["request_id"].(string)
+			if !ok {
+				continue
+			}
+
+			requestData, ok := req["request"].(map[string]any)
+			if !ok {
+				continue
+			}
+			if requestData["subtype"] == "set_model" {
+				if _, ok := requestData["model"]; ok {
+					done <- fmt.Errorf("expected set_model without model field, got %v", requestData["model"])
+					return
+				}
+			}
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{},
+				},
+			})
+
+			if requestData["subtype"] == "set_model" {
+				done <- nil
+				return
+			}
+		}
+	}()
+
+	ctx := context.Background()
+	if err := client.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	if err := client.ClearModel(); err != nil {
+		t.Fatalf("ClearModel failed: %v", err)
+	}
+
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClient_ClearModel_NotConnected(t *testing.T) {
+	client := NewClient()
+
+	err := client.ClearModel()
+	if err == nil {
+		t.Error("expected error when clearing model on disconnected client")
 	}
 
 	if _, ok := err.(*types.ConnectionError); !ok {

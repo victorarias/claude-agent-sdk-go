@@ -68,6 +68,36 @@ func TestParseMessage_Assistant(t *testing.T) {
 	}
 }
 
+func TestParseMessage_Assistant_MetadataFields(t *testing.T) {
+	raw := map[string]any{
+		"type":       "assistant",
+		"uuid":       "assistant_1",
+		"session_id": "sess_1",
+		"message": map[string]any{
+			"content": []any{
+				map[string]any{"type": "text", "text": "Hello!"},
+			},
+			"model": "claude-sonnet-4-5",
+		},
+	}
+
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+
+	asst, ok := msg.(*types.AssistantMessage)
+	if !ok {
+		t.Fatalf("expected *AssistantMessage, got %T", msg)
+	}
+	if asst.UUID != "assistant_1" {
+		t.Errorf("got uuid %q, want assistant_1", asst.UUID)
+	}
+	if asst.SessionID != "sess_1" {
+		t.Errorf("got session_id %q, want sess_1", asst.SessionID)
+	}
+}
+
 func TestParseMessage_Result(t *testing.T) {
 	raw := map[string]any{
 		"type":           "result",
@@ -97,6 +127,75 @@ func TestParseMessage_Result(t *testing.T) {
 	}
 }
 
+func TestParseMessage_Result_ExpandedFields(t *testing.T) {
+	raw := map[string]any{
+		"type":            "result",
+		"subtype":         "success",
+		"uuid":            "result_1",
+		"duration_ms":     float64(1000),
+		"duration_api_ms": float64(600),
+		"is_error":        false,
+		"num_turns":       float64(2),
+		"session_id":      "sess_1",
+		"stop_reason":     "end_turn",
+		"result":          "ok",
+		"structured_output": map[string]any{
+			"value": "done",
+		},
+		"usage": map[string]any{
+			"input_tokens": float64(10),
+		},
+		"modelUsage": map[string]any{
+			"claude-sonnet-4-5": map[string]any{
+				"inputTokens":              float64(10),
+				"outputTokens":             float64(5),
+				"cacheReadInputTokens":     float64(1),
+				"cacheCreationInputTokens": float64(2),
+				"webSearchRequests":        float64(0),
+				"costUSD":                  float64(0.001),
+				"contextWindow":            float64(200000),
+				"maxOutputTokens":          float64(8192),
+			},
+		},
+		"permission_denials": []any{
+			map[string]any{
+				"tool_name":   "Bash",
+				"tool_use_id": "tool_1",
+				"tool_input":  map[string]any{"command": "rm -rf /"},
+			},
+		},
+		"errors": []any{"denied"},
+	}
+
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+
+	result, ok := msg.(*types.ResultMessage)
+	if !ok {
+		t.Fatalf("expected *ResultMessage, got %T", msg)
+	}
+	if result.UUID != "result_1" {
+		t.Fatalf("expected uuid=result_1, got %s", result.UUID)
+	}
+	if result.StopReason == nil || *result.StopReason != "end_turn" {
+		t.Fatalf("unexpected stop_reason: %v", result.StopReason)
+	}
+	if result.Result == nil || *result.Result != "ok" {
+		t.Fatalf("unexpected result: %v", result.Result)
+	}
+	if len(result.ModelUsage) != 1 {
+		t.Fatalf("expected 1 modelUsage entry, got %d", len(result.ModelUsage))
+	}
+	if len(result.PermissionDenials) != 1 || result.PermissionDenials[0].ToolUseID != "tool_1" {
+		t.Fatalf("unexpected permission_denials: %+v", result.PermissionDenials)
+	}
+	if len(result.Errors) != 1 || result.Errors[0] != "denied" {
+		t.Fatalf("unexpected errors: %+v", result.Errors)
+	}
+}
+
 func TestParseMessage_User(t *testing.T) {
 	raw := map[string]any{
 		"type": "user",
@@ -118,6 +217,42 @@ func TestParseMessage_User(t *testing.T) {
 
 	if user.Text() != "Hello Claude!" {
 		t.Errorf("got text %q, want Hello Claude!", user.Text())
+	}
+}
+
+func TestParseMessage_User_MetadataFields(t *testing.T) {
+	raw := map[string]any{
+		"type":        "user",
+		"uuid":        "user_1",
+		"session_id":  "sess_1",
+		"isSynthetic": true,
+		"isReplay":    true,
+		"message": map[string]any{
+			"role":    "user",
+			"content": "Hello Claude!",
+		},
+	}
+
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+
+	user, ok := msg.(*types.UserMessage)
+	if !ok {
+		t.Fatalf("expected *UserMessage, got %T", msg)
+	}
+	if user.UUID != "user_1" {
+		t.Errorf("got uuid %q, want user_1", user.UUID)
+	}
+	if user.SessionID != "sess_1" {
+		t.Errorf("got session_id %q, want sess_1", user.SessionID)
+	}
+	if !user.IsSynthetic {
+		t.Error("expected isSynthetic=true")
+	}
+	if !user.IsReplay {
+		t.Error("expected isReplay=true")
 	}
 }
 
@@ -157,6 +292,40 @@ func TestParseMessage_StreamEvent(t *testing.T) {
 	}
 	if event.Index == nil || *event.Index != 0 {
 		t.Error("expected index 0")
+	}
+}
+
+func TestParseMessage_StreamEventTopLevelFields(t *testing.T) {
+	raw := map[string]any{
+		"type":               "stream_event",
+		"uuid":               "event_top_1",
+		"session_id":         "sess_top_1",
+		"event_type":         "content_block_delta",
+		"index":              float64(2),
+		"delta":              map[string]any{"type": "text_delta", "text": "abc"},
+		"parent_tool_use_id": "tool_parent_1",
+	}
+
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+
+	event, ok := msg.(*types.StreamEvent)
+	if !ok {
+		t.Fatalf("expected *StreamEvent, got %T", msg)
+	}
+	if event.EventType != "content_block_delta" {
+		t.Fatalf("expected event_type=content_block_delta, got %q", event.EventType)
+	}
+	if event.Index == nil || *event.Index != 2 {
+		t.Fatalf("expected index=2, got %+v", event.Index)
+	}
+	if event.Delta == nil || event.Delta["text"] != "abc" {
+		t.Fatalf("unexpected delta payload: %+v", event.Delta)
+	}
+	if event.ParentToolUseID == nil || *event.ParentToolUseID != "tool_parent_1" {
+		t.Fatalf("unexpected parent_tool_use_id: %+v", event.ParentToolUseID)
 	}
 }
 
@@ -321,6 +490,32 @@ func TestParseMessage_SystemTaskNotification(t *testing.T) {
 	}
 }
 
+func TestParseMessage_System_MetadataFields(t *testing.T) {
+	raw := map[string]any{
+		"type":       "system",
+		"subtype":    "init",
+		"uuid":       "sys_1",
+		"session_id": "sess_1",
+		"version":    "2.0.0",
+	}
+
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+
+	sys, ok := msg.(*types.SystemMessage)
+	if !ok {
+		t.Fatalf("expected *SystemMessage, got %T", msg)
+	}
+	if sys.UUID != "sys_1" {
+		t.Fatalf("expected uuid=sys_1, got %s", sys.UUID)
+	}
+	if sys.SessionID != "sess_1" {
+		t.Fatalf("expected session_id=sess_1, got %s", sys.SessionID)
+	}
+}
+
 func TestParseMessage_SystemFilesPersisted(t *testing.T) {
 	raw := map[string]any{
 		"type":         "system",
@@ -348,6 +543,65 @@ func TestParseMessage_SystemFilesPersisted(t *testing.T) {
 	}
 	if len(persisted.Failed) != 1 || persisted.Failed[0].Filename != "b.go" {
 		t.Fatalf("unexpected failed payload: %+v", persisted.Failed)
+	}
+}
+
+func TestParseMessage_SystemStatus(t *testing.T) {
+	raw := map[string]any{
+		"type":           "system",
+		"subtype":        "status",
+		"status":         "compacting",
+		"permissionMode": "plan",
+		"uuid":           "sys_1",
+		"session_id":     "sess_1",
+	}
+
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+
+	status, ok := msg.(*types.StatusMessage)
+	if !ok {
+		t.Fatalf("expected *StatusMessage, got %T", msg)
+	}
+	if status.Subtype != "status" {
+		t.Fatalf("expected subtype=status, got %s", status.Subtype)
+	}
+	if status.Status != "compacting" {
+		t.Fatalf("expected status=compacting, got %v", status.Status)
+	}
+	if status.PermissionMode != types.PermissionPlan {
+		t.Fatalf("expected permissionMode=plan, got %s", status.PermissionMode)
+	}
+}
+
+func TestParseMessage_SystemCompactBoundary(t *testing.T) {
+	raw := map[string]any{
+		"type":       "system",
+		"subtype":    "compact_boundary",
+		"uuid":       "sys_2",
+		"session_id": "sess_2",
+		"compact_metadata": map[string]any{
+			"trigger":    "auto",
+			"pre_tokens": float64(12345),
+		},
+	}
+
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+
+	compact, ok := msg.(*types.CompactBoundaryMessage)
+	if !ok {
+		t.Fatalf("expected *CompactBoundaryMessage, got %T", msg)
+	}
+	if compact.CompactMetadata.Trigger != "auto" {
+		t.Fatalf("expected trigger=auto, got %s", compact.CompactMetadata.Trigger)
+	}
+	if compact.CompactMetadata.PreTokens != 12345 {
+		t.Fatalf("expected pre_tokens=12345, got %d", compact.CompactMetadata.PreTokens)
 	}
 }
 
@@ -475,6 +729,63 @@ func TestParseContentBlock(t *testing.T) {
 				t.Errorf("got type %q, want %q", block.Type(), tt.want)
 			}
 		})
+	}
+}
+
+func TestParseContentBlock_ToolResultStructuredContent(t *testing.T) {
+	raw := map[string]any{
+		"type":        "tool_result",
+		"tool_use_id": "tool_1",
+		"content": []any{
+			map[string]any{"type": "text", "text": "line1"},
+			map[string]any{"type": "text", "text": "line2"},
+		},
+	}
+
+	block, err := parseContentBlock(raw)
+	if err != nil {
+		t.Fatalf("parseContentBlock failed: %v", err)
+	}
+
+	toolResult, ok := block.(*types.ToolResultBlock)
+	if !ok {
+		t.Fatalf("expected *ToolResultBlock, got %T", block)
+	}
+	expected := `[{"text":"line1","type":"text"},{"text":"line2","type":"text"}]`
+	if toolResult.ResultContent != expected {
+		t.Fatalf("unexpected structured tool result content: got %q want %q", toolResult.ResultContent, expected)
+	}
+}
+
+func TestParseMessage_AssistantInvalidOnlyContentFails(t *testing.T) {
+	raw := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"model": "claude-sonnet-4-5",
+			"content": []any{
+				map[string]any{"type": "unknown_block_type"},
+			},
+		},
+	}
+
+	if _, err := ParseMessage(raw); err == nil {
+		t.Fatal("expected parse failure for assistant with only invalid content blocks")
+	}
+}
+
+func TestParseMessage_UserInvalidOnlyContentFails(t *testing.T) {
+	raw := map[string]any{
+		"type": "user",
+		"message": map[string]any{
+			"role": "user",
+			"content": []any{
+				map[string]any{"type": "unknown_block_type"},
+			},
+		},
+	}
+
+	if _, err := ParseMessage(raw); err == nil {
+		t.Fatal("expected parse failure for user with only invalid content blocks")
 	}
 }
 

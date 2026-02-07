@@ -1058,11 +1058,21 @@ func (q *Query) SetPermissionMode(mode types.PermissionMode) error {
 
 // SetModel changes the AI model.
 func (q *Query) SetModel(model string) error {
-	_, err := q.sendControlRequest(map[string]any{
+	req := map[string]any{
 		"subtype": "set_model",
-		"model":   model,
-	}, 30*time.Second)
+	}
+	// TS parity: undefined model clears override and falls back to default.
+	// In Go, empty string maps to that clear behavior by omitting the field.
+	if model != "" {
+		req["model"] = model
+	}
+	_, err := q.sendControlRequest(req, 30*time.Second)
 	return err
+}
+
+// ClearModel clears any previously set model override and uses default model selection.
+func (q *Query) ClearModel() error {
+	return q.SetModel("")
 }
 
 // SetMaxThinkingTokens sets or clears the max thinking token limit.

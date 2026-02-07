@@ -364,6 +364,20 @@ func TestSystemMessage(t *testing.T) {
 			t.Errorf("Expected MessageType to return 'system', got %q", msg.MessageType())
 		}
 	})
+
+	t.Run("StatusMessage MessageType returns system", func(t *testing.T) {
+		msg := &StatusMessage{}
+		if msg.MessageType() != "system" {
+			t.Errorf("Expected MessageType to return 'system', got %q", msg.MessageType())
+		}
+	})
+
+	t.Run("CompactBoundaryMessage MessageType returns system", func(t *testing.T) {
+		msg := &CompactBoundaryMessage{}
+		if msg.MessageType() != "system" {
+			t.Errorf("Expected MessageType to return 'system', got %q", msg.MessageType())
+		}
+	})
 }
 
 // TestResultMessage tests ResultMessage methods.

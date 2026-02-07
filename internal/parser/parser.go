@@ -12,6 +12,7 @@
 package parser
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/victorarias/claude-agent-sdk-go/types"
@@ -52,6 +53,16 @@ func parseStreamEvent(raw map[string]any) (*types.StreamEvent, error) {
 		UUID:      getString(raw, "uuid"),
 		SessionID: getString(raw, "session_id"),
 	}
+	if eventType := getString(raw, "event_type"); eventType != "" {
+		event.EventType = eventType
+	}
+	if idx, ok := raw["index"].(float64); ok {
+		idxInt := int(idx)
+		event.Index = &idxInt
+	}
+	if delta, ok := raw["delta"].(map[string]any); ok {
+		event.Delta = delta
+	}
 
 	// Extract parent_tool_use_id if present
 	if parentID, ok := raw["parent_tool_use_id"].(string); ok {
@@ -86,6 +97,10 @@ func parseSystemMessage(raw map[string]any) (types.Message, error) {
 		return parseTaskNotificationMessage(raw), nil
 	case "files_persisted":
 		return parseFilesPersistedMessage(raw), nil
+	case "status":
+		return parseStatusMessage(raw), nil
+	case "compact_boundary":
+		return parseCompactBoundaryMessage(raw), nil
 	case "hook_started":
 		return parseHookStartedMessage(raw), nil
 	case "hook_progress":
@@ -96,6 +111,7 @@ func parseSystemMessage(raw map[string]any) (types.Message, error) {
 
 	msg := &types.SystemMessage{
 		Subtype: subtype,
+		UUID:    getString(raw, "uuid"),
 	}
 
 	if data, ok := raw["data"].(map[string]any); ok {
@@ -242,8 +258,40 @@ func parseHookResponseMessage(raw map[string]any) *types.HookResponseMessage {
 	return msg
 }
 
+func parseStatusMessage(raw map[string]any) *types.StatusMessage {
+	msg := &types.StatusMessage{
+		Subtype:        getString(raw, "subtype"),
+		PermissionMode: types.PermissionMode(getString(raw, "permissionMode")),
+		UUID:           getString(raw, "uuid"),
+		SessionID:      getString(raw, "session_id"),
+	}
+	if status, ok := raw["status"]; ok {
+		msg.Status = status
+	}
+	return msg
+}
+
+func parseCompactBoundaryMessage(raw map[string]any) *types.CompactBoundaryMessage {
+	msg := &types.CompactBoundaryMessage{
+		Subtype:   getString(raw, "subtype"),
+		UUID:      getString(raw, "uuid"),
+		SessionID: getString(raw, "session_id"),
+	}
+	if metadata, ok := raw["compact_metadata"].(map[string]any); ok {
+		msg.CompactMetadata = types.CompactMetadata{
+			Trigger:   getString(metadata, "trigger"),
+			PreTokens: getInt(metadata, "pre_tokens"),
+		}
+	}
+	return msg
+}
+
 func parseAssistantMessage(raw map[string]any) (*types.AssistantMessage, error) {
-	msg := &types.AssistantMessage{}
+	msg := &types.AssistantMessage{
+		UUID:      getString(raw, "uuid"),
+		SessionID: getString(raw, "session_id"),
+	}
+	var firstParseErr error
 
 	// Extract parent_tool_use_id for subagent messages
 	if parentID, ok := raw["parent_tool_use_id"].(string); ok {
@@ -266,11 +314,20 @@ func parseAssistantMessage(raw map[string]any) (*types.AssistantMessage, error) 
 				if blockRaw, ok := item.(map[string]any); ok {
 					block, err := parseContentBlock(blockRaw)
 					if err != nil {
+						if firstParseErr == nil {
+							firstParseErr = err
+						}
 						continue // Skip invalid blocks
 					}
 					msg.Content = append(msg.Content, block)
 				}
 			}
+		}
+	}
+	if len(msg.Content) == 0 && firstParseErr != nil {
+		return nil, &types.MessageParseError{
+			Message: fmt.Sprintf("failed to parse assistant content: %v", firstParseErr),
+			Data:    raw,
 		}
 	}
 
@@ -279,8 +336,10 @@ func parseAssistantMessage(raw map[string]any) (*types.AssistantMessage, error) 
 
 func parseUserMessage(raw map[string]any) (*types.UserMessage, error) {
 	msg := &types.UserMessage{
-		UUID: getString(raw, "uuid"),
+		UUID:      getString(raw, "uuid"),
+		SessionID: getString(raw, "session_id"),
 	}
+	var firstParseErr error
 
 	// Extract parent_tool_use_id for subagent messages
 	if parentID, ok := raw["parent_tool_use_id"].(string); ok {
@@ -289,6 +348,8 @@ func parseUserMessage(raw map[string]any) (*types.UserMessage, error) {
 	if toolUseResult, ok := raw["tool_use_result"].(map[string]any); ok {
 		msg.ToolUseResult = toolUseResult
 	}
+	msg.IsSynthetic = getBool(raw, "isSynthetic")
+	msg.IsReplay = getBool(raw, "isReplay")
 
 	if msgData, ok := raw["message"].(map[string]any); ok {
 		msg.Role = getString(msgData, "role")
@@ -302,11 +363,20 @@ func parseUserMessage(raw map[string]any) (*types.UserMessage, error) {
 				if blockRaw, ok := item.(map[string]any); ok {
 					block, err := parseContentBlock(blockRaw)
 					if err != nil {
+						if firstParseErr == nil {
+							firstParseErr = err
+						}
 						continue
 					}
 					msg.Content = append(msg.Content, block)
 				}
 			}
+		}
+	}
+	if len(msg.Content) == 0 && firstParseErr != nil {
+		return nil, &types.MessageParseError{
+			Message: fmt.Sprintf("failed to parse user content: %v", firstParseErr),
+			Data:    raw,
 		}
 	}
 
@@ -316,6 +386,7 @@ func parseUserMessage(raw map[string]any) (*types.UserMessage, error) {
 func parseResultMessage(raw map[string]any) (*types.ResultMessage, error) {
 	msg := &types.ResultMessage{
 		Subtype:   getString(raw, "subtype"),
+		UUID:      getString(raw, "uuid"),
 		SessionID: getString(raw, "session_id"),
 		IsError:   getBool(raw, "is_error"),
 	}
@@ -331,6 +402,58 @@ func parseResultMessage(raw map[string]any) (*types.ResultMessage, error) {
 	}
 	if cost, ok := raw["total_cost_usd"].(float64); ok {
 		msg.TotalCostUSD = &cost
+	}
+	if usage, ok := raw["usage"].(map[string]any); ok {
+		msg.Usage = usage
+	}
+	if stopReason, ok := raw["stop_reason"].(string); ok {
+		msg.StopReason = &stopReason
+	}
+	if result, ok := raw["result"].(string); ok {
+		msg.Result = &result
+	}
+	if structured, ok := raw["structured_output"]; ok {
+		msg.StructuredOutput = structured
+	}
+	if errorsRaw := getStringSlice(raw, "errors"); len(errorsRaw) > 0 {
+		msg.Errors = errorsRaw
+	}
+	if permissionDenialsRaw, ok := raw["permission_denials"].([]any); ok {
+		denials := make([]types.PermissionDenial, 0, len(permissionDenialsRaw))
+		for _, item := range permissionDenialsRaw {
+			entry, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			denial := types.PermissionDenial{
+				ToolName:  getString(entry, "tool_name"),
+				ToolUseID: getString(entry, "tool_use_id"),
+			}
+			if toolInput, ok := entry["tool_input"].(map[string]any); ok {
+				denial.ToolInput = toolInput
+			}
+			denials = append(denials, denial)
+		}
+		msg.PermissionDenials = denials
+	}
+	if modelUsageRaw, ok := raw["modelUsage"].(map[string]any); ok {
+		msg.ModelUsage = make(map[string]types.ModelUsage, len(modelUsageRaw))
+		for modelName, item := range modelUsageRaw {
+			entry, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			msg.ModelUsage[modelName] = types.ModelUsage{
+				InputTokens:              getInt(entry, "inputTokens"),
+				OutputTokens:             getInt(entry, "outputTokens"),
+				CacheReadInputTokens:     getInt(entry, "cacheReadInputTokens"),
+				CacheCreationInputTokens: getInt(entry, "cacheCreationInputTokens"),
+				WebSearchRequests:        getInt(entry, "webSearchRequests"),
+				CostUSD:                  getFloat64(entry, "costUSD"),
+				ContextWindow:            getInt(entry, "contextWindow"),
+				MaxOutputTokens:          getInt(entry, "maxOutputTokens"),
+			}
+		}
 	}
 
 	return msg, nil
@@ -366,6 +489,14 @@ func parseContentBlock(raw map[string]any) (types.ContentBlock, error) {
 		switch c := raw["content"].(type) {
 		case string:
 			content = c
+		case nil:
+			content = ""
+		default:
+			data, err := json.Marshal(c)
+			if err != nil {
+				return nil, fmt.Errorf("invalid tool_result content: %w", err)
+			}
+			content = string(data)
 		}
 		return &types.ToolResultBlock{
 			ToolUseID:     getString(raw, "tool_use_id"),
@@ -401,4 +532,24 @@ func getStringSlice(m map[string]any, key string) []string {
 		}
 	}
 	return result
+}
+
+func getInt(m map[string]any, key string) int {
+	if v, ok := m[key].(float64); ok {
+		return int(v)
+	}
+	if v, ok := m[key].(int); ok {
+		return v
+	}
+	return 0
+}
+
+func getFloat64(m map[string]any, key string) float64 {
+	if v, ok := m[key].(float64); ok {
+		return v
+	}
+	if v, ok := m[key].(int); ok {
+		return float64(v)
+	}
+	return 0
 }

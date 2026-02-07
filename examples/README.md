@@ -11,6 +11,7 @@ This directory contains examples demonstrating common SDK usage patterns.
 | [hooks](./hooks/) | Pre/post tool use hooks for logging and control |
 | [mcp-server](./mcp-server/) | SDK-hosted MCP server with custom tools |
 | [runtime-controls](./runtime-controls/) | Runtime model/permission/session/MCP control APIs |
+| [unstable-session](./unstable-session/) | Unstable v2 create/resume/prompt session APIs |
 | [permissions](./permissions/) | Custom tool permission handling |
 | [session](./session/) | Session resume and conversation continuation |
 | [error-handling](./error-handling/) | Error types and recovery patterns |
@@ -30,6 +31,7 @@ go run ./examples/simple/ "What is 2+2?"
 go run ./examples/streaming/
 go run ./examples/hooks/
 go run ./examples/runtime-controls/
+go run ./examples/unstable-session/
 ```
 
 ## Common Patterns
