@@ -415,6 +415,60 @@ func TestClient_SetModel_NotConnected(t *testing.T) {
 	}
 }
 
+func TestClient_SetMaxThinkingTokens(t *testing.T) {
+	transport := NewMockTransport()
+	client := NewClient(types.WithTransport(transport))
+
+	done := make(chan bool)
+	go func() {
+		defer close(done)
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			reqID, ok := req["request_id"].(string)
+			if !ok {
+				continue
+			}
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   map[string]any{},
+				},
+			})
+
+			if requestData, ok := req["request"].(map[string]any); ok {
+				if requestData["subtype"] == "set_max_thinking_tokens" {
+					return
+				}
+			}
+		}
+	}()
+
+	ctx := context.Background()
+	if err := client.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	maxTokens := 2048
+	if err := client.SetMaxThinkingTokens(&maxTokens); err != nil {
+		t.Errorf("SetMaxThinkingTokens failed: %v", err)
+	}
+
+	<-done
+}
+
 func TestClient_RewindFiles(t *testing.T) {
 	transport := NewMockTransport()
 	client := NewClient(types.WithTransport(transport))
@@ -560,6 +614,176 @@ func TestClient_GetMCPStatus_NotConnected(t *testing.T) {
 	}
 }
 
+func TestClient_MCPServerControlMethods(t *testing.T) {
+	transport := NewMockTransport()
+	client := NewClient(types.WithTransport(transport))
+
+	done := make(chan bool)
+	go func() {
+		defer close(done)
+		expected := map[string]bool{
+			"mcp_reconnect":   false,
+			"mcp_toggle":      false,
+			"mcp_set_servers": false,
+		}
+		allSeen := func() bool {
+			for _, seen := range expected {
+				if !seen {
+					return false
+				}
+			}
+			return true
+		}
+		for !allSeen() {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			reqID, ok := req["request_id"].(string)
+			if !ok {
+				continue
+			}
+
+			response := map[string]any{}
+			if requestData, ok := req["request"].(map[string]any); ok {
+				if subtype, ok := requestData["subtype"].(string); ok {
+					if _, tracked := expected[subtype]; tracked {
+						expected[subtype] = true
+					}
+					if subtype == "mcp_set_servers" {
+						response = map[string]any{
+							"added":   []any{"calc"},
+							"removed": []any{},
+							"errors":  map[string]any{},
+						}
+					}
+				}
+			}
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response":   response,
+				},
+			})
+		}
+	}()
+
+	ctx := context.Background()
+	if err := client.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	if err := client.ReconnectMCPServer("calc"); err != nil {
+		t.Fatalf("ReconnectMCPServer failed: %v", err)
+	}
+	if err := client.ToggleMCPServer("calc", false); err != nil {
+		t.Fatalf("ToggleMCPServer failed: %v", err)
+	}
+	result, err := client.SetMCPServers(map[string]any{
+		"calc": map[string]any{"type": "stdio", "command": "node"},
+	})
+	if err != nil {
+		t.Fatalf("SetMCPServers failed: %v", err)
+	}
+	if len(result.Added) != 1 || result.Added[0] != "calc" {
+		t.Fatalf("unexpected SetMCPServers result: %+v", result)
+	}
+
+	<-done
+}
+
+func TestClient_SetMCPServers_WithSDKInstancePayload(t *testing.T) {
+	transport := NewMockTransport()
+	client := NewClient(types.WithTransport(transport))
+
+	done := make(chan bool)
+	go func() {
+		defer close(done)
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			requestData, ok := req["request"].(map[string]any)
+			if !ok {
+				continue
+			}
+			if requestData["subtype"] != "mcp_set_servers" {
+				// Respond to initialize or other control requests.
+				reqID, _ := req["request_id"].(string)
+				transport.SendMessage(map[string]any{
+					"type": "control_response",
+					"response": map[string]any{
+						"subtype":    "success",
+						"request_id": reqID,
+						"response":   map[string]any{},
+					},
+				})
+				continue
+			}
+
+			servers, _ := requestData["servers"].(map[string]any)
+			local, ok := servers["local"].(map[string]any)
+			if !ok {
+				t.Errorf("expected local sdk server in payload, got %v", servers["local"])
+			} else {
+				if local["type"] != "sdk" {
+					t.Errorf("expected local server type sdk, got %v", local["type"])
+				}
+				if local["name"] != "local" {
+					t.Errorf("expected local server name field, got %v", local["name"])
+				}
+			}
+
+			reqID, _ := req["request_id"].(string)
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response": map[string]any{
+						"added":   []any{"local"},
+						"removed": []any{},
+						"errors":  map[string]any{},
+					},
+				},
+			})
+			return
+		}
+	}()
+
+	ctx := context.Background()
+	if err := client.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	local := types.NewMCPServerBuilder("local").Build()
+	if _, err := client.SetMCPServers(map[string]any{
+		"local": local,
+	}); err != nil {
+		t.Fatalf("SetMCPServers failed: %v", err)
+	}
+
+	<-done
+}
+
 func TestClient_ServerInfo(t *testing.T) {
 	transport := NewMockTransport()
 	client := NewClient(types.WithTransport(transport))
@@ -619,6 +843,90 @@ func TestClient_ServerInfo_NotConnected(t *testing.T) {
 	info := client.ServerInfo()
 	if info != nil {
 		t.Errorf("expected nil from ServerInfo when not connected, got %v", info)
+	}
+}
+
+func TestClient_InitializationMetadataMethods(t *testing.T) {
+	transport := NewMockTransport()
+	client := NewClient(types.WithTransport(transport))
+
+	go func() {
+		for {
+			time.Sleep(10 * time.Millisecond)
+			written := transport.Written()
+			if len(written) == 0 {
+				continue
+			}
+
+			var req map[string]any
+			if err := json.Unmarshal([]byte(written[len(written)-1]), &req); err != nil {
+				continue
+			}
+			reqID, ok := req["request_id"].(string)
+			if !ok {
+				continue
+			}
+
+			transport.SendMessage(map[string]any{
+				"type": "control_response",
+				"response": map[string]any{
+					"subtype":    "success",
+					"request_id": reqID,
+					"response": map[string]any{
+						"commands": []any{
+							map[string]any{
+								"name":         "review",
+								"description":  "Review code",
+								"argumentHint": "<path>",
+							},
+						},
+						"models": []any{
+							map[string]any{
+								"value":       "claude-sonnet-4-5",
+								"displayName": "Sonnet 4.5",
+								"description": "Balanced",
+							},
+						},
+						"account": map[string]any{
+							"email": "user@example.com",
+						},
+					},
+				},
+			})
+			return
+		}
+	}()
+
+	ctx := context.Background()
+	if err := client.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	init, err := client.InitializationResult()
+	if err != nil {
+		t.Fatalf("InitializationResult failed: %v", err)
+	}
+	if len(init.Commands) != 1 {
+		t.Fatalf("unexpected init commands: %+v", init.Commands)
+	}
+
+	commands, err := client.SupportedCommands()
+	if err != nil || len(commands) != 1 {
+		t.Fatalf("SupportedCommands failed: %v, %+v", err, commands)
+	}
+
+	models, err := client.SupportedModels()
+	if err != nil || len(models) != 1 {
+		t.Fatalf("SupportedModels failed: %v, %+v", err, models)
+	}
+
+	account, err := client.AccountInfo()
+	if err != nil {
+		t.Fatalf("AccountInfo failed: %v", err)
+	}
+	if account.Email != "user@example.com" {
+		t.Fatalf("unexpected account info: %+v", account)
 	}
 }
 

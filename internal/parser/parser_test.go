@@ -220,6 +220,214 @@ func TestParseMessage_UserWithToolUseResult(t *testing.T) {
 	}
 }
 
+func TestParseMessage_AuthStatus(t *testing.T) {
+	raw := map[string]any{
+		"type":             "auth_status",
+		"isAuthenticating": true,
+		"output":           []any{"Starting login"},
+		"session_id":       "sess_1",
+	}
+
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+
+	auth, ok := msg.(*types.AuthStatusMessage)
+	if !ok {
+		t.Fatalf("expected *AuthStatusMessage, got %T", msg)
+	}
+	if !auth.IsAuthenticating {
+		t.Fatal("expected IsAuthenticating=true")
+	}
+	if len(auth.Output) != 1 || auth.Output[0] != "Starting login" {
+		t.Fatalf("unexpected output payload: %+v", auth.Output)
+	}
+}
+
+func TestParseMessage_ToolProgress(t *testing.T) {
+	raw := map[string]any{
+		"type":                 "tool_progress",
+		"tool_use_id":          "tool_1",
+		"tool_name":            "Bash",
+		"elapsed_time_seconds": float64(3.5),
+	}
+
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+
+	progress, ok := msg.(*types.ToolProgressMessage)
+	if !ok {
+		t.Fatalf("expected *ToolProgressMessage, got %T", msg)
+	}
+	if progress.ToolUseID != "tool_1" {
+		t.Fatalf("expected tool_use_id=tool_1, got %s", progress.ToolUseID)
+	}
+	if progress.ElapsedTimeSeconds != 3.5 {
+		t.Fatalf("expected elapsed_time_seconds=3.5, got %v", progress.ElapsedTimeSeconds)
+	}
+}
+
+func TestParseMessage_ToolUseSummary(t *testing.T) {
+	raw := map[string]any{
+		"type":    "tool_use_summary",
+		"summary": "Summarized operations",
+		"preceding_tool_use_ids": []any{
+			"tool_1",
+			"tool_2",
+		},
+	}
+
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+
+	summary, ok := msg.(*types.ToolUseSummaryMessage)
+	if !ok {
+		t.Fatalf("expected *ToolUseSummaryMessage, got %T", msg)
+	}
+	if summary.Summary != "Summarized operations" {
+		t.Fatalf("unexpected summary: %s", summary.Summary)
+	}
+	if len(summary.PrecedingToolUseIDs) != 2 {
+		t.Fatalf("unexpected tool id list: %+v", summary.PrecedingToolUseIDs)
+	}
+}
+
+func TestParseMessage_SystemTaskNotification(t *testing.T) {
+	raw := map[string]any{
+		"type":        "system",
+		"subtype":     "task_notification",
+		"task_id":     "task_1",
+		"status":      "completed",
+		"output_file": "/tmp/task.out",
+		"summary":     "Task complete",
+	}
+
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+
+	task, ok := msg.(*types.TaskNotificationMessage)
+	if !ok {
+		t.Fatalf("expected *TaskNotificationMessage, got %T", msg)
+	}
+	if task.TaskID != "task_1" {
+		t.Fatalf("expected task_id=task_1, got %s", task.TaskID)
+	}
+}
+
+func TestParseMessage_SystemFilesPersisted(t *testing.T) {
+	raw := map[string]any{
+		"type":         "system",
+		"subtype":      "files_persisted",
+		"processed_at": "2026-02-07T00:00:00Z",
+		"files": []any{
+			map[string]any{"filename": "a.go", "file_id": "f1"},
+		},
+		"failed": []any{
+			map[string]any{"filename": "b.go", "error": "permission denied"},
+		},
+	}
+
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+
+	persisted, ok := msg.(*types.FilesPersistedMessage)
+	if !ok {
+		t.Fatalf("expected *FilesPersistedMessage, got %T", msg)
+	}
+	if len(persisted.Files) != 1 || persisted.Files[0].Filename != "a.go" {
+		t.Fatalf("unexpected files payload: %+v", persisted.Files)
+	}
+	if len(persisted.Failed) != 1 || persisted.Failed[0].Filename != "b.go" {
+		t.Fatalf("unexpected failed payload: %+v", persisted.Failed)
+	}
+}
+
+func TestParseMessage_SystemHookStarted(t *testing.T) {
+	raw := map[string]any{
+		"type":       "system",
+		"subtype":    "hook_started",
+		"hook_id":    "hook-1",
+		"hook_name":  "pre_tool_check",
+		"hook_event": "PreToolUse",
+		"session_id": "sess-1",
+	}
+
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+
+	hook, ok := msg.(*types.HookStartedMessage)
+	if !ok {
+		t.Fatalf("expected *HookStartedMessage, got %T", msg)
+	}
+	if hook.HookID != "hook-1" || hook.HookEvent != "PreToolUse" {
+		t.Fatalf("unexpected hook_started payload: %+v", hook)
+	}
+}
+
+func TestParseMessage_SystemHookProgress(t *testing.T) {
+	raw := map[string]any{
+		"type":       "system",
+		"subtype":    "hook_progress",
+		"hook_id":    "hook-2",
+		"hook_name":  "setup",
+		"hook_event": "Setup",
+		"stdout":     "checking...",
+		"stderr":     "",
+		"output":     "partial output",
+	}
+
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+
+	hook, ok := msg.(*types.HookProgressMessage)
+	if !ok {
+		t.Fatalf("expected *HookProgressMessage, got %T", msg)
+	}
+	if hook.Stdout != "checking..." || hook.Output != "partial output" {
+		t.Fatalf("unexpected hook_progress payload: %+v", hook)
+	}
+}
+
+func TestParseMessage_SystemHookResponse(t *testing.T) {
+	raw := map[string]any{
+		"type":       "system",
+		"subtype":    "hook_response",
+		"hook_id":    "hook-3",
+		"hook_name":  "cleanup",
+		"hook_event": "Stop",
+		"outcome":    "success",
+		"exit_code":  float64(0),
+		"stdout":     "done",
+		"stderr":     "",
+	}
+
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+
+	hook, ok := msg.(*types.HookResponseMessage)
+	if !ok {
+		t.Fatalf("expected *HookResponseMessage, got %T", msg)
+	}
+	if hook.ExitCode == nil || *hook.ExitCode != 0 || hook.Outcome != "success" {
+		t.Fatalf("unexpected hook_response payload: %+v", hook)
+	}
+}
+
 func TestParseContentBlock(t *testing.T) {
 	tests := []struct {
 		name string

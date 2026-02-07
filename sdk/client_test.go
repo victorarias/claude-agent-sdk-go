@@ -123,6 +123,33 @@ func TestClientWithCanUseTool(t *testing.T) {
 	_ = called
 }
 
+func TestClientWithAdditionalHooks(t *testing.T) {
+	cb := func(input any, toolUseID *string, ctx *types.HookContext) (*types.HookOutput, error) {
+		cont := true
+		return &types.HookOutput{Continue: &cont}, nil
+	}
+
+	client := NewClient(
+		WithSessionStartHook(cb),
+		WithSessionEndHook(cb),
+		WithSetupHook(cb),
+		WithTeammateIdleHook(cb),
+		WithTaskCompletedHook(cb),
+	)
+
+	for _, event := range []types.HookEvent{
+		types.HookSessionStart,
+		types.HookSessionEnd,
+		types.HookSetup,
+		types.HookTeammateIdle,
+		types.HookTaskCompleted,
+	} {
+		if len(client.hooks[event]) != 1 {
+			t.Fatalf("expected exactly one hook for %s, got %d", event, len(client.hooks[event]))
+		}
+	}
+}
+
 func TestClient_SessionID(t *testing.T) {
 	client := NewClient()
 

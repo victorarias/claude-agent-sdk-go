@@ -24,6 +24,8 @@ func ParseMessage(raw map[string]any) (types.Message, error) {
 	switch msgType {
 	case "system":
 		return parseSystemMessage(raw)
+	case "auth_status":
+		return parseAuthStatusMessage(raw)
 	case "assistant":
 		return parseAssistantMessage(raw)
 	case "user":
@@ -32,6 +34,10 @@ func ParseMessage(raw map[string]any) (types.Message, error) {
 		return parseResultMessage(raw)
 	case "stream_event":
 		return parseStreamEvent(raw)
+	case "tool_progress":
+		return parseToolProgressMessage(raw)
+	case "tool_use_summary":
+		return parseToolUseSummaryMessage(raw)
 	default:
 		return nil, &types.MessageParseError{
 			Message: fmt.Sprintf("unknown message type: %s", msgType),
@@ -72,18 +78,168 @@ func parseStreamEvent(raw map[string]any) (*types.StreamEvent, error) {
 	return event, nil
 }
 
-func parseSystemMessage(raw map[string]any) (*types.SystemMessage, error) {
+func parseSystemMessage(raw map[string]any) (types.Message, error) {
+	subtype := getString(raw, "subtype")
+
+	switch subtype {
+	case "task_notification":
+		return parseTaskNotificationMessage(raw), nil
+	case "files_persisted":
+		return parseFilesPersistedMessage(raw), nil
+	case "hook_started":
+		return parseHookStartedMessage(raw), nil
+	case "hook_progress":
+		return parseHookProgressMessage(raw), nil
+	case "hook_response":
+		return parseHookResponseMessage(raw), nil
+	}
+
 	msg := &types.SystemMessage{
-		Subtype: getString(raw, "subtype"),
+		Subtype: subtype,
 	}
 
 	if data, ok := raw["data"].(map[string]any); ok {
 		msg.SessionID = getString(data, "session_id")
 		msg.Version = getString(data, "version")
 		msg.Data = data
+	} else {
+		msg.SessionID = getString(raw, "session_id")
+		msg.Version = getString(raw, "version")
+		msg.Data = raw
 	}
 
 	return msg, nil
+}
+
+func parseAuthStatusMessage(raw map[string]any) (*types.AuthStatusMessage, error) {
+	msg := &types.AuthStatusMessage{
+		IsAuthenticating: getBool(raw, "isAuthenticating"),
+		Error:            getString(raw, "error"),
+		UUID:             getString(raw, "uuid"),
+		SessionID:        getString(raw, "session_id"),
+		Output:           getStringSlice(raw, "output"),
+	}
+	return msg, nil
+}
+
+func parseToolProgressMessage(raw map[string]any) (*types.ToolProgressMessage, error) {
+	msg := &types.ToolProgressMessage{
+		ToolUseID: getString(raw, "tool_use_id"),
+		ToolName:  getString(raw, "tool_name"),
+		UUID:      getString(raw, "uuid"),
+		SessionID: getString(raw, "session_id"),
+	}
+	if parentID, ok := raw["parent_tool_use_id"].(string); ok {
+		msg.ParentToolUseID = &parentID
+	}
+	if elapsed, ok := raw["elapsed_time_seconds"].(float64); ok {
+		msg.ElapsedTimeSeconds = elapsed
+	}
+	return msg, nil
+}
+
+func parseToolUseSummaryMessage(raw map[string]any) (*types.ToolUseSummaryMessage, error) {
+	msg := &types.ToolUseSummaryMessage{
+		Summary:             getString(raw, "summary"),
+		PrecedingToolUseIDs: getStringSlice(raw, "preceding_tool_use_ids"),
+		UUID:                getString(raw, "uuid"),
+		SessionID:           getString(raw, "session_id"),
+	}
+	return msg, nil
+}
+
+func parseTaskNotificationMessage(raw map[string]any) *types.TaskNotificationMessage {
+	return &types.TaskNotificationMessage{
+		Subtype:    getString(raw, "subtype"),
+		TaskID:     getString(raw, "task_id"),
+		Status:     getString(raw, "status"),
+		OutputFile: getString(raw, "output_file"),
+		Summary:    getString(raw, "summary"),
+		UUID:       getString(raw, "uuid"),
+		SessionID:  getString(raw, "session_id"),
+	}
+}
+
+func parseFilesPersistedMessage(raw map[string]any) *types.FilesPersistedMessage {
+	msg := &types.FilesPersistedMessage{
+		Subtype:     getString(raw, "subtype"),
+		ProcessedAt: getString(raw, "processed_at"),
+		UUID:        getString(raw, "uuid"),
+		SessionID:   getString(raw, "session_id"),
+	}
+
+	if filesRaw, ok := raw["files"].([]any); ok {
+		files := make([]types.FilesPersistedFile, 0, len(filesRaw))
+		for _, item := range filesRaw {
+			if m, ok := item.(map[string]any); ok {
+				files = append(files, types.FilesPersistedFile{
+					Filename: getString(m, "filename"),
+					FileID:   getString(m, "file_id"),
+				})
+			}
+		}
+		msg.Files = files
+	}
+
+	if failedRaw, ok := raw["failed"].([]any); ok {
+		failed := make([]types.FilesPersistedFailure, 0, len(failedRaw))
+		for _, item := range failedRaw {
+			if m, ok := item.(map[string]any); ok {
+				failed = append(failed, types.FilesPersistedFailure{
+					Filename: getString(m, "filename"),
+					Error:    getString(m, "error"),
+				})
+			}
+		}
+		msg.Failed = failed
+	}
+
+	return msg
+}
+
+func parseHookStartedMessage(raw map[string]any) *types.HookStartedMessage {
+	return &types.HookStartedMessage{
+		Subtype:   getString(raw, "subtype"),
+		HookID:    getString(raw, "hook_id"),
+		HookName:  getString(raw, "hook_name"),
+		HookEvent: getString(raw, "hook_event"),
+		UUID:      getString(raw, "uuid"),
+		SessionID: getString(raw, "session_id"),
+	}
+}
+
+func parseHookProgressMessage(raw map[string]any) *types.HookProgressMessage {
+	return &types.HookProgressMessage{
+		Subtype:   getString(raw, "subtype"),
+		HookID:    getString(raw, "hook_id"),
+		HookName:  getString(raw, "hook_name"),
+		HookEvent: getString(raw, "hook_event"),
+		Stdout:    getString(raw, "stdout"),
+		Stderr:    getString(raw, "stderr"),
+		Output:    getString(raw, "output"),
+		UUID:      getString(raw, "uuid"),
+		SessionID: getString(raw, "session_id"),
+	}
+}
+
+func parseHookResponseMessage(raw map[string]any) *types.HookResponseMessage {
+	msg := &types.HookResponseMessage{
+		Subtype:   getString(raw, "subtype"),
+		HookID:    getString(raw, "hook_id"),
+		HookName:  getString(raw, "hook_name"),
+		HookEvent: getString(raw, "hook_event"),
+		Output:    getString(raw, "output"),
+		Stdout:    getString(raw, "stdout"),
+		Stderr:    getString(raw, "stderr"),
+		Outcome:   getString(raw, "outcome"),
+		UUID:      getString(raw, "uuid"),
+		SessionID: getString(raw, "session_id"),
+	}
+	if exitCode, ok := raw["exit_code"].(float64); ok {
+		n := int(exitCode)
+		msg.ExitCode = &n
+	}
+	return msg
 }
 
 func parseAssistantMessage(raw map[string]any) (*types.AssistantMessage, error) {
@@ -231,4 +387,18 @@ func getString(m map[string]any, key string) string {
 func getBool(m map[string]any, key string) bool {
 	v, _ := m[key].(bool)
 	return v
+}
+
+func getStringSlice(m map[string]any, key string) []string {
+	raw, ok := m[key].([]any)
+	if !ok {
+		return nil
+	}
+	result := make([]string, 0, len(raw))
+	for _, v := range raw {
+		if s, ok := v.(string); ok {
+			result = append(result, s)
+		}
+	}
+	return result
 }

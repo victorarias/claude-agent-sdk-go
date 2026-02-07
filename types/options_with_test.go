@@ -144,11 +144,38 @@ func TestWithResume(t *testing.T) {
 	}
 }
 
+func TestWithResumeSessionAt(t *testing.T) {
+	opts := DefaultOptions()
+	WithResumeSessionAt("msg-123")(opts)
+	if opts.ResumeSessionAt != "msg-123" {
+		t.Errorf("expected 'msg-123', got %q", opts.ResumeSessionAt)
+	}
+}
+
+func TestWithSessionID(t *testing.T) {
+	opts := DefaultOptions()
+	WithSessionID("session-456")(opts)
+	if opts.SessionID != "session-456" {
+		t.Errorf("expected 'session-456', got %q", opts.SessionID)
+	}
+}
+
 func TestWithContinue(t *testing.T) {
 	opts := DefaultOptions()
 	WithContinue()(opts)
 	if !opts.ContinueConversation {
 		t.Error("expected ContinueConversation=true")
+	}
+}
+
+func TestWithPersistSession(t *testing.T) {
+	opts := DefaultOptions()
+	WithPersistSession(false)(opts)
+	if opts.PersistSession == nil {
+		t.Fatal("expected PersistSession to be set")
+	}
+	if *opts.PersistSession {
+		t.Error("expected PersistSession=false")
 	}
 }
 
@@ -224,6 +251,46 @@ func TestWithPlugins(t *testing.T) {
 	WithPlugins(plugin)(opts)
 	if len(opts.Plugins) != 1 {
 		t.Errorf("expected 1 plugin, got %d", len(opts.Plugins))
+	}
+}
+
+func TestWithAgent(t *testing.T) {
+	opts := DefaultOptions()
+	WithAgent("code-reviewer")(opts)
+	if opts.Agent != "code-reviewer" {
+		t.Errorf("expected 'code-reviewer', got %q", opts.Agent)
+	}
+}
+
+func TestWithDebug(t *testing.T) {
+	opts := DefaultOptions()
+	WithDebug()(opts)
+	if !opts.Debug {
+		t.Error("expected Debug=true")
+	}
+}
+
+func TestWithDebugFile(t *testing.T) {
+	opts := DefaultOptions()
+	WithDebugFile("/tmp/claude-debug.log")(opts)
+	if opts.DebugFile != "/tmp/claude-debug.log" {
+		t.Errorf("expected debug file path, got %q", opts.DebugFile)
+	}
+}
+
+func TestWithStrictMCPConfig(t *testing.T) {
+	opts := DefaultOptions()
+	WithStrictMCPConfig()(opts)
+	if !opts.StrictMCPConfig {
+		t.Error("expected StrictMCPConfig=true")
+	}
+}
+
+func TestWithAllowDangerouslySkipPermissions(t *testing.T) {
+	opts := DefaultOptions()
+	WithAllowDangerouslySkipPermissions()(opts)
+	if !opts.AllowDangerouslySkipPermissions {
+		t.Error("expected AllowDangerouslySkipPermissions=true")
 	}
 }
 

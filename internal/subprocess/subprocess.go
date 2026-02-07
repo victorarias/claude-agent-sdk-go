@@ -92,6 +92,39 @@ func ValidatePathOptions(opts *types.Options) error {
 	return nil
 }
 
+// ValidateOptionSemantics validates non-path option constraints to match CLI semantics.
+func ValidateOptionSemantics(opts *types.Options) error {
+	if opts == nil {
+		return nil
+	}
+
+	if opts.PermissionMode == types.PermissionBypass && !opts.AllowDangerouslySkipPermissions {
+		return fmt.Errorf("permission_mode bypassPermissions requires allow_dangerously_skip_permissions=true")
+	}
+
+	if opts.Model != "" && opts.FallbackModel != "" && opts.Model == opts.FallbackModel {
+		return fmt.Errorf("fallback_model cannot be the same as model")
+	}
+
+	if opts.ContinueConversation && opts.Resume != "" {
+		return fmt.Errorf("continue_conversation and resume are mutually exclusive")
+	}
+
+	if opts.ResumeSessionAt != "" && opts.Resume == "" {
+		return fmt.Errorf("resume_session_at requires resume")
+	}
+
+	if opts.ResumeSessionAt != "" && opts.ContinueConversation {
+		return fmt.Errorf("resume_session_at cannot be used with continue_conversation")
+	}
+
+	if opts.SessionID != "" && (opts.ContinueConversation || opts.Resume != "") && !opts.ForkSession {
+		return fmt.Errorf("session_id cannot be used with continue_conversation or resume unless fork_session is enabled")
+	}
+
+	return nil
+}
+
 // parseVersionOutput extracts a semver version from CLI output.
 func parseVersionOutput(output string) (string, error) {
 	output = strings.TrimSpace(output)
@@ -367,6 +400,10 @@ func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) [
 		cmd = append(cmd, "--model", opts.Model)
 	}
 
+	if opts.Agent != "" {
+		cmd = append(cmd, "--agent", opts.Agent)
+	}
+
 	if opts.FallbackModel != "" {
 		cmd = append(cmd, "--fallback-model", opts.FallbackModel)
 	}
@@ -402,8 +439,20 @@ func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) [
 		cmd = append(cmd, "--resume", opts.Resume)
 	}
 
+	if opts.ResumeSessionAt != "" {
+		cmd = append(cmd, "--resume-session-at", opts.ResumeSessionAt)
+	}
+
+	if opts.SessionID != "" {
+		cmd = append(cmd, "--session-id", opts.SessionID)
+	}
+
 	if opts.ForkSession {
 		cmd = append(cmd, "--fork-session")
+	}
+
+	if opts.PersistSession != nil && !*opts.PersistSession {
+		cmd = append(cmd, "--no-session-persistence")
 	}
 
 	// Settings - merge sandbox into settings if both are provided
@@ -484,6 +533,20 @@ func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) [
 			betas[i] = string(b)
 		}
 		cmd = append(cmd, "--betas", strings.Join(betas, ","))
+	}
+
+	if opts.DebugFile != "" {
+		cmd = append(cmd, "--debug-file", opts.DebugFile)
+	} else if opts.Debug {
+		cmd = append(cmd, "--debug")
+	}
+
+	if opts.StrictMCPConfig {
+		cmd = append(cmd, "--strict-mcp-config")
+	}
+
+	if opts.AllowDangerouslySkipPermissions {
+		cmd = append(cmd, "--allow-dangerously-skip-permissions")
 	}
 
 	// Streaming options
@@ -676,6 +739,11 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 
 	// Validate path options for security
 	if err := ValidatePathOptions(t.options); err != nil {
+		return err
+	}
+
+	// Validate semantic option constraints.
+	if err := ValidateOptionSemantics(t.options); err != nil {
 		return err
 	}
 

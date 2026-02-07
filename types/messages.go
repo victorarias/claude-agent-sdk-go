@@ -280,6 +280,120 @@ type StreamEvent struct {
 
 func (m *StreamEvent) MessageType() string { return "stream_event" }
 
+// AuthStatusMessage reports authentication progress from the CLI.
+type AuthStatusMessage struct {
+	IsAuthenticating bool     `json:"isAuthenticating"`
+	Output           []string `json:"output,omitempty"`
+	Error            string   `json:"error,omitempty"`
+	UUID             string   `json:"uuid,omitempty"`
+	SessionID        string   `json:"session_id,omitempty"`
+}
+
+func (m *AuthStatusMessage) MessageType() string { return "auth_status" }
+
+// ToolProgressMessage reports progress for a long-running tool call.
+type ToolProgressMessage struct {
+	ToolUseID          string  `json:"tool_use_id"`
+	ToolName           string  `json:"tool_name"`
+	ParentToolUseID    *string `json:"parent_tool_use_id,omitempty"`
+	ElapsedTimeSeconds float64 `json:"elapsed_time_seconds,omitempty"`
+	UUID               string  `json:"uuid,omitempty"`
+	SessionID          string  `json:"session_id,omitempty"`
+}
+
+func (m *ToolProgressMessage) MessageType() string { return "tool_progress" }
+
+// ToolUseSummaryMessage reports condensed tool usage summaries.
+type ToolUseSummaryMessage struct {
+	Summary             string   `json:"summary"`
+	PrecedingToolUseIDs []string `json:"preceding_tool_use_ids,omitempty"`
+	UUID                string   `json:"uuid,omitempty"`
+	SessionID           string   `json:"session_id,omitempty"`
+}
+
+func (m *ToolUseSummaryMessage) MessageType() string { return "tool_use_summary" }
+
+// TaskNotificationMessage reports background task completion/failure.
+type TaskNotificationMessage struct {
+	Subtype    string `json:"subtype"`
+	TaskID     string `json:"task_id"`
+	Status     string `json:"status"`
+	OutputFile string `json:"output_file,omitempty"`
+	Summary    string `json:"summary,omitempty"`
+	UUID       string `json:"uuid,omitempty"`
+	SessionID  string `json:"session_id,omitempty"`
+}
+
+func (m *TaskNotificationMessage) MessageType() string { return "system" }
+
+// FilesPersistedFile describes a successfully persisted file.
+type FilesPersistedFile struct {
+	Filename string `json:"filename"`
+	FileID   string `json:"file_id"`
+}
+
+// FilesPersistedFailure describes a file that failed to persist.
+type FilesPersistedFailure struct {
+	Filename string `json:"filename"`
+	Error    string `json:"error"`
+}
+
+// FilesPersistedMessage reports persisted-file snapshots.
+type FilesPersistedMessage struct {
+	Subtype     string                  `json:"subtype"`
+	Files       []FilesPersistedFile    `json:"files,omitempty"`
+	Failed      []FilesPersistedFailure `json:"failed,omitempty"`
+	ProcessedAt string                  `json:"processed_at,omitempty"`
+	UUID        string                  `json:"uuid,omitempty"`
+	SessionID   string                  `json:"session_id,omitempty"`
+}
+
+func (m *FilesPersistedMessage) MessageType() string { return "system" }
+
+// HookStartedMessage reports when a hook invocation starts.
+type HookStartedMessage struct {
+	Subtype   string `json:"subtype"`
+	HookID    string `json:"hook_id"`
+	HookName  string `json:"hook_name"`
+	HookEvent string `json:"hook_event"`
+	UUID      string `json:"uuid,omitempty"`
+	SessionID string `json:"session_id,omitempty"`
+}
+
+func (m *HookStartedMessage) MessageType() string { return "system" }
+
+// HookProgressMessage reports streaming output from a running hook.
+type HookProgressMessage struct {
+	Subtype   string `json:"subtype"`
+	HookID    string `json:"hook_id"`
+	HookName  string `json:"hook_name"`
+	HookEvent string `json:"hook_event"`
+	Stdout    string `json:"stdout,omitempty"`
+	Stderr    string `json:"stderr,omitempty"`
+	Output    string `json:"output,omitempty"`
+	UUID      string `json:"uuid,omitempty"`
+	SessionID string `json:"session_id,omitempty"`
+}
+
+func (m *HookProgressMessage) MessageType() string { return "system" }
+
+// HookResponseMessage reports completion status for a hook invocation.
+type HookResponseMessage struct {
+	Subtype   string `json:"subtype"`
+	HookID    string `json:"hook_id"`
+	HookName  string `json:"hook_name"`
+	HookEvent string `json:"hook_event"`
+	Output    string `json:"output,omitempty"`
+	Stdout    string `json:"stdout,omitempty"`
+	Stderr    string `json:"stderr,omitempty"`
+	ExitCode  *int   `json:"exit_code,omitempty"`
+	Outcome   string `json:"outcome,omitempty"`
+	UUID      string `json:"uuid,omitempty"`
+	SessionID string `json:"session_id,omitempty"`
+}
+
+func (m *HookResponseMessage) MessageType() string { return "system" }
+
 // HookEvent represents the type of hook event.
 type HookEvent string
 
@@ -319,6 +433,21 @@ const (
 
 	// HookPermissionRequest is triggered for permission request hook events.
 	HookPermissionRequest HookEvent = "PermissionRequest"
+
+	// HookSessionStart is triggered when a session starts.
+	HookSessionStart HookEvent = "SessionStart"
+
+	// HookSessionEnd is triggered when a session ends.
+	HookSessionEnd HookEvent = "SessionEnd"
+
+	// HookSetup is triggered during setup operations.
+	HookSetup HookEvent = "Setup"
+
+	// HookTeammateIdle is triggered when a teammate agent becomes idle.
+	HookTeammateIdle HookEvent = "TeammateIdle"
+
+	// HookTaskCompleted is triggered when a task completes.
+	HookTaskCompleted HookEvent = "TaskCompleted"
 )
 
 // HookContext provides context for hook callbacks.
@@ -413,6 +542,43 @@ type PermissionRequestHookInput struct {
 	PermissionSuggestions []any          `json:"permission_suggestions,omitempty"`
 }
 
+// SessionStartHookInput is the input for SessionStart hooks.
+type SessionStartHookInput struct {
+	BaseHookInput
+	Source    string  `json:"source"`
+	AgentType *string `json:"agent_type,omitempty"`
+	Model     *string `json:"model,omitempty"`
+}
+
+// SessionEndHookInput is the input for SessionEnd hooks.
+type SessionEndHookInput struct {
+	BaseHookInput
+	Reason string `json:"reason"`
+}
+
+// SetupHookInput is the input for Setup hooks.
+type SetupHookInput struct {
+	BaseHookInput
+	Trigger string `json:"trigger"`
+}
+
+// TeammateIdleHookInput is the input for TeammateIdle hooks.
+type TeammateIdleHookInput struct {
+	BaseHookInput
+	TeammateName string `json:"teammate_name"`
+	TeamName     string `json:"team_name"`
+}
+
+// TaskCompletedHookInput is the input for TaskCompleted hooks.
+type TaskCompletedHookInput struct {
+	BaseHookInput
+	TaskID          string  `json:"task_id"`
+	TaskSubject     string  `json:"task_subject"`
+	TaskDescription *string `json:"task_description,omitempty"`
+	TeammateName    *string `json:"teammate_name,omitempty"`
+	TeamName        *string `json:"team_name,omitempty"`
+}
+
 // HookOutput is the output from a hook callback.
 type HookOutput struct {
 	Continue       *bool          `json:"continue,omitempty"`
@@ -462,15 +628,44 @@ type SubagentStartCallback func(input *SubagentStartHookInput, toolUseID *string
 // PermissionRequestCallback is a type-safe callback for PermissionRequest hooks.
 type PermissionRequestCallback func(input *PermissionRequestHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error)
 
+// SessionStartCallback is a type-safe callback for SessionStart hooks.
+type SessionStartCallback func(input *SessionStartHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error)
+
+// SessionEndCallback is a type-safe callback for SessionEnd hooks.
+type SessionEndCallback func(input *SessionEndHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error)
+
+// SetupCallback is a type-safe callback for Setup hooks.
+type SetupCallback func(input *SetupHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error)
+
+// TeammateIdleCallback is a type-safe callback for TeammateIdle hooks.
+type TeammateIdleCallback func(input *TeammateIdleHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error)
+
+// TaskCompletedCallback is a type-safe callback for TaskCompleted hooks.
+type TaskCompletedCallback func(input *TaskCompletedHookInput, toolUseID *string, ctx *HookContext) (*HookOutput, error)
+
 // ToGenericCallback converts a type-safe callback to a generic HookCallback.
 // This allows using type-safe callbacks with the existing hook infrastructure.
 func ToGenericCallback[T any](callback func(*T, *string, *HookContext) (*HookOutput, error)) HookCallback {
 	return func(input any, toolUseID *string, ctx *HookContext) (*HookOutput, error) {
-		typedInput, ok := input.(*T)
-		if !ok {
-			return nil, fmt.Errorf("invalid input type: expected *%T, got %T", new(T), input)
+		if typedInput, ok := input.(*T); ok {
+			return callback(typedInput, toolUseID, ctx)
 		}
-		return callback(typedInput, toolUseID, ctx)
+		if typedValue, ok := input.(T); ok {
+			v := typedValue
+			return callback(&v, toolUseID, ctx)
+		}
+		if rawMap, ok := input.(map[string]any); ok {
+			data, err := json.Marshal(rawMap)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal hook input map: %w", err)
+			}
+			var typed T
+			if err := json.Unmarshal(data, &typed); err != nil {
+				return nil, fmt.Errorf("failed to parse hook input as typed payload: %w", err)
+			}
+			return callback(&typed, toolUseID, ctx)
+		}
+		return nil, fmt.Errorf("invalid input type: expected *%T/%T/map[string]any, got %T", new(T), *new(T), input)
 	}
 }
 
@@ -557,6 +752,16 @@ func (b *HookBuilder) WithCallback(callback any) *HookBuilder {
 		genericCallback = ToGenericCallback[SubagentStartHookInput](cb)
 	case PermissionRequestCallback:
 		genericCallback = ToGenericCallback[PermissionRequestHookInput](cb)
+	case SessionStartCallback:
+		genericCallback = ToGenericCallback[SessionStartHookInput](cb)
+	case SessionEndCallback:
+		genericCallback = ToGenericCallback[SessionEndHookInput](cb)
+	case SetupCallback:
+		genericCallback = ToGenericCallback[SetupHookInput](cb)
+	case TeammateIdleCallback:
+		genericCallback = ToGenericCallback[TeammateIdleHookInput](cb)
+	case TaskCompletedCallback:
+		genericCallback = ToGenericCallback[TaskCompletedHookInput](cb)
 	case HookCallback:
 		// Already a generic callback
 		genericCallback = cb
@@ -583,6 +788,16 @@ func (b *HookBuilder) WithCallback(callback any) *HookBuilder {
 			genericCallback = ToGenericCallback[SubagentStartHookInput](fn)
 		} else if fn, ok := callback.(func(*PermissionRequestHookInput, *string, *HookContext) (*HookOutput, error)); ok {
 			genericCallback = ToGenericCallback[PermissionRequestHookInput](fn)
+		} else if fn, ok := callback.(func(*SessionStartHookInput, *string, *HookContext) (*HookOutput, error)); ok {
+			genericCallback = ToGenericCallback[SessionStartHookInput](fn)
+		} else if fn, ok := callback.(func(*SessionEndHookInput, *string, *HookContext) (*HookOutput, error)); ok {
+			genericCallback = ToGenericCallback[SessionEndHookInput](fn)
+		} else if fn, ok := callback.(func(*SetupHookInput, *string, *HookContext) (*HookOutput, error)); ok {
+			genericCallback = ToGenericCallback[SetupHookInput](fn)
+		} else if fn, ok := callback.(func(*TeammateIdleHookInput, *string, *HookContext) (*HookOutput, error)); ok {
+			genericCallback = ToGenericCallback[TeammateIdleHookInput](fn)
+		} else if fn, ok := callback.(func(*TaskCompletedHookInput, *string, *HookContext) (*HookOutput, error)); ok {
+			genericCallback = ToGenericCallback[TaskCompletedHookInput](fn)
 		} else {
 			panic(fmt.Sprintf("unsupported callback type: %T", callback))
 		}
@@ -681,6 +896,10 @@ type SDKControlPermissionRequest struct {
 	Input                 map[string]any     `json:"input"`
 	PermissionSuggestions []PermissionUpdate `json:"permission_suggestions,omitempty"`
 	BlockedPath           *string            `json:"blocked_path,omitempty"`
+	DecisionReason        *string            `json:"decision_reason,omitempty"`
+	ToolUseID             string             `json:"tool_use_id,omitempty"`
+	AgentID               *string            `json:"agent_id,omitempty"`
+	Description           *string            `json:"description,omitempty"`
 }
 
 // ControlRequestType returns the request subtype.
@@ -708,6 +927,28 @@ type SDKControlSetPermissionModeRequest struct {
 
 // ControlRequestType returns the request subtype.
 func (r *SDKControlSetPermissionModeRequest) ControlRequestType() string {
+	return r.Subtype
+}
+
+// SDKControlSetModelRequest sets the active model.
+type SDKControlSetModelRequest struct {
+	Subtype string `json:"subtype"`
+	Model   string `json:"model,omitempty"`
+}
+
+// ControlRequestType returns the request subtype.
+func (r *SDKControlSetModelRequest) ControlRequestType() string {
+	return r.Subtype
+}
+
+// SDKControlSetMaxThinkingTokensRequest sets or clears max thinking tokens.
+type SDKControlSetMaxThinkingTokensRequest struct {
+	Subtype           string `json:"subtype"`
+	MaxThinkingTokens *int   `json:"max_thinking_tokens"`
+}
+
+// ControlRequestType returns the request subtype.
+func (r *SDKControlSetMaxThinkingTokensRequest) ControlRequestType() string {
 	return r.Subtype
 }
 
@@ -753,11 +994,113 @@ func (r *SDKControlMcpToolCallRequest) ControlRequestType() string {
 type SDKControlRewindFilesRequest struct {
 	Subtype       string `json:"subtype"`
 	UserMessageID string `json:"user_message_id"`
+	DryRun        *bool  `json:"dry_run,omitempty"`
 }
 
 // ControlRequestType returns the request subtype.
 func (r *SDKControlRewindFilesRequest) ControlRequestType() string {
 	return r.Subtype
+}
+
+// SDKControlMcpStatusRequest requests MCP server status.
+type SDKControlMcpStatusRequest struct {
+	Subtype string `json:"subtype"`
+}
+
+// ControlRequestType returns the request subtype.
+func (r *SDKControlMcpStatusRequest) ControlRequestType() string {
+	return r.Subtype
+}
+
+// SDKControlMcpSetServersRequest sets dynamic MCP servers.
+type SDKControlMcpSetServersRequest struct {
+	Subtype string         `json:"subtype"`
+	Servers map[string]any `json:"servers"`
+}
+
+// ControlRequestType returns the request subtype.
+func (r *SDKControlMcpSetServersRequest) ControlRequestType() string {
+	return r.Subtype
+}
+
+// SDKControlMcpReconnectRequest reconnects an MCP server.
+type SDKControlMcpReconnectRequest struct {
+	Subtype    string `json:"subtype"`
+	ServerName string `json:"serverName"`
+}
+
+// ControlRequestType returns the request subtype.
+func (r *SDKControlMcpReconnectRequest) ControlRequestType() string {
+	return r.Subtype
+}
+
+// SDKControlMcpToggleRequest toggles an MCP server enabled state.
+type SDKControlMcpToggleRequest struct {
+	Subtype    string `json:"subtype"`
+	ServerName string `json:"serverName"`
+	Enabled    bool   `json:"enabled"`
+}
+
+// ControlRequestType returns the request subtype.
+func (r *SDKControlMcpToggleRequest) ControlRequestType() string {
+	return r.Subtype
+}
+
+// SDKControlInitializeResponse contains initialization metadata returned by the CLI.
+type SDKControlInitializeResponse struct {
+	Commands              []SlashCommand `json:"commands,omitempty"`
+	OutputStyle           string         `json:"output_style,omitempty"`
+	AvailableOutputStyles []string       `json:"available_output_styles,omitempty"`
+	Models                []ModelInfo    `json:"models,omitempty"`
+	Account               AccountInfo    `json:"account,omitempty"`
+}
+
+// SlashCommand describes an available slash command.
+type SlashCommand struct {
+	Name         string `json:"name"`
+	Description  string `json:"description"`
+	ArgumentHint string `json:"argumentHint"`
+}
+
+// ModelInfo describes an available model.
+type ModelInfo struct {
+	Value       string `json:"value"`
+	DisplayName string `json:"displayName"`
+	Description string `json:"description"`
+}
+
+// AccountInfo describes account metadata for the authenticated user.
+type AccountInfo struct {
+	Email            string `json:"email,omitempty"`
+	Organization     string `json:"organization,omitempty"`
+	SubscriptionType string `json:"subscriptionType,omitempty"`
+	TokenSource      string `json:"tokenSource,omitempty"`
+	APIKeySource     string `json:"apiKeySource,omitempty"`
+}
+
+// RewindFilesResult contains file rewind operation details.
+type RewindFilesResult struct {
+	CanRewind    bool     `json:"canRewind"`
+	Error        string   `json:"error,omitempty"`
+	FilesChanged []string `json:"filesChanged,omitempty"`
+	Insertions   int      `json:"insertions,omitempty"`
+	Deletions    int      `json:"deletions,omitempty"`
+}
+
+// MCPServerStatus describes a server status returned by mcp_status.
+type MCPServerStatus struct {
+	Name   string         `json:"name"`
+	Status string         `json:"status"`
+	Scope  string         `json:"scope,omitempty"`
+	Error  string         `json:"error,omitempty"`
+	Config map[string]any `json:"config,omitempty"`
+}
+
+// MCPSetServersResult describes dynamic MCP update results.
+type MCPSetServersResult struct {
+	Added   []string          `json:"added"`
+	Removed []string          `json:"removed"`
+	Errors  map[string]string `json:"errors,omitempty"`
 }
 
 // ParseSDKControlRequest parses a raw JSON map into a typed SDKControlRequest.
@@ -801,6 +1144,20 @@ func ParseSDKControlRequest(raw map[string]any) (SDKControlRequest, error) {
 		}
 		return &req, nil
 
+	case "set_model":
+		var req SDKControlSetModelRequest
+		if err := json.Unmarshal(data, &req); err != nil {
+			return nil, fmt.Errorf("failed to parse set model request: %w", err)
+		}
+		return &req, nil
+
+	case "set_max_thinking_tokens":
+		var req SDKControlSetMaxThinkingTokensRequest
+		if err := json.Unmarshal(data, &req); err != nil {
+			return nil, fmt.Errorf("failed to parse set max thinking tokens request: %w", err)
+		}
+		return &req, nil
+
 	case "hook_callback":
 		var req SDKHookCallbackRequest
 		if err := json.Unmarshal(data, &req); err != nil {
@@ -829,6 +1186,34 @@ func ParseSDKControlRequest(raw map[string]any) (SDKControlRequest, error) {
 		}
 		return &req, nil
 
+	case "mcp_status":
+		var req SDKControlMcpStatusRequest
+		if err := json.Unmarshal(data, &req); err != nil {
+			return nil, fmt.Errorf("failed to parse mcp status request: %w", err)
+		}
+		return &req, nil
+
+	case "mcp_set_servers":
+		var req SDKControlMcpSetServersRequest
+		if err := json.Unmarshal(data, &req); err != nil {
+			return nil, fmt.Errorf("failed to parse mcp set servers request: %w", err)
+		}
+		return &req, nil
+
+	case "mcp_reconnect":
+		var req SDKControlMcpReconnectRequest
+		if err := json.Unmarshal(data, &req); err != nil {
+			return nil, fmt.Errorf("failed to parse mcp reconnect request: %w", err)
+		}
+		return &req, nil
+
+	case "mcp_toggle":
+		var req SDKControlMcpToggleRequest
+		if err := json.Unmarshal(data, &req); err != nil {
+			return nil, fmt.Errorf("failed to parse mcp toggle request: %w", err)
+		}
+		return &req, nil
+
 	default:
 		return nil, fmt.Errorf("unknown control request subtype: %s", subtype)
 	}
@@ -844,15 +1229,17 @@ type PermissionResultAllow struct {
 	Behavior           string             `json:"behavior"`
 	UpdatedInput       map[string]any     `json:"updatedInput,omitempty"`
 	UpdatedPermissions []PermissionUpdate `json:"updatedPermissions,omitempty"`
+	ToolUseID          *string            `json:"toolUseID,omitempty"`
 }
 
 func (r *PermissionResultAllow) isPermissionResult() {}
 
 // PermissionResultDeny denies a tool from running.
 type PermissionResultDeny struct {
-	Behavior  string `json:"behavior"`
-	Message   string `json:"message,omitempty"`
-	Interrupt bool   `json:"interrupt,omitempty"`
+	Behavior  string  `json:"behavior"`
+	Message   string  `json:"message,omitempty"`
+	Interrupt bool    `json:"interrupt,omitempty"`
+	ToolUseID *string `json:"toolUseID,omitempty"`
 }
 
 func (r *PermissionResultDeny) isPermissionResult() {}
@@ -927,9 +1314,13 @@ func (p *PermissionUpdate) ToDict() map[string]any {
 
 // ToolPermissionContext provides context for permission callbacks.
 type ToolPermissionContext struct {
-	Signal      any                `json:"-"`
-	Suggestions []PermissionUpdate `json:"suggestions,omitempty"`
-	BlockedPath *string            `json:"blocked_path,omitempty"`
+	Signal         any                `json:"-"`
+	Suggestions    []PermissionUpdate `json:"suggestions,omitempty"`
+	BlockedPath    *string            `json:"blocked_path,omitempty"`
+	DecisionReason *string            `json:"decision_reason,omitempty"`
+	ToolUseID      string             `json:"tool_use_id,omitempty"`
+	AgentID        *string            `json:"agent_id,omitempty"`
+	Description    *string            `json:"description,omitempty"`
 }
 
 // CanUseToolCallback is called when a tool needs permission.

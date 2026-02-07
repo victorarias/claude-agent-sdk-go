@@ -12,10 +12,12 @@ import (
 type PermissionMode string
 
 const (
-	PermissionDefault PermissionMode = "default"
-	PermissionAccept  PermissionMode = "acceptEdits"
-	PermissionPlan    PermissionMode = "plan"
-	PermissionBypass  PermissionMode = "bypassPermissions"
+	PermissionDefault  PermissionMode = "default"
+	PermissionAccept   PermissionMode = "acceptEdits"
+	PermissionPlan     PermissionMode = "plan"
+	PermissionBypass   PermissionMode = "bypassPermissions"
+	PermissionDelegate PermissionMode = "delegate"
+	PermissionDontAsk  PermissionMode = "dontAsk"
 )
 
 // SettingSource specifies where settings come from.
@@ -46,10 +48,15 @@ const (
 
 // AgentDefinition defines a custom agent.
 type AgentDefinition struct {
-	Description string     `json:"description"`
-	Prompt      string     `json:"prompt"`
-	Tools       []string   `json:"tools,omitempty"`
-	Model       AgentModel `json:"model,omitempty"`
+	Description                        string     `json:"description"`
+	Prompt                             string     `json:"prompt"`
+	Tools                              []string   `json:"tools,omitempty"`
+	DisallowedTools                    []string   `json:"disallowedTools,omitempty"`
+	Model                              AgentModel `json:"model,omitempty"`
+	MCPServers                         []any      `json:"mcpServers,omitempty"`
+	CriticalSystemReminderExperimental string     `json:"criticalSystemReminder_EXPERIMENTAL,omitempty"`
+	Skills                             []string   `json:"skills,omitempty"`
+	MaxTurns                           int        `json:"maxTurns,omitempty"`
 }
 
 // PluginConfig defines a plugin configuration.
@@ -275,6 +282,8 @@ type Options struct {
 	Model string `json:"model,omitempty"`
 	// FallbackModel specifies a model to use if the primary model fails.
 	FallbackModel string `json:"fallback_model,omitempty"`
+	// Agent specifies the main thread agent name.
+	Agent string `json:"agent,omitempty"`
 
 	// PermissionMode controls how tool permissions are handled.
 	PermissionMode PermissionMode `json:"permission_mode,omitempty"`
@@ -285,8 +294,14 @@ type Options struct {
 	ContinueConversation bool `json:"continue_conversation,omitempty"`
 	// Resume specifies a session ID to resume.
 	Resume string `json:"resume,omitempty"`
+	// ResumeSessionAt specifies the message UUID to resume at when using Resume.
+	ResumeSessionAt string `json:"resume_session_at,omitempty"`
+	// SessionID sets an explicit session UUID for the conversation.
+	SessionID string `json:"session_id,omitempty"`
 	// ForkSession creates a new session forked from the current one.
 	ForkSession bool `json:"fork_session,omitempty"`
+	// PersistSession controls disk persistence. Nil uses CLI default behavior.
+	PersistSession *bool `json:"persist_session,omitempty"`
 
 	// MaxTurns limits the number of conversation turns.
 	MaxTurns int `json:"max_turns,omitempty"`
@@ -341,6 +356,16 @@ type Options struct {
 
 	// User specifies a user identifier for the session.
 	User string `json:"user,omitempty"`
+
+	// Debug enables verbose debug logging from the Claude CLI.
+	Debug bool `json:"debug,omitempty"`
+	// DebugFile writes debug logs to a specific file path.
+	DebugFile string `json:"debug_file,omitempty"`
+
+	// StrictMCPConfig enforces strict MCP configuration validation.
+	StrictMCPConfig bool `json:"strict_mcp_config,omitempty"`
+	// AllowDangerouslySkipPermissions is required for bypass permissions mode.
+	AllowDangerouslySkipPermissions bool `json:"allow_dangerously_skip_permissions,omitempty"`
 
 	// Agents defines custom agent configurations.
 	Agents map[string]AgentDefinition `json:"agents,omitempty"`
@@ -500,10 +525,31 @@ func WithResume(sessionID string) Option {
 	}
 }
 
+// WithResumeSessionAt resumes a session up to and including a message UUID.
+func WithResumeSessionAt(messageID string) Option {
+	return func(o *Options) {
+		o.ResumeSessionAt = messageID
+	}
+}
+
+// WithSessionID sets an explicit session UUID.
+func WithSessionID(sessionID string) Option {
+	return func(o *Options) {
+		o.SessionID = sessionID
+	}
+}
+
 // WithContinue continues the last conversation.
 func WithContinue() Option {
 	return func(o *Options) {
 		o.ContinueConversation = true
+	}
+}
+
+// WithPersistSession controls whether session persistence is enabled.
+func WithPersistSession(enabled bool) Option {
+	return func(o *Options) {
+		o.PersistSession = &enabled
 	}
 }
 
@@ -574,6 +620,41 @@ func WithAgents(agents map[string]AgentDefinition) Option {
 func WithPlugins(plugins ...PluginConfig) Option {
 	return func(o *Options) {
 		o.Plugins = plugins
+	}
+}
+
+// WithAgent sets the main thread agent name.
+func WithAgent(agent string) Option {
+	return func(o *Options) {
+		o.Agent = agent
+	}
+}
+
+// WithDebug enables debug logging from the CLI.
+func WithDebug() Option {
+	return func(o *Options) {
+		o.Debug = true
+	}
+}
+
+// WithDebugFile writes debug logs to a file.
+func WithDebugFile(path string) Option {
+	return func(o *Options) {
+		o.DebugFile = path
+	}
+}
+
+// WithStrictMCPConfig enables strict MCP config validation.
+func WithStrictMCPConfig() Option {
+	return func(o *Options) {
+		o.StrictMCPConfig = true
+	}
+}
+
+// WithAllowDangerouslySkipPermissions acknowledges bypass permission mode.
+func WithAllowDangerouslySkipPermissions() Option {
+	return func(o *Options) {
+		o.AllowDangerouslySkipPermissions = true
 	}
 }
 

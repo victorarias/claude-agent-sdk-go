@@ -105,6 +105,21 @@ func NewSessionStartOutput(additionalContext string) *HookOutput {
 	}
 }
 
+// NewSetupOutput creates a HookOutput for Setup events.
+func NewSetupOutput(additionalContext string) *HookOutput {
+	hookSpecific := map[string]any{
+		"hookEventName": "Setup",
+	}
+
+	if additionalContext != "" {
+		hookSpecific["additionalContext"] = additionalContext
+	}
+
+	return &HookOutput{
+		HookSpecific: hookSpecific,
+	}
+}
+
 // NewStopOutput creates a HookOutput for Stop events with hook-specific fields.
 func NewStopOutput() *HookOutput {
 	hookSpecific := map[string]any{

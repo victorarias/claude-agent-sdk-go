@@ -144,14 +144,44 @@ The SDK supports extensive configuration through functional options:
 
 ```go
 client := sdk.NewClient(
-    types.WithModel("claude-opus-4-5"),           // Choose Claude model
-    types.WithMaxTurns(20),                       // Limit conversation turns
-    types.WithSystemPrompt("Custom instructions"), // Set system prompt
-    types.WithMaxTokens(4096),                    // Limit response tokens
-    types.WithPermissionMode(types.PermissionAlways), // Tool permission mode
-    types.WithTimeout(10*time.Minute),            // Set timeout
-    types.WithBudget(1.0),                        // Set cost budget in USD
+    types.WithModel("claude-opus-4-5"),               // Choose Claude model
+    types.WithMaxTurns(20),                           // Limit conversation turns
+    types.WithSystemPrompt("Custom instructions"),    // Set system prompt
+    types.WithPermissionMode(types.PermissionAccept), // Tool permission mode
+    types.WithMaxThinkingTokens(4096),                // Limit thinking tokens
+    types.WithMaxBudget(1.0),                         // Set cost budget in USD
+    types.WithAgent("researcher"),                    // Set default thread agent
+    types.WithDebugFile("claude-debug.log"),          // Write CLI debug logs
 )
+```
+
+For `types.PermissionBypass`, you must also set `types.WithAllowDangerouslySkipPermissions()`.
+
+## Runtime Control API
+
+After connecting, you can update runtime controls without restarting the client:
+
+```go
+if err := client.SetPermissionMode(types.PermissionDefault); err != nil {
+    panic(err)
+}
+if err := client.SetModel("claude-sonnet-4-5"); err != nil {
+    panic(err)
+}
+maxThinking := 2048
+if err := client.SetMaxThinkingTokens(&maxThinking); err != nil {
+    panic(err)
+}
+
+initMeta, _ := client.InitializationResult()
+models, _ := client.SupportedModels()
+commands, _ := client.SupportedCommands()
+account, _ := client.AccountInfo()
+
+_ = initMeta
+_ = models
+_ = commands
+_ = account
 ```
 
 ## Examples
@@ -164,6 +194,7 @@ Comprehensive examples are available in the [`examples/`](./examples) directory:
 | [streaming](./examples/streaming/) | Interactive multi-turn conversation |
 | [hooks](./examples/hooks/) | Pre/post tool use hooks for logging and control |
 | [mcp-server](./examples/mcp-server/) | SDK-hosted MCP server with custom tools |
+| [runtime-controls](./examples/runtime-controls/) | Runtime model/permission/session/MCP control APIs |
 | [permissions](./examples/permissions/) | Custom tool permission handling |
 | [session](./examples/session/) | Session resume and conversation continuation |
 | [error-handling](./examples/error-handling/) | Error types and recovery patterns |

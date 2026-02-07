@@ -36,12 +36,19 @@ func TestSDKControlInterruptRequest(t *testing.T) {
 
 // TestSDKControlPermissionRequest tests the permission request type.
 func TestSDKControlPermissionRequest(t *testing.T) {
+	decisionReason := "path_outside_workspace"
+	agentID := "agent-1"
+	description := "Request to run bash"
 	req := &SDKControlPermissionRequest{
 		Subtype:               "can_use_tool",
 		ToolName:              "Bash",
 		Input:                 map[string]any{"command": "ls"},
 		PermissionSuggestions: []PermissionUpdate{{Type: PermissionAddRules}},
 		BlockedPath:           stringPtr("/some/path"),
+		DecisionReason:        &decisionReason,
+		ToolUseID:             "tool-123",
+		AgentID:               &agentID,
+		Description:           &description,
 	}
 
 	// Test that it implements SDKControlRequest interface
@@ -64,6 +71,9 @@ func TestSDKControlPermissionRequest(t *testing.T) {
 	}
 	if result["tool_name"] != "Bash" {
 		t.Errorf("Expected tool_name 'Bash', got %v", result["tool_name"])
+	}
+	if result["tool_use_id"] != "tool-123" {
+		t.Errorf("Expected tool_use_id 'tool-123', got %v", result["tool_use_id"])
 	}
 
 	// Test type discrimination
@@ -137,6 +147,45 @@ func TestSDKControlSetPermissionModeRequest(t *testing.T) {
 	// Test type discrimination
 	if req.ControlRequestType() != "set_permission_mode" {
 		t.Errorf("Expected type 'set_permission_mode', got '%s'", req.ControlRequestType())
+	}
+}
+
+func TestSDKControlSetModelRequest(t *testing.T) {
+	req := &SDKControlSetModelRequest{
+		Subtype: "set_model",
+		Model:   "claude-sonnet-4-5",
+	}
+
+	var _ SDKControlRequest = req
+
+	data, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	expected := `{"subtype":"set_model","model":"claude-sonnet-4-5"}`
+	if string(data) != expected {
+		t.Errorf("expected %s, got %s", expected, string(data))
+	}
+}
+
+func TestSDKControlSetMaxThinkingTokensRequest(t *testing.T) {
+	maxTokens := 8192
+	req := &SDKControlSetMaxThinkingTokensRequest{
+		Subtype:           "set_max_thinking_tokens",
+		MaxThinkingTokens: &maxTokens,
+	}
+
+	var _ SDKControlRequest = req
+
+	data, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	expected := `{"subtype":"set_max_thinking_tokens","max_thinking_tokens":8192}`
+	if string(data) != expected {
+		t.Errorf("expected %s, got %s", expected, string(data))
 	}
 }
 
@@ -240,6 +289,25 @@ func TestSDKControlRewindFilesRequest(t *testing.T) {
 	}
 }
 
+func TestSDKControlRewindFilesRequest_WithDryRun(t *testing.T) {
+	dryRun := true
+	req := &SDKControlRewindFilesRequest{
+		Subtype:       "rewind_files",
+		UserMessageID: "msg_789",
+		DryRun:        &dryRun,
+	}
+
+	data, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	expected := `{"subtype":"rewind_files","user_message_id":"msg_789","dry_run":true}`
+	if string(data) != expected {
+		t.Errorf("expected %s, got %s", expected, string(data))
+	}
+}
+
 // TestSDKControlMcpToolCallRequest tests the MCP tool call request type.
 func TestSDKControlMcpToolCallRequest(t *testing.T) {
 	req := &SDKControlMcpToolCallRequest{
@@ -280,6 +348,89 @@ func TestSDKControlMcpToolCallRequest(t *testing.T) {
 	}
 }
 
+func TestSDKControlMcpStatusRequest(t *testing.T) {
+	req := &SDKControlMcpStatusRequest{Subtype: "mcp_status"}
+
+	var _ SDKControlRequest = req
+
+	data, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	expected := `{"subtype":"mcp_status"}`
+	if string(data) != expected {
+		t.Errorf("expected %s, got %s", expected, string(data))
+	}
+}
+
+func TestSDKControlMcpSetServersRequest(t *testing.T) {
+	req := &SDKControlMcpSetServersRequest{
+		Subtype: "mcp_set_servers",
+		Servers: map[string]any{
+			"calc": map[string]any{"type": "stdio", "command": "node"},
+		},
+	}
+
+	var _ SDKControlRequest = req
+
+	data, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if parsed["subtype"] != "mcp_set_servers" {
+		t.Errorf("expected subtype mcp_set_servers, got %v", parsed["subtype"])
+	}
+	if _, ok := parsed["servers"]; !ok {
+		t.Error("expected servers payload")
+	}
+}
+
+func TestSDKControlMcpReconnectRequest(t *testing.T) {
+	req := &SDKControlMcpReconnectRequest{
+		Subtype:    "mcp_reconnect",
+		ServerName: "calc",
+	}
+
+	var _ SDKControlRequest = req
+
+	data, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	expected := `{"subtype":"mcp_reconnect","serverName":"calc"}`
+	if string(data) != expected {
+		t.Errorf("expected %s, got %s", expected, string(data))
+	}
+}
+
+func TestSDKControlMcpToggleRequest(t *testing.T) {
+	req := &SDKControlMcpToggleRequest{
+		Subtype:    "mcp_toggle",
+		ServerName: "calc",
+		Enabled:    true,
+	}
+
+	var _ SDKControlRequest = req
+
+	data, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	expected := `{"subtype":"mcp_toggle","serverName":"calc","enabled":true}`
+	if string(data) != expected {
+		t.Errorf("expected %s, got %s", expected, string(data))
+	}
+}
+
 // TestParseSDKControlRequest tests parsing raw JSON into typed structs.
 func TestParseSDKControlRequest(t *testing.T) {
 	tests := []struct {
@@ -294,7 +445,7 @@ func TestParseSDKControlRequest(t *testing.T) {
 		},
 		{
 			name: "permission",
-			json: `{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"ls"},"permission_suggestions":null,"blocked_path":null}`,
+			json: `{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"ls"},"permission_suggestions":null,"blocked_path":null,"decision_reason":"outside_workspace","tool_use_id":"tool-1","agent_id":"agent-1","description":"bash request"}`,
 			expected: &SDKControlPermissionRequest{
 				Subtype:  "can_use_tool",
 				ToolName: "Bash",
@@ -349,6 +500,49 @@ func TestParseSDKControlRequest(t *testing.T) {
 				UserMessageID: "msg_123",
 			},
 		},
+		{
+			name: "set_model",
+			json: `{"subtype":"set_model","model":"claude-opus-4"}`,
+			expected: &SDKControlSetModelRequest{
+				Subtype: "set_model",
+				Model:   "claude-opus-4",
+			},
+		},
+		{
+			name: "set_max_thinking_tokens",
+			json: `{"subtype":"set_max_thinking_tokens","max_thinking_tokens":4096}`,
+			expected: &SDKControlSetMaxThinkingTokensRequest{
+				Subtype: "set_max_thinking_tokens",
+			},
+		},
+		{
+			name: "mcp_status",
+			json: `{"subtype":"mcp_status"}`,
+			expected: &SDKControlMcpStatusRequest{
+				Subtype: "mcp_status",
+			},
+		},
+		{
+			name: "mcp_set_servers",
+			json: `{"subtype":"mcp_set_servers","servers":{"calc":{"type":"stdio","command":"node"}}}`,
+			expected: &SDKControlMcpSetServersRequest{
+				Subtype: "mcp_set_servers",
+			},
+		},
+		{
+			name: "mcp_reconnect",
+			json: `{"subtype":"mcp_reconnect","serverName":"calc"}`,
+			expected: &SDKControlMcpReconnectRequest{
+				Subtype: "mcp_reconnect",
+			},
+		},
+		{
+			name: "mcp_toggle",
+			json: `{"subtype":"mcp_toggle","serverName":"calc","enabled":true}`,
+			expected: &SDKControlMcpToggleRequest{
+				Subtype: "mcp_toggle",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -381,6 +575,34 @@ func TestParseSDKControlRequest_InvalidSubtype(t *testing.T) {
 	_, err := ParseSDKControlRequest(raw)
 	if err == nil {
 		t.Error("Expected error for unknown subtype, got nil")
+	}
+}
+
+func TestSDKControlInitializeResponse_Unmarshal(t *testing.T) {
+	raw := `{
+		"commands":[{"name":"review","description":"Review code","argumentHint":"<path>"}],
+		"output_style":"default",
+		"available_output_styles":["default","concise"],
+		"models":[{"value":"claude-sonnet-4-5","displayName":"Sonnet 4.5","description":"Balanced model"}],
+		"account":{"email":"user@example.com","organization":"acme","subscriptionType":"pro"}
+	}`
+
+	var resp SDKControlInitializeResponse
+	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
+		t.Fatalf("failed to unmarshal initialize response: %v", err)
+	}
+
+	if len(resp.Commands) != 1 || resp.Commands[0].Name != "review" {
+		t.Fatalf("unexpected commands payload: %+v", resp.Commands)
+	}
+	if resp.OutputStyle != "default" {
+		t.Fatalf("unexpected output style: %s", resp.OutputStyle)
+	}
+	if len(resp.Models) != 1 || resp.Models[0].Value != "claude-sonnet-4-5" {
+		t.Fatalf("unexpected models payload: %+v", resp.Models)
+	}
+	if resp.Account.Email != "user@example.com" {
+		t.Fatalf("unexpected account payload: %+v", resp.Account)
 	}
 }
 

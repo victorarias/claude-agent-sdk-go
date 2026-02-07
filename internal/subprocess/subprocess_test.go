@@ -162,6 +162,135 @@ func TestBuildCommand_WithOptions(t *testing.T) {
 	}
 }
 
+func TestBuildCommand_NewOptionFlags(t *testing.T) {
+	opts := types.DefaultOptions()
+	opts.Agent = "code-reviewer"
+	opts.SessionID = "11111111-1111-1111-1111-111111111111"
+	opts.ResumeSessionAt = "22222222-2222-2222-2222-222222222222"
+	opts.Debug = true
+	opts.StrictMCPConfig = true
+	opts.AllowDangerouslySkipPermissions = true
+	persist := false
+	opts.PersistSession = &persist
+
+	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
+
+	checks := map[string]string{
+		"--agent":             "code-reviewer",
+		"--session-id":        "11111111-1111-1111-1111-111111111111",
+		"--resume-session-at": "22222222-2222-2222-2222-222222222222",
+	}
+
+	for flag, value := range checks {
+		found := false
+		for i, arg := range cmd {
+			if arg == flag && i+1 < len(cmd) && cmd[i+1] == value {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("missing %s %s in command", flag, value)
+		}
+	}
+
+	boolFlags := []string{
+		"--debug",
+		"--strict-mcp-config",
+		"--allow-dangerously-skip-permissions",
+		"--no-session-persistence",
+	}
+	for _, flag := range boolFlags {
+		found := false
+		for _, arg := range cmd {
+			if arg == flag {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("missing %s in command", flag)
+		}
+	}
+}
+
+func TestBuildCommand_DebugFileTakesPrecedenceOverDebug(t *testing.T) {
+	opts := types.DefaultOptions()
+	opts.Debug = true
+	opts.DebugFile = "/tmp/claude-debug.log"
+
+	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
+
+	hasDebug := false
+	hasDebugFile := false
+	for i, arg := range cmd {
+		if arg == "--debug" {
+			hasDebug = true
+		}
+		if arg == "--debug-file" && i+1 < len(cmd) && cmd[i+1] == "/tmp/claude-debug.log" {
+			hasDebugFile = true
+		}
+	}
+
+	if hasDebug {
+		t.Error("--debug should not be present when --debug-file is set")
+	}
+	if !hasDebugFile {
+		t.Error("missing --debug-file flag")
+	}
+}
+
+func TestBuildCommand_PersistSessionTriState(t *testing.T) {
+	tests := []struct {
+		name            string
+		persist         *bool
+		expectNoPersist bool
+	}{
+		{
+			name:            "nil means default behavior",
+			persist:         nil,
+			expectNoPersist: false,
+		},
+		{
+			name: "true does not pass no-session flag",
+			persist: func() *bool {
+				v := true
+				return &v
+			}(),
+			expectNoPersist: false,
+		},
+		{
+			name: "false passes no-session flag",
+			persist: func() *bool {
+				v := false
+				return &v
+			}(),
+			expectNoPersist: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := types.DefaultOptions()
+			opts.PersistSession = tt.persist
+
+			cmd := buildCommand("/usr/bin/claude", "test", opts, false)
+
+			hasNoPersist := false
+			for _, arg := range cmd {
+				if arg == "--no-session-persistence" {
+					hasNoPersist = true
+					break
+				}
+			}
+
+			if hasNoPersist != tt.expectNoPersist {
+				t.Fatalf("expected --no-session-persistence presence=%v, got %v", tt.expectNoPersist, hasNoPersist)
+			}
+		})
+	}
+}
+
 func TestBuildCommand_MCPServers(t *testing.T) {
 	opts := types.DefaultOptions()
 	opts.MCPServers = map[string]types.MCPServerConfig{

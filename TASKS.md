@@ -1,53 +1,84 @@
-# Python SDK Parity Tasks (from 2025-11-01 onward)
+# TypeScript SDK Parity Roadmap
 
-This file tracks missing features identified when comparing this Go port against `anthropics/claude-code-sdk-python` up to v0.1.31.
+Source of truth for parity: `@anthropic-ai/claude-agent-sdk@0.2.34` (`sdk.d.ts` + `sdk.mjs`).
 
-## Tasks
+Status legend:
+- [ ] pending
+- [~] in progress
+- [x] complete
 
-- [x] 1. Add MCP tool annotations support for SDK-hosted tools
-  - Add annotation fields to Go MCP tool types
-  - Include annotations in `tools/list` responses for SDK MCP servers
-  - Add/adjust tests for annotation serialization and bridge behavior
+## Implementation Order (Foundational -> Advanced)
 
-- [x] 2. Send `agents` via initialize control request (stdin), not `--agents` CLI args
-  - Stop passing `--agents` in subprocess command construction
-  - Extend `Query.Initialize(...)` path to include agent payload
-  - Wire client options agents into initialize request
-  - Remove obsolete command-length `--agents` fallback logic/tests
+- [x] 1. Core options + CLI flag parity foundation
+  - Add missing permission modes: `delegate`, `dontAsk`
+  - Add missing `Options` fields used directly by CLI launch:
+    - `agent`, `session_id`, `resume_session_at`
+    - `debug`, `debug_file`
+    - `strict_mcp_config`
+    - `allow_dangerously_skip_permissions`
+    - `persist_session` (tri-state behavior; only pass `--no-session-persistence` when explicitly false)
+  - Extend subprocess command building for corresponding flags:
+    - `--agent`, `--session-id`, `--resume-session-at`
+    - `--debug` / `--debug-file`
+    - `--strict-mcp-config`
+    - `--allow-dangerously-skip-permissions`
+    - `--no-session-persistence`
+  - Add option helpers + tests
 
-- [x] 3. Add public MCP status API
-  - Add `Query.GetMCPStatus()` control request (`subtype: mcp_status`)
-  - Add `Client.GetMCPStatus()` wrapper method
-  - Add tests for request/response handling
+- [x] 2. Agent definition parity + initialize payload parity
+  - Extend `AgentDefinition` with TS fields (`disallowedTools`, `mcpServers`, `criticalSystemReminder_EXPERIMENTAL`, `skills`, `maxTurns`)
+  - Ensure initialize request serializes all supported fields
+  - Add serialization + initialize payload tests
 
-- [x] 4. Add `tool_use_result` support on `UserMessage`
-  - Add typed field to message model
-  - Parse it from raw user messages
-  - Add tests for parsing and type behavior
+- [x] 3. Control protocol type parity (request/response surface)
+  - Add control request types/subtypes:
+    - `set_max_thinking_tokens`
+    - `mcp_set_servers`, `mcp_reconnect`, `mcp_toggle`
+    - `rewind_files` with optional `dry_run`
+  - Add initialization response typed model (`commands`, `models`, `account`, output style data)
+  - Add parser tests for new control types
 
-- [x] 5. Add new hook events and typed hook inputs/outputs
-  - Add events: `PostToolUseFailure`, `Notification`, `SubagentStart`, `PermissionRequest`
-  - Add missing input fields: `tool_use_id` (Pre/PostToolUse), subagent stop metadata fields
-  - Add hook-specific output support fields
-  - Add tests for JSON/control parsing and callback typing
+- [x] 4. Query/Client control API parity
+  - Implement query methods:
+    - `SetMaxThinkingTokens(*int / clear)` semantics
+    - `InitializationResult`, `SupportedCommands`, `SupportedModels`, `AccountInfo`
+    - `ReconnectMCPServer`, `ToggleMCPServer`, `SetMCPServers`
+    - `RewindFiles` options/result structure parity (incl. dry-run)
+  - Add `Client` wrappers with connection checks
+  - Add unit tests for each control method
 
-- [x] 6. Extend hook helper API surface
-  - PreToolUse helper supports optional `additionalContext`
-  - PostToolUse helper supports optional `updatedMCPToolOutput`
-  - Add helpers for new events where useful
-  - Add tests for helper output payloads
+- [x] 5. Dynamic MCP server management parity
+  - Implement runtime replacement/toggling/reconnect for process-managed MCP servers
+  - Keep SDK-hosted MCP server behavior aligned with TS expectations
+  - Add integration-style tests around MCP control flow
 
-- [x] 7. Honor `CLAUDE_CODE_STREAM_CLOSE_TIMEOUT` for initialize timeout behavior
-  - Read env var (milliseconds) and apply `max(env/1000, 60)` semantics for initialize timeout
-  - Keep existing stream-close timeout behavior intact
-  - Add tests for env override parsing and clamping
+- [x] 6. Hook event/type parity expansion
+  - Add missing events: `SessionStart`, `SessionEnd`, `Setup`, `TeammateIdle`, `TaskCompleted`
+  - Add typed hook input/output structs + helper builders
+  - Ensure parser + hook callback routing handles all events
 
-- [x] 8. Fail fast pending control requests on transport/read failure
-  - Ensure pending control waits are unblocked with errors when transport closes/errors
-  - Avoid waiting full request timeout in broken-transport scenarios
-  - Add regression tests for pending request fast-fail
+- [x] 7. Message type parity expansion
+  - Add missing SDK message types/subtypes and parser support:
+    - auth/task notification/files persisted/hook progress/hook response/tool summary variants
+  - Add robust unknown-message handling tests
 
-## Verification
+- [x] 8. Permission callback context parity
+  - Add fields from TS control payload (`decision_reason`, `tool_use_id`, `agent_id`, description)
+  - Thread through `CanUseTool` context and tests
 
-- [x] Run targeted unit tests for each implemented task
-- [x] Run full test suite: `go test ./...`
+- [x] 9. Behavioral validation parity
+  - Enforce TS-equivalent option validation where applicable:
+    - `canUseTool` vs `permissionPromptToolName` exclusivity (already present, keep)
+    - `fallbackModel != model`
+    - bypass-permissions safety checks
+    - continue/resume/session-id interaction constraints
+  - Add validation-focused tests
+
+- [x] 10. Docs + examples parity sweep
+  - Update README/options docs for new fields and control APIs
+  - Add/refresh examples for session controls + MCP management
+
+## Current Execution
+
+- Current step: Completed roadmap (items 1-10)
+- Next step: open a new parity sweep against the newest TypeScript SDK release

@@ -353,9 +353,27 @@ func (q *Query) handleControlRequest(msg map[string]any) {
 	case *types.SDKControlSetPermissionModeRequest:
 		// Set permission mode is handled via sendControlRequest, not incoming
 		err = fmt.Errorf("set permission mode request not expected as incoming request")
+	case *types.SDKControlSetModelRequest:
+		// Set model is handled via sendControlRequest, not incoming
+		err = fmt.Errorf("set model request not expected as incoming request")
+	case *types.SDKControlSetMaxThinkingTokensRequest:
+		// Set max thinking tokens is handled via sendControlRequest, not incoming
+		err = fmt.Errorf("set max thinking tokens request not expected as incoming request")
 	case *types.SDKControlRewindFilesRequest:
 		// Rewind files is handled via sendControlRequest, not incoming
 		err = fmt.Errorf("rewind files request not expected as incoming request")
+	case *types.SDKControlMcpStatusRequest:
+		// MCP status is handled via sendControlRequest, not incoming
+		err = fmt.Errorf("mcp status request not expected as incoming request")
+	case *types.SDKControlMcpSetServersRequest:
+		// MCP server set is handled via sendControlRequest, not incoming
+		err = fmt.Errorf("mcp set servers request not expected as incoming request")
+	case *types.SDKControlMcpReconnectRequest:
+		// MCP reconnect is handled via sendControlRequest, not incoming
+		err = fmt.Errorf("mcp reconnect request not expected as incoming request")
+	case *types.SDKControlMcpToggleRequest:
+		// MCP toggle is handled via sendControlRequest, not incoming
+		err = fmt.Errorf("mcp toggle request not expected as incoming request")
 	default:
 		err = fmt.Errorf("unsupported control request type: %T", typedRequest)
 	}
@@ -420,12 +438,20 @@ func (q *Query) hookOutputToResponse(output *types.HookOutput) map[string]any {
 func (q *Query) handleCanUseToolTyped(req *types.SDKControlPermissionRequest) (map[string]any, error) {
 	if q.canUseTool == nil {
 		// Default: allow all
-		return map[string]any{"behavior": "allow"}, nil
+		resp := map[string]any{"behavior": "allow"}
+		if req.ToolUseID != "" {
+			resp["toolUseID"] = req.ToolUseID
+		}
+		return resp, nil
 	}
 
 	ctx := &types.ToolPermissionContext{
-		Suggestions: req.PermissionSuggestions,
-		BlockedPath: req.BlockedPath,
+		Suggestions:    req.PermissionSuggestions,
+		BlockedPath:    req.BlockedPath,
+		DecisionReason: req.DecisionReason,
+		ToolUseID:      req.ToolUseID,
+		AgentID:        req.AgentID,
+		Description:    req.Description,
 	}
 
 	result, err := q.canUseTool(req.ToolName, req.Input, ctx)
@@ -433,7 +459,16 @@ func (q *Query) handleCanUseToolTyped(req *types.SDKControlPermissionRequest) (m
 		return nil, err
 	}
 
-	return q.permissionResultToResponse(result)
+	resp, err := q.permissionResultToResponse(result)
+	if err != nil {
+		return nil, err
+	}
+	if req.ToolUseID != "" {
+		if _, ok := resp["toolUseID"]; !ok {
+			resp["toolUseID"] = req.ToolUseID
+		}
+	}
+	return resp, nil
 }
 
 // permissionResultToResponse converts a permission result to a response map.
@@ -449,6 +484,9 @@ func (q *Query) permissionResultToResponse(result types.PermissionResult) (map[s
 		if len(r.UpdatedPermissions) > 0 {
 			resp["permissionUpdates"] = r.UpdatedPermissions
 		}
+		if r.ToolUseID != nil && *r.ToolUseID != "" {
+			resp["toolUseID"] = *r.ToolUseID
+		}
 		return resp, nil
 
 	case *types.PermissionResultDeny:
@@ -458,6 +496,9 @@ func (q *Query) permissionResultToResponse(result types.PermissionResult) (map[s
 		}
 		if r.Interrupt {
 			resp["interrupt"] = true
+		}
+		if r.ToolUseID != nil && *r.ToolUseID != "" {
+			resp["toolUseID"] = *r.ToolUseID
 		}
 		return resp, nil
 
@@ -929,8 +970,23 @@ func buildInitializeAgents(agents map[string]types.AgentDefinition) map[string]a
 		if len(agent.Tools) > 0 {
 			agentConfig["tools"] = agent.Tools
 		}
+		if len(agent.DisallowedTools) > 0 {
+			agentConfig["disallowedTools"] = agent.DisallowedTools
+		}
 		if agent.Model != "" {
 			agentConfig["model"] = string(agent.Model)
+		}
+		if len(agent.MCPServers) > 0 {
+			agentConfig["mcpServers"] = agent.MCPServers
+		}
+		if agent.CriticalSystemReminderExperimental != "" {
+			agentConfig["criticalSystemReminder_EXPERIMENTAL"] = agent.CriticalSystemReminderExperimental
+		}
+		if len(agent.Skills) > 0 {
+			agentConfig["skills"] = agent.Skills
+		}
+		if agent.MaxTurns > 0 {
+			agentConfig["maxTurns"] = agent.MaxTurns
 		}
 		result[name] = agentConfig
 	}
@@ -1009,13 +1065,103 @@ func (q *Query) SetModel(model string) error {
 	return err
 }
 
-// RewindFiles rewinds tracked files to a specific user message.
-func (q *Query) RewindFiles(userMessageID string) error {
+// SetMaxThinkingTokens sets or clears the max thinking token limit.
+// Pass nil to clear and use the default.
+func (q *Query) SetMaxThinkingTokens(maxThinkingTokens *int) error {
+	var value any
+	if maxThinkingTokens != nil {
+		value = *maxThinkingTokens
+	}
+
 	_, err := q.sendControlRequest(map[string]any{
-		"subtype":         "rewind_files",
-		"user_message_id": userMessageID,
+		"subtype":             "set_max_thinking_tokens",
+		"max_thinking_tokens": value,
 	}, 30*time.Second)
 	return err
+}
+
+// InitializationResult returns the typed initialization metadata.
+func (q *Query) InitializationResult() (*types.SDKControlInitializeResponse, error) {
+	init := q.InitResult()
+	if init == nil {
+		return nil, fmt.Errorf("initialization result not available")
+	}
+
+	data, err := json.Marshal(init)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal initialization result: %w", err)
+	}
+
+	var parsed types.SDKControlInitializeResponse
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		return nil, fmt.Errorf("failed to parse initialization result: %w", err)
+	}
+	return &parsed, nil
+}
+
+// SupportedCommands returns available slash commands from initialization metadata.
+func (q *Query) SupportedCommands() ([]types.SlashCommand, error) {
+	init, err := q.InitializationResult()
+	if err != nil {
+		return nil, err
+	}
+	return init.Commands, nil
+}
+
+// SupportedModels returns available models from initialization metadata.
+func (q *Query) SupportedModels() ([]types.ModelInfo, error) {
+	init, err := q.InitializationResult()
+	if err != nil {
+		return nil, err
+	}
+	return init.Models, nil
+}
+
+// AccountInfo returns account metadata from initialization metadata.
+func (q *Query) AccountInfo() (*types.AccountInfo, error) {
+	init, err := q.InitializationResult()
+	if err != nil {
+		return nil, err
+	}
+	return &init.Account, nil
+}
+
+// RewindFiles rewinds tracked files to a specific user message.
+// Deprecated: use RewindFilesWithOptions for typed result support.
+func (q *Query) RewindFiles(userMessageID string) error {
+	_, err := q.RewindFilesWithOptions(userMessageID, nil)
+	return err
+}
+
+// RewindFilesWithOptions rewinds tracked files with optional dry-run mode.
+func (q *Query) RewindFilesWithOptions(userMessageID string, dryRun *bool) (*types.RewindFilesResult, error) {
+	request := map[string]any{
+		"subtype":         "rewind_files",
+		"user_message_id": userMessageID,
+	}
+	if dryRun != nil {
+		request["dry_run"] = *dryRun
+	}
+
+	response, err := q.sendControlRequest(request, 30*time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(response) == 0 {
+		return &types.RewindFilesResult{}, nil
+	}
+
+	data, err := json.Marshal(response)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal rewind response: %w", err)
+	}
+
+	var result types.RewindFilesResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse rewind response: %w", err)
+	}
+	return &result, nil
 }
 
 // GetMCPStatus returns current MCP server connection status.
@@ -1023,4 +1169,121 @@ func (q *Query) GetMCPStatus() (map[string]any, error) {
 	return q.sendControlRequest(map[string]any{
 		"subtype": "mcp_status",
 	}, 30*time.Second)
+}
+
+// MCPServerStatus returns typed MCP server statuses.
+func (q *Query) MCPServerStatus() ([]types.MCPServerStatus, error) {
+	resp, err := q.GetMCPStatus()
+	if err != nil {
+		return nil, err
+	}
+
+	raw, ok := resp["mcpServers"]
+	if !ok {
+		return nil, nil
+	}
+
+	data, err := json.Marshal(raw)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal mcp status: %w", err)
+	}
+
+	var status []types.MCPServerStatus
+	if err := json.Unmarshal(data, &status); err != nil {
+		return nil, fmt.Errorf("failed to parse mcp status: %w", err)
+	}
+	return status, nil
+}
+
+// ReconnectMCPServer reconnects an MCP server by name.
+func (q *Query) ReconnectMCPServer(serverName string) error {
+	_, err := q.sendControlRequest(map[string]any{
+		"subtype":    "mcp_reconnect",
+		"serverName": serverName,
+	}, 30*time.Second)
+	return err
+}
+
+// ToggleMCPServer enables or disables an MCP server by name.
+func (q *Query) ToggleMCPServer(serverName string, enabled bool) error {
+	_, err := q.sendControlRequest(map[string]any{
+		"subtype":    "mcp_toggle",
+		"serverName": serverName,
+		"enabled":    enabled,
+	}, 30*time.Second)
+	return err
+}
+
+// SetMCPServers replaces the dynamic MCP server set for the current session.
+func (q *Query) SetMCPServers(servers map[string]any) (*types.MCPSetServersResult, error) {
+	cliServers := make(map[string]any)
+	sdkServers := make(map[string]*types.MCPServer)
+
+	for name, server := range servers {
+		switch s := server.(type) {
+		case *types.MCPServer:
+			sdkServers[name] = s
+		case types.MCPServerConfig:
+			cliServers[name] = s
+		case map[string]any:
+			serverType, _ := s["type"].(string)
+			if serverType == "sdk" {
+				if instance, ok := s["instance"].(*types.MCPServer); ok && instance != nil {
+					sdkServers[name] = instance
+				} else {
+					cliServers[name] = map[string]any{
+						"type": "sdk",
+						"name": name,
+					}
+				}
+			} else {
+				cliServers[name] = s
+			}
+		default:
+			cliServers[name] = s
+		}
+	}
+
+	// Reconcile SDK-hosted MCP servers used by mcp_message bridging.
+	q.mcpServersMu.Lock()
+	for name := range q.mcpServers {
+		if _, keep := sdkServers[name]; !keep {
+			delete(q.mcpServers, name)
+		}
+	}
+	for name, server := range sdkServers {
+		q.mcpServers[name] = server
+	}
+	q.mcpServersMu.Unlock()
+
+	// Include SDK-hosted servers in the control payload so CLI can route mcp_message.
+	for name := range sdkServers {
+		cliServers[name] = map[string]any{
+			"type": "sdk",
+			"name": name,
+		}
+	}
+
+	resp, err := q.sendControlRequest(map[string]any{
+		"subtype": "mcp_set_servers",
+		"servers": cliServers,
+	}, 30*time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(resp) == 0 {
+		return &types.MCPSetServersResult{}, nil
+	}
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal mcp set servers response: %w", err)
+	}
+
+	var result types.MCPSetServersResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse mcp set servers response: %w", err)
+	}
+	return &result, nil
 }

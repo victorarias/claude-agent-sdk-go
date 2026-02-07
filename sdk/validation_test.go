@@ -96,3 +96,56 @@ func TestPermissionValidationOnConnect(t *testing.T) {
 		t.Errorf("unexpected error message: %v", err)
 	}
 }
+
+func TestOptionSemanticValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		options     []types.Option
+		expectError bool
+	}{
+		{
+			name: "bypass mode requires allow dangerous flag",
+			options: []types.Option{
+				types.WithPermissionMode(types.PermissionBypass),
+			},
+			expectError: true,
+		},
+		{
+			name: "model and fallback model cannot match",
+			options: []types.Option{
+				types.WithModel("claude-sonnet-4-5"),
+				func(o *types.Options) { o.FallbackModel = "claude-sonnet-4-5" },
+			},
+			expectError: true,
+		},
+		{
+			name: "resume session at requires resume",
+			options: []types.Option{
+				types.WithResumeSessionAt("msg-1"),
+			},
+			expectError: true,
+		},
+		{
+			name: "valid bypass configuration",
+			options: []types.Option{
+				types.WithPermissionMode(types.PermissionBypass),
+				types.WithAllowDangerouslySkipPermissions(),
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := NewClient(tt.options...)
+			err := client.validateOptions()
+
+			if tt.expectError && err == nil {
+				t.Fatal("expected validation error, got nil")
+			}
+			if !tt.expectError && err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+		})
+	}
+}

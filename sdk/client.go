@@ -86,6 +86,9 @@ func (c *Client) validateOptions() error {
 			Message: "can_use_tool callback cannot be used with permission_prompt_tool_name. Please use one or the other",
 		}
 	}
+	if err := subprocess.ValidateOptionSemantics(c.options); err != nil {
+		return &types.SDKError{Message: err.Error()}
+	}
 	return nil
 }
 
@@ -229,6 +232,71 @@ func WithPermissionRequestHook(callback types.HookCallback) types.Option {
 			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
 		}
 		o.Hooks[types.HookPermissionRequest] = append(o.Hooks[types.HookPermissionRequest], types.HookMatcher{
+			Matcher: nil,
+			Hooks:   []types.HookCallback{callback},
+		})
+	}
+}
+
+// WithSessionStartHook adds a session-start hook.
+func WithSessionStartHook(callback types.HookCallback) types.Option {
+	return func(o *types.Options) {
+		if o.Hooks == nil {
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
+		}
+		o.Hooks[types.HookSessionStart] = append(o.Hooks[types.HookSessionStart], types.HookMatcher{
+			Matcher: nil,
+			Hooks:   []types.HookCallback{callback},
+		})
+	}
+}
+
+// WithSessionEndHook adds a session-end hook.
+func WithSessionEndHook(callback types.HookCallback) types.Option {
+	return func(o *types.Options) {
+		if o.Hooks == nil {
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
+		}
+		o.Hooks[types.HookSessionEnd] = append(o.Hooks[types.HookSessionEnd], types.HookMatcher{
+			Matcher: nil,
+			Hooks:   []types.HookCallback{callback},
+		})
+	}
+}
+
+// WithSetupHook adds a setup hook.
+func WithSetupHook(callback types.HookCallback) types.Option {
+	return func(o *types.Options) {
+		if o.Hooks == nil {
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
+		}
+		o.Hooks[types.HookSetup] = append(o.Hooks[types.HookSetup], types.HookMatcher{
+			Matcher: nil,
+			Hooks:   []types.HookCallback{callback},
+		})
+	}
+}
+
+// WithTeammateIdleHook adds a teammate-idle hook.
+func WithTeammateIdleHook(callback types.HookCallback) types.Option {
+	return func(o *types.Options) {
+		if o.Hooks == nil {
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
+		}
+		o.Hooks[types.HookTeammateIdle] = append(o.Hooks[types.HookTeammateIdle], types.HookMatcher{
+			Matcher: nil,
+			Hooks:   []types.HookCallback{callback},
+		})
+	}
+}
+
+// WithTaskCompletedHook adds a task-completed hook.
+func WithTaskCompletedHook(callback types.HookCallback) types.Option {
+	return func(o *types.Options) {
+		if o.Hooks == nil {
+			o.Hooks = make(map[types.HookEvent][]types.HookMatcher)
+		}
+		o.Hooks[types.HookTaskCompleted] = append(o.Hooks[types.HookTaskCompleted], types.HookMatcher{
 			Matcher: nil,
 			Hooks:   []types.HookCallback{callback},
 		})
@@ -630,6 +698,19 @@ func (c *Client) SetModel(model string) error {
 	return q.SetModel(model)
 }
 
+// SetMaxThinkingTokens sets or clears max thinking tokens (nil clears the limit).
+func (c *Client) SetMaxThinkingTokens(maxThinkingTokens *int) error {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		return &types.ConnectionError{Message: "not connected"}
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	return q.SetMaxThinkingTokens(maxThinkingTokens)
+}
+
 // RewindFiles rewinds tracked files to a specific user message.
 func (c *Client) RewindFiles(userMessageID string) error {
 	c.mu.Lock()
@@ -643,6 +724,19 @@ func (c *Client) RewindFiles(userMessageID string) error {
 	return q.RewindFiles(userMessageID)
 }
 
+// RewindFilesWithOptions rewinds tracked files with optional dry-run mode.
+func (c *Client) RewindFilesWithOptions(userMessageID string, dryRun *bool) (*types.RewindFilesResult, error) {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		return nil, &types.ConnectionError{Message: "not connected"}
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	return q.RewindFilesWithOptions(userMessageID, dryRun)
+}
+
 // GetMCPStatus returns current MCP server connection status.
 func (c *Client) GetMCPStatus() (map[string]any, error) {
 	c.mu.Lock()
@@ -654,6 +748,110 @@ func (c *Client) GetMCPStatus() (map[string]any, error) {
 	c.mu.Unlock()
 
 	return q.GetMCPStatus()
+}
+
+// MCPServerStatus returns typed MCP server statuses.
+func (c *Client) MCPServerStatus() ([]types.MCPServerStatus, error) {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		return nil, &types.ConnectionError{Message: "not connected"}
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	return q.MCPServerStatus()
+}
+
+// ReconnectMCPServer reconnects an MCP server by name.
+func (c *Client) ReconnectMCPServer(serverName string) error {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		return &types.ConnectionError{Message: "not connected"}
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	return q.ReconnectMCPServer(serverName)
+}
+
+// ToggleMCPServer enables or disables an MCP server by name.
+func (c *Client) ToggleMCPServer(serverName string, enabled bool) error {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		return &types.ConnectionError{Message: "not connected"}
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	return q.ToggleMCPServer(serverName, enabled)
+}
+
+// SetMCPServers replaces dynamic MCP servers and returns update results.
+func (c *Client) SetMCPServers(servers map[string]any) (*types.MCPSetServersResult, error) {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		return nil, &types.ConnectionError{Message: "not connected"}
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	return q.SetMCPServers(servers)
+}
+
+// InitializationResult returns typed initialization metadata.
+func (c *Client) InitializationResult() (*types.SDKControlInitializeResponse, error) {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		return nil, &types.ConnectionError{Message: "not connected"}
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	return q.InitializationResult()
+}
+
+// SupportedCommands returns available slash commands from initialization metadata.
+func (c *Client) SupportedCommands() ([]types.SlashCommand, error) {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		return nil, &types.ConnectionError{Message: "not connected"}
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	return q.SupportedCommands()
+}
+
+// SupportedModels returns available models from initialization metadata.
+func (c *Client) SupportedModels() ([]types.ModelInfo, error) {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		return nil, &types.ConnectionError{Message: "not connected"}
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	return q.SupportedModels()
+}
+
+// AccountInfo returns account metadata from initialization metadata.
+func (c *Client) AccountInfo() (*types.AccountInfo, error) {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		return nil, &types.ConnectionError{Message: "not connected"}
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	return q.AccountInfo()
 }
 
 // ServerInfo returns the initialization info.

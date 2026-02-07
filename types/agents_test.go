@@ -157,3 +157,41 @@ func TestAgentDefinitionOmitsEmptyFields(t *testing.T) {
 		t.Error("prompt should be present")
 	}
 }
+
+func TestAgentDefinitionSerializesExtendedFields(t *testing.T) {
+	agent := AgentDefinition{
+		Description: "Specialist",
+		Prompt:      "You are a specialist.",
+		Tools:       []string{"Read"},
+		DisallowedTools: []string{
+			"Bash",
+		},
+		Model:                              AgentModelOpus,
+		MCPServers:                         []any{"server-a"},
+		CriticalSystemReminderExperimental: "Keep focus",
+		Skills:                             []string{"analyze"},
+		MaxTurns:                           5,
+	}
+
+	data, err := json.Marshal(agent)
+	if err != nil {
+		t.Fatalf("failed to marshal agent: %v", err)
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("failed to unmarshal agent: %v", err)
+	}
+
+	for _, key := range []string{
+		"disallowedTools",
+		"mcpServers",
+		"criticalSystemReminder_EXPERIMENTAL",
+		"skills",
+		"maxTurns",
+	} {
+		if _, ok := parsed[key]; !ok {
+			t.Errorf("expected %s field in JSON payload", key)
+		}
+	}
+}
