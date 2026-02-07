@@ -18,6 +18,7 @@ func TestSandboxSettings_Fields(t *testing.T) {
 		Network:                   &SandboxNetworkConfig{AllowLocalBinding: true},
 		IgnoreViolations:          &SandboxIgnoreViolations{File: []string{"/tmp"}},
 		EnableWeakerNestedSandbox: true,
+		Ripgrep:                   &SandboxRipgrepConfig{Command: "rg", Args: []string{"--hidden"}},
 	}
 
 	// All fields should be settable
@@ -42,6 +43,9 @@ func TestSandboxSettings_Fields(t *testing.T) {
 	if !settings.EnableWeakerNestedSandbox {
 		t.Error("EnableWeakerNestedSandbox field not set")
 	}
+	if settings.Ripgrep == nil || settings.Ripgrep.Command != "rg" {
+		t.Error("Ripgrep field not set")
+	}
 }
 
 // TestSandboxNetworkConfig_Fields tests that all network config fields are present.
@@ -50,14 +54,22 @@ func TestSandboxNetworkConfig_Fields(t *testing.T) {
 	socksPort := 1080
 
 	config := SandboxNetworkConfig{
-		AllowUnixSockets:    []string{"/var/run/docker.sock", "/tmp/agent.sock"},
-		AllowAllUnixSockets: true,
-		AllowLocalBinding:   true,
-		HTTPProxyPort:       &httpPort,
-		SocksProxyPort:      &socksPort,
+		AllowedDomains:          []string{"example.com", "api.example.com"},
+		AllowManagedDomainsOnly: true,
+		AllowUnixSockets:        []string{"/var/run/docker.sock", "/tmp/agent.sock"},
+		AllowAllUnixSockets:     true,
+		AllowLocalBinding:       true,
+		HTTPProxyPort:           &httpPort,
+		SocksProxyPort:          &socksPort,
 	}
 
 	// All fields should be settable
+	if len(config.AllowedDomains) != 2 {
+		t.Error("AllowedDomains field not set")
+	}
+	if !config.AllowManagedDomainsOnly {
+		t.Error("AllowManagedDomainsOnly field not set")
+	}
 	if len(config.AllowUnixSockets) != 2 {
 		t.Error("AllowUnixSockets field not set")
 	}
@@ -100,16 +112,19 @@ func TestSandboxSettings_JSONSerialization(t *testing.T) {
 		ExcludedCommands:         []string{"git", "docker"},
 		AllowUnsandboxedCommands: false,
 		Network: &SandboxNetworkConfig{
-			AllowUnixSockets:    []string{"/var/run/docker.sock"},
-			AllowAllUnixSockets: false,
-			AllowLocalBinding:   true,
-			HTTPProxyPort:       &httpPort,
+			AllowedDomains:          []string{"example.com"},
+			AllowManagedDomainsOnly: true,
+			AllowUnixSockets:        []string{"/var/run/docker.sock"},
+			AllowAllUnixSockets:     false,
+			AllowLocalBinding:       true,
+			HTTPProxyPort:           &httpPort,
 		},
 		IgnoreViolations: &SandboxIgnoreViolations{
 			File:    []string{"/tmp"},
 			Network: []string{"localhost"},
 		},
 		EnableWeakerNestedSandbox: true,
+		Ripgrep:                   &SandboxRipgrepConfig{Command: "rg", Args: []string{"--hidden"}},
 	}
 
 	// Marshal to JSON
@@ -145,6 +160,12 @@ func TestSandboxSettings_JSONSerialization(t *testing.T) {
 	if restored.Network == nil {
 		t.Fatal("Network not preserved")
 	}
+	if len(restored.Network.AllowedDomains) != len(original.Network.AllowedDomains) {
+		t.Error("Network.AllowedDomains not preserved")
+	}
+	if restored.Network.AllowManagedDomainsOnly != original.Network.AllowManagedDomainsOnly {
+		t.Error("Network.AllowManagedDomainsOnly not preserved")
+	}
 	if len(restored.Network.AllowUnixSockets) != len(original.Network.AllowUnixSockets) {
 		t.Error("Network.AllowUnixSockets not preserved")
 	}
@@ -164,6 +185,9 @@ func TestSandboxSettings_JSONSerialization(t *testing.T) {
 	}
 	if len(restored.IgnoreViolations.Network) != len(original.IgnoreViolations.Network) {
 		t.Error("IgnoreViolations.Network not preserved")
+	}
+	if restored.Ripgrep == nil || restored.Ripgrep.Command != original.Ripgrep.Command {
+		t.Error("Ripgrep not preserved")
 	}
 }
 
@@ -200,10 +224,12 @@ func TestSandboxSettings_JSONOmitEmpty(t *testing.T) {
 func TestSandboxNetworkConfig_JSONSerialization(t *testing.T) {
 	httpPort := 8080
 	original := SandboxNetworkConfig{
-		AllowUnixSockets:    []string{"/var/run/docker.sock"},
-		AllowAllUnixSockets: true,
-		AllowLocalBinding:   true,
-		HTTPProxyPort:       &httpPort,
+		AllowedDomains:          []string{"example.com"},
+		AllowManagedDomainsOnly: true,
+		AllowUnixSockets:        []string{"/var/run/docker.sock"},
+		AllowAllUnixSockets:     true,
+		AllowLocalBinding:       true,
+		HTTPProxyPort:           &httpPort,
 	}
 
 	data, err := json.Marshal(original)
@@ -218,6 +244,12 @@ func TestSandboxNetworkConfig_JSONSerialization(t *testing.T) {
 
 	if len(restored.AllowUnixSockets) != 1 {
 		t.Error("AllowUnixSockets not preserved")
+	}
+	if len(restored.AllowedDomains) != 1 || restored.AllowedDomains[0] != "example.com" {
+		t.Error("AllowedDomains not preserved")
+	}
+	if !restored.AllowManagedDomainsOnly {
+		t.Error("AllowManagedDomainsOnly not preserved")
 	}
 	if !restored.AllowAllUnixSockets {
 		t.Error("AllowAllUnixSockets not preserved")
@@ -288,17 +320,20 @@ func TestSandboxSettings_FullConfig(t *testing.T) {
 		ExcludedCommands:         []string{"git", "docker", "kubectl"},
 		AllowUnsandboxedCommands: true,
 		Network: &SandboxNetworkConfig{
-			AllowUnixSockets:    []string{"/var/run/docker.sock", "/tmp/agent.sock"},
-			AllowAllUnixSockets: false,
-			AllowLocalBinding:   true,
-			HTTPProxyPort:       &httpPort,
-			SocksProxyPort:      &socksPort,
+			AllowedDomains:          []string{"example.com", "api.example.com"},
+			AllowManagedDomainsOnly: true,
+			AllowUnixSockets:        []string{"/var/run/docker.sock", "/tmp/agent.sock"},
+			AllowAllUnixSockets:     false,
+			AllowLocalBinding:       true,
+			HTTPProxyPort:           &httpPort,
+			SocksProxyPort:          &socksPort,
 		},
 		IgnoreViolations: &SandboxIgnoreViolations{
 			File:    []string{"/tmp", "/var/tmp"},
 			Network: []string{"localhost", "127.0.0.1"},
 		},
 		EnableWeakerNestedSandbox: false,
+		Ripgrep:                   &SandboxRipgrepConfig{Command: "rg", Args: []string{"--hidden"}},
 	}
 
 	data, err := json.Marshal(settings)
@@ -327,6 +362,12 @@ func TestSandboxSettings_FullConfig(t *testing.T) {
 	if restored.Network == nil {
 		t.Fatal("Network not preserved in full config")
 	}
+	if len(restored.Network.AllowedDomains) != 2 {
+		t.Error("Network.AllowedDomains not preserved in full config")
+	}
+	if !restored.Network.AllowManagedDomainsOnly {
+		t.Error("Network.AllowManagedDomainsOnly not preserved in full config")
+	}
 	if len(restored.Network.AllowUnixSockets) != 2 {
 		t.Error("Network.AllowUnixSockets not preserved in full config")
 	}
@@ -353,5 +394,8 @@ func TestSandboxSettings_FullConfig(t *testing.T) {
 	}
 	if restored.EnableWeakerNestedSandbox {
 		t.Error("EnableWeakerNestedSandbox should be false in full config")
+	}
+	if restored.Ripgrep == nil || restored.Ripgrep.Command != "rg" {
+		t.Error("Ripgrep not preserved in full config")
 	}
 }

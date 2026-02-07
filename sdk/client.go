@@ -698,6 +698,19 @@ func (c *Client) SetModel(model string) error {
 	return q.SetModel(model)
 }
 
+// ClearModel clears any model override for subsequent responses.
+func (c *Client) ClearModel() error {
+	c.mu.Lock()
+	if !c.connected || c.query == nil {
+		c.mu.Unlock()
+		return &types.ConnectionError{Message: "not connected"}
+	}
+	q := c.query
+	c.mu.Unlock()
+
+	return q.ClearModel()
+}
+
 // SetMaxThinkingTokens sets or clears max thinking tokens (nil clears the limit).
 func (c *Client) SetMaxThinkingTokens(maxThinkingTokens *int) error {
 	c.mu.Lock()

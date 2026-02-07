@@ -618,6 +618,59 @@ func TestQuery_SetModel(t *testing.T) {
 	}
 }
 
+func TestQuery_SetModel_ClearDefault(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	done := make(chan error, 1)
+	go func() {
+		if !transport.WaitForWrite(time.Second) {
+			done <- fmt.Errorf("timeout waiting for set model request write")
+			return
+		}
+
+		written := transport.Written()
+		if len(written) == 0 {
+			done <- fmt.Errorf("expected control request")
+			return
+		}
+		var req map[string]any
+		if err := json.Unmarshal([]byte(written[0]), &req); err != nil {
+			done <- err
+			return
+		}
+		reqID := req["request_id"].(string)
+		request := req["request"].(map[string]any)
+		if _, ok := request["model"]; ok {
+			done <- fmt.Errorf("expected model field to be omitted when clearing default, got %v", request["model"])
+			return
+		}
+
+		transport.SendMessage(map[string]any{
+			"type": "control_response",
+			"response": map[string]any{
+				"subtype":    "success",
+				"request_id": reqID,
+				"response":   map[string]any{},
+			},
+		})
+		done <- nil
+	}()
+
+	if err := query.SetModel(""); err != nil {
+		t.Fatalf("SetModel clear failed: %v", err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestQuery_SetMaxThinkingTokens(t *testing.T) {
 	transport := NewMockTransport()
 	query := NewQuery(transport, true)
@@ -813,6 +866,86 @@ func TestQuery_GetMCPStatus(t *testing.T) {
 	}
 	if status["mcpServers"] == nil {
 		t.Errorf("expected mcpServers in response, got %v", status)
+	}
+}
+
+func TestQuery_MCPServerStatus_TypedFields(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	go func() {
+		if !transport.WaitForWrite(time.Second) {
+			t.Error("timeout waiting for mcp status request write")
+			return
+		}
+
+		written := transport.Written()
+		if len(written) == 0 {
+			t.Error("expected mcp status request")
+			return
+		}
+
+		var req map[string]any
+		if err := json.Unmarshal([]byte(written[0]), &req); err != nil {
+			t.Errorf("failed to parse request: %v", err)
+			return
+		}
+		reqID := req["request_id"].(string)
+
+		transport.SendMessage(map[string]any{
+			"type": "control_response",
+			"response": map[string]any{
+				"subtype":    "success",
+				"request_id": reqID,
+				"response": map[string]any{
+					"mcpServers": []any{
+						map[string]any{
+							"name":   "calc",
+							"status": "connected",
+							"scope":  "project",
+							"serverInfo": map[string]any{
+								"name":    "calc",
+								"version": "1.0.0",
+							},
+							"tools": []any{
+								map[string]any{
+									"name":        "calculate",
+									"description": "Compute values",
+									"annotations": map[string]any{
+										"readOnly":    true,
+										"destructive": false,
+										"openWorld":   false,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+	}()
+
+	statuses, err := query.MCPServerStatus()
+	if err != nil {
+		t.Fatalf("MCPServerStatus failed: %v", err)
+	}
+	if len(statuses) != 1 {
+		t.Fatalf("expected 1 status entry, got %d", len(statuses))
+	}
+	if statuses[0].ServerInfo == nil || statuses[0].ServerInfo.Version != "1.0.0" {
+		t.Fatalf("expected serverInfo version 1.0.0, got %+v", statuses[0].ServerInfo)
+	}
+	if len(statuses[0].Tools) != 1 || statuses[0].Tools[0].Name != "calculate" {
+		t.Fatalf("unexpected tools payload: %+v", statuses[0].Tools)
+	}
+	if statuses[0].Tools[0].Annotations == nil || !statuses[0].Tools[0].Annotations.ReadOnly {
+		t.Fatalf("expected readonly annotation in tools payload: %+v", statuses[0].Tools[0].Annotations)
 	}
 }
 

@@ -170,12 +170,14 @@ func parseVersionOutput(output string) (string, error) {
 	return "", fmt.Errorf("no version found in output: %s", output)
 }
 
-// checkCLIVersion runs the CLI to get its version.
-func checkCLIVersion(cliPath string) (string, error) {
+// checkCLIVersion runs the CLI command to get its version.
+func checkCLIVersion(command string, args []string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), versionCheckTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, cliPath, "-v")
+	cmdArgs := append([]string{}, args...)
+	cmdArgs = append(cmdArgs, "-v")
+	cmd := exec.CommandContext(ctx, command, cmdArgs...)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to get CLI version: %w", err)
@@ -273,6 +275,62 @@ func findCLI(explicitPath, bundledPath string) (string, error) {
 	return "", &types.CLINotFoundError{SearchedPaths: searchedPaths}
 }
 
+func isScriptEntryPoint(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".js", ".mjs", ".ts", ".tsx", ".jsx":
+		return true
+	default:
+		// Support extensionless JavaScript-runtime scripts only.
+		// This intentionally excludes generic shell shebang scripts, which should
+		// execute directly as native entrypoints.
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return false
+		}
+		if len(data) < 2 || string(data[:2]) != "#!" {
+			return false
+		}
+		firstLine := string(data)
+		if idx := strings.IndexByte(firstLine, '\n'); idx >= 0 {
+			firstLine = firstLine[:idx]
+		}
+		return strings.Contains(firstLine, "node") ||
+			strings.Contains(firstLine, "bun") ||
+			strings.Contains(firstLine, "deno")
+	}
+}
+
+func resolveRuntimeExecutable(opts *types.Options) string {
+	if opts != nil && opts.Executable != "" {
+		return opts.Executable
+	}
+	return "node"
+}
+
+func buildProcessCommand(entrypoint string, cliArgs []string, opts *types.Options) []string {
+	if opts == nil {
+		opts = types.DefaultOptions()
+	}
+
+	// Match TS behavior: script entrypoints run through runtime executable;
+	// native binaries run directly and ignore opts.Executable.
+	if isScriptEntryPoint(entrypoint) {
+		executableArgs := make([]string, 0, len(opts.ExecutableArgs))
+		executableArgs = append(executableArgs, opts.ExecutableArgs...)
+		cmd := make([]string, 0, 1+len(executableArgs)+1+len(cliArgs))
+		cmd = append(cmd, resolveRuntimeExecutable(opts))
+		cmd = append(cmd, executableArgs...)
+		cmd = append(cmd, entrypoint)
+		cmd = append(cmd, cliArgs...)
+		return cmd
+	}
+
+	cmd := make([]string, 0, 1+len(cliArgs))
+	cmd = append(cmd, entrypoint)
+	cmd = append(cmd, cliArgs...)
+	return cmd
+}
+
 // WindowsMaxCommandLength is the maximum command line length on Windows.
 const WindowsMaxCommandLength = 8191
 
@@ -364,7 +422,14 @@ func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) [
 			cmd = append(cmd, "--system-prompt", "")
 		}
 	case types.SystemPromptPreset:
-		if data, err := json.Marshal(sp); err == nil {
+		// Preset means "use CLI default system prompt".
+		// Only append additional text if provided.
+		if sp.Preset == "" || sp.Preset == "claude_code" {
+			if sp.Append != nil {
+				cmd = append(cmd, "--append-system-prompt", *sp.Append)
+			}
+		} else if data, err := json.Marshal(sp); err == nil {
+			// Preserve backward compatibility for custom preset objects.
 			cmd = append(cmd, "--system-prompt", string(data))
 		}
 	default:
@@ -378,12 +443,19 @@ func buildCommand(cliPath, prompt string, opts *types.Options, streaming bool) [
 	// Tools configuration
 	switch t := opts.Tools.(type) {
 	case []string:
-		if len(t) > 0 {
+		if len(t) == 0 {
+			cmd = append(cmd, "--tools", "")
+		} else {
 			cmd = append(cmd, "--tools", strings.Join(t, ","))
 		}
 	case types.ToolsPreset:
-		if data, err := json.Marshal(t); err == nil {
-			cmd = append(cmd, "--tools", string(data))
+		preset := strings.TrimSpace(t.Preset)
+		if preset == "" || preset == "claude_code" {
+			// Preset claude_code maps to CLI "default" tools preset.
+			cmd = append(cmd, "--tools", "default")
+		} else {
+			// Pass through future preset names.
+			cmd = append(cmd, "--tools", preset)
 		}
 	}
 
@@ -716,7 +788,11 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 	}
 
 	// Find CLI
-	cliPath, err := findCLI(t.options.CLIPath, t.options.BundledCLIPath)
+	explicitCLIPath := t.options.CLIPath
+	if t.options.PathToClaudeCodeExecutable != "" {
+		explicitCLIPath = t.options.PathToClaudeCodeExecutable
+	}
+	cliPath, err := findCLI(explicitCLIPath, t.options.BundledCLIPath)
 	if err != nil {
 		return err
 	}
@@ -724,7 +800,8 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 
 	// Check CLI version unless skipped via environment variable
 	if os.Getenv("CLAUDE_AGENT_SDK_SKIP_VERSION_CHECK") == "" {
-		if version, err := checkCLIVersion(cliPath); err == nil {
+		versionCmd := buildProcessCommand(cliPath, nil, t.options)
+		if version, err := checkCLIVersion(versionCmd[0], versionCmd[1:]); err == nil {
 			// Check if version meets minimum requirements
 			if !isVersionAtLeast(version, types.MinimumCLIVersion) {
 				return &types.CLIVersionError{
@@ -747,8 +824,9 @@ func (t *SubprocessTransport) Connect(ctx context.Context) error {
 		return err
 	}
 
-	// Build command
-	args := buildCommand(cliPath, t.prompt, t.options, t.streaming)
+	// Build CLI arguments, then adapt process launch for runtime wrappers.
+	cliCommand := buildCommand(cliPath, t.prompt, t.options, t.streaming)
+	args := buildProcessCommand(cliCommand[0], cliCommand[1:], t.options)
 
 	// Check command length on Windows
 	if err := checkCommandLength(args); err != nil {

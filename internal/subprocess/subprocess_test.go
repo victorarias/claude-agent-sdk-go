@@ -132,6 +132,57 @@ func TestBuildCommand_Streaming(t *testing.T) {
 	}
 }
 
+func TestBuildProcessCommand_NativeEntrypoint(t *testing.T) {
+	opts := types.DefaultOptions()
+	opts.Executable = "node" // Ignored for native entrypoints (TS parity)
+	opts.ExecutableArgs = []string{"--trace-warnings"}
+
+	cmd := buildProcessCommand("/usr/bin/claude", []string{"--output-format", "stream-json"}, opts)
+	if len(cmd) != 3 {
+		t.Fatalf("unexpected command length: %+v", cmd)
+	}
+	if cmd[0] != "/usr/bin/claude" {
+		t.Fatalf("expected native entrypoint command, got %q", cmd[0])
+	}
+	if cmd[1] != "--output-format" {
+		t.Fatalf("expected native command to ignore executable args, got %+v", cmd)
+	}
+	if cmd[2] != "stream-json" {
+		t.Fatalf("unexpected cli arg position: %+v", cmd)
+	}
+}
+
+func TestBuildProcessCommand_ScriptEntrypoint(t *testing.T) {
+	opts := types.DefaultOptions()
+	opts.Executable = "bun"
+	opts.ExecutableArgs = []string{"--smol"}
+
+	cmd := buildProcessCommand("/tmp/cli.js", []string{"--output-format", "stream-json"}, opts)
+	expected := []string{"bun", "--smol", "/tmp/cli.js", "--output-format", "stream-json"}
+	if len(cmd) != len(expected) {
+		t.Fatalf("unexpected command length: got %d want %d (%+v)", len(cmd), len(expected), cmd)
+	}
+	for i := range expected {
+		if cmd[i] != expected[i] {
+			t.Fatalf("unexpected command at %d: got %q want %q (%+v)", i, cmd[i], expected[i], cmd)
+		}
+	}
+}
+
+func TestBuildProcessCommand_ScriptEntrypoint_DefaultRuntime(t *testing.T) {
+	opts := types.DefaultOptions()
+	cmd := buildProcessCommand("/tmp/cli.mjs", []string{"--output-format", "stream-json"}, opts)
+	if len(cmd) < 2 {
+		t.Fatalf("unexpected command length: %+v", cmd)
+	}
+	if cmd[0] != "node" {
+		t.Fatalf("expected default runtime to be node, got %q", cmd[0])
+	}
+	if cmd[1] != "/tmp/cli.mjs" {
+		t.Fatalf("expected script path in argv, got %+v", cmd)
+	}
+}
+
 func TestBuildCommand_WithOptions(t *testing.T) {
 	opts := types.DefaultOptions()
 	opts.Model = "claude-opus-4"
@@ -159,6 +210,190 @@ func TestBuildCommand_WithOptions(t *testing.T) {
 		if !found {
 			t.Errorf("missing %s %s in command", flag, value)
 		}
+	}
+}
+
+func TestBuildCommand_ToolsEmptyArrayDisablesTools(t *testing.T) {
+	opts := types.DefaultOptions()
+	opts.Tools = []string{}
+
+	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
+
+	found := false
+	for i, arg := range cmd {
+		if arg == "--tools" && i+1 < len(cmd) && cmd[i+1] == "" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected --tools with empty value, got %+v", cmd)
+	}
+}
+
+func TestBuildCommand_ToolsPresetUsesDefault(t *testing.T) {
+	opts := types.DefaultOptions()
+	opts.Tools = types.ToolsPreset{Type: "preset", Preset: "claude_code"}
+
+	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
+
+	found := false
+	for i, arg := range cmd {
+		if arg == "--tools" && i+1 < len(cmd) && cmd[i+1] == "default" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected --tools default, got %+v", cmd)
+	}
+}
+
+func TestBuildCommand_ToolsPresetPassThrough(t *testing.T) {
+	opts := types.DefaultOptions()
+	opts.Tools = types.ToolsPreset{Type: "preset", Preset: "experimental_toolset"}
+
+	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
+
+	found := false
+	for i, arg := range cmd {
+		if arg == "--tools" && i+1 < len(cmd) && cmd[i+1] == "experimental_toolset" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected --tools experimental_toolset, got %+v", cmd)
+	}
+}
+
+func TestBuildCommand_SystemPromptPresetWithoutAppend(t *testing.T) {
+	opts := types.DefaultOptions()
+	opts.SystemPrompt = types.SystemPromptPreset{Type: "preset", Preset: "claude_code"}
+
+	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
+
+	for _, arg := range cmd {
+		if arg == "--system-prompt" {
+			t.Fatalf("did not expect --system-prompt for preset without append, got %+v", cmd)
+		}
+		if arg == "--append-system-prompt" {
+			t.Fatalf("did not expect --append-system-prompt for preset without append, got %+v", cmd)
+		}
+	}
+}
+
+func TestBuildCommand_SystemPromptPresetWithAppend(t *testing.T) {
+	opts := types.DefaultOptions()
+	appendText := "Always include test coverage notes."
+	opts.SystemPrompt = types.SystemPromptPreset{
+		Type:   "preset",
+		Preset: "claude_code",
+		Append: &appendText,
+	}
+
+	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
+
+	hasAppend := false
+	hasSystemPrompt := false
+	for i, arg := range cmd {
+		if arg == "--append-system-prompt" && i+1 < len(cmd) && cmd[i+1] == appendText {
+			hasAppend = true
+		}
+		if arg == "--system-prompt" {
+			hasSystemPrompt = true
+		}
+	}
+	if !hasAppend {
+		t.Fatalf("expected --append-system-prompt for preset append, got %+v", cmd)
+	}
+	if hasSystemPrompt {
+		t.Fatalf("did not expect --system-prompt for preset append flow, got %+v", cmd)
+	}
+}
+
+func TestBuildCommand_SystemPromptPresetPassThrough(t *testing.T) {
+	opts := types.DefaultOptions()
+	opts.SystemPrompt = types.SystemPromptPreset{Type: "preset", Preset: "custom_preset"}
+
+	cmd := buildCommand("/usr/bin/claude", "test", opts, false)
+
+	var rawPreset string
+	for i, arg := range cmd {
+		if arg == "--system-prompt" && i+1 < len(cmd) {
+			rawPreset = cmd[i+1]
+			break
+		}
+	}
+	if rawPreset == "" {
+		t.Fatalf("expected --system-prompt for custom preset, got %+v", cmd)
+	}
+	var preset map[string]any
+	if err := json.Unmarshal([]byte(rawPreset), &preset); err != nil {
+		t.Fatalf("expected JSON preset payload, got %q (%v)", rawPreset, err)
+	}
+	if preset["type"] != "preset" || preset["preset"] != "custom_preset" {
+		t.Fatalf("unexpected preset payload: %+v", preset)
+	}
+}
+
+func TestIsScriptEntryPoint_ExtensionlessShebang(t *testing.T) {
+	tmpDir := t.TempDir()
+	scriptPath := filepath.Join(tmpDir, "claude-wrapper")
+	if err := os.WriteFile(scriptPath, []byte("#!/usr/bin/env node\nconsole.log('hi');\n"), 0755); err != nil {
+		t.Fatalf("failed to write test script: %v", err)
+	}
+	if !isScriptEntryPoint(scriptPath) {
+		t.Fatalf("expected extensionless shebang script to be treated as script: %s", scriptPath)
+	}
+}
+
+func TestIsScriptEntryPoint_ExtensionlessShellScriptIsNative(t *testing.T) {
+	tmpDir := t.TempDir()
+	scriptPath := filepath.Join(tmpDir, "claude-shell-wrapper")
+	if err := os.WriteFile(scriptPath, []byte("#!/bin/sh\necho hi\n"), 0755); err != nil {
+		t.Fatalf("failed to write shell test script: %v", err)
+	}
+	if isScriptEntryPoint(scriptPath) {
+		t.Fatalf("expected extensionless shell script to be treated as native: %s", scriptPath)
+	}
+}
+
+func TestSubprocessTransport_PathToClaudeCodeExecutablePrecedence(t *testing.T) {
+	tmpDir := t.TempDir()
+	cliPath := filepath.Join(tmpDir, "cli-primary")
+	overridePath := filepath.Join(tmpDir, "cli-override")
+	script := `#!/bin/sh
+if [ "$1" = "-v" ]; then
+  echo "2.0.0"
+  exit 0
+fi
+while IFS= read -r _line; do
+  :
+done
+`
+	if err := os.WriteFile(cliPath, []byte(script), 0755); err != nil {
+		t.Fatalf("failed to write primary cli script: %v", err)
+	}
+	if err := os.WriteFile(overridePath, []byte(script), 0755); err != nil {
+		t.Fatalf("failed to write override cli script: %v", err)
+	}
+
+	opts := types.DefaultOptions()
+	opts.CLIPath = cliPath
+	opts.PathToClaudeCodeExecutable = overridePath
+
+	transport := NewStreamingTransport(opts)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := transport.Connect(ctx); err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+	defer transport.Close()
+
+	if transport.cliPath != overridePath {
+		t.Fatalf("expected override path %q, got %q", overridePath, transport.cliPath)
 	}
 }
 
