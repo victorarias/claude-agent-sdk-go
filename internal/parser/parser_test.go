@@ -194,6 +194,16 @@ func TestParseMessage_Result_ExpandedFields(t *testing.T) {
 	if len(result.Errors) != 1 || result.Errors[0] != "denied" {
 		t.Fatalf("unexpected errors: %+v", result.Errors)
 	}
+	structured, ok := result.StructuredOutput.(map[string]any)
+	if !ok {
+		t.Fatalf("expected structured output map, got %T", result.StructuredOutput)
+	}
+	if structured["value"] != "done" {
+		t.Fatalf("got structured_output.value %v, want done", structured["value"])
+	}
+	if result.Usage == nil || result.Usage["input_tokens"] != float64(10) {
+		t.Fatalf("unexpected usage payload: %+v", result.Usage)
+	}
 }
 
 func TestParseMessage_User(t *testing.T) {
