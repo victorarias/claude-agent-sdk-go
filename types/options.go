@@ -67,11 +67,19 @@ type PluginConfig struct {
 
 // SandboxNetworkConfig defines network isolation settings.
 type SandboxNetworkConfig struct {
-	AllowUnixSockets    []string `json:"allowUnixSockets,omitempty"`
-	AllowAllUnixSockets bool     `json:"allowAllUnixSockets,omitempty"`
-	AllowLocalBinding   bool     `json:"allowLocalBinding,omitempty"`
-	HTTPProxyPort       *int     `json:"httpProxyPort,omitempty"`
-	SocksProxyPort      *int     `json:"socksProxyPort,omitempty"`
+	AllowedDomains          []string `json:"allowedDomains,omitempty"`
+	AllowManagedDomainsOnly bool     `json:"allowManagedDomainsOnly,omitempty"`
+	AllowUnixSockets        []string `json:"allowUnixSockets,omitempty"`
+	AllowAllUnixSockets     bool     `json:"allowAllUnixSockets,omitempty"`
+	AllowLocalBinding       bool     `json:"allowLocalBinding,omitempty"`
+	HTTPProxyPort           *int     `json:"httpProxyPort,omitempty"`
+	SocksProxyPort          *int     `json:"socksProxyPort,omitempty"`
+}
+
+// SandboxRipgrepConfig defines ripgrep command override settings in sandbox mode.
+type SandboxRipgrepConfig struct {
+	Command string   `json:"command"`
+	Args    []string `json:"args,omitempty"`
 }
 
 // SandboxIgnoreViolations defines violation ignore rules.
@@ -89,6 +97,7 @@ type SandboxSettings struct {
 	Network                   *SandboxNetworkConfig    `json:"network,omitempty"`
 	IgnoreViolations          *SandboxIgnoreViolations `json:"ignoreViolations,omitempty"`
 	EnableWeakerNestedSandbox bool                     `json:"enableWeakerNestedSandbox,omitempty"`
+	Ripgrep                   *SandboxRipgrepConfig    `json:"ripgrep,omitempty"`
 }
 
 // SystemPromptPreset allows using preset system prompts.
@@ -316,6 +325,12 @@ type Options struct {
 	Cwd string `json:"cwd,omitempty"`
 	// CLIPath specifies an explicit path to the Claude CLI binary.
 	CLIPath string `json:"cli_path,omitempty"`
+	// PathToClaudeCodeExecutable specifies an explicit Claude Code executable or script path (TS parity alias).
+	PathToClaudeCodeExecutable string `json:"path_to_claude_code_executable,omitempty"`
+	// Executable specifies the runtime executable used when launching a script-based Claude Code entrypoint.
+	Executable string `json:"executable,omitempty"`
+	// ExecutableArgs specifies additional args passed to the runtime executable.
+	ExecutableArgs []string `json:"executable_args,omitempty"`
 	// BundledCLIPath is used by packaged distributions to specify a bundled CLI.
 	BundledCLIPath string `json:"bundled_cli_path,omitempty"`
 	// AddDirs adds additional directories to make available to the agent.
@@ -418,11 +433,30 @@ func WithModel(model string) Option {
 	}
 }
 
+// WithFallbackModel sets a fallback model to use when the primary model fails.
+func WithFallbackModel(model string) Option {
+	return func(o *Options) {
+		o.FallbackModel = model
+	}
+}
+
 // WithCwd sets the working directory.
 func WithCwd(cwd string) Option {
 	return func(o *Options) {
 		o.Cwd = cwd
 	}
+}
+
+// WithAdditionalDirectories adds extra directories Claude can access.
+func WithAdditionalDirectories(dirs ...string) Option {
+	return func(o *Options) {
+		o.AddDirs = dirs
+	}
+}
+
+// WithAddDirs is a backwards-compatible alias for WithAdditionalDirectories.
+func WithAddDirs(dirs ...string) Option {
+	return WithAdditionalDirectories(dirs...)
 }
 
 // WithPermissionMode sets the permission mode.
@@ -432,12 +466,26 @@ func WithPermissionMode(mode PermissionMode) Option {
 	}
 }
 
+// WithPermissionPromptToolName routes permission prompts through a named MCP tool.
+func WithPermissionPromptToolName(toolName string) Option {
+	return func(o *Options) {
+		o.PermissionPromptToolName = toolName
+	}
+}
+
 // WithEnv sets environment variables.
 func WithEnv(env map[string]string) Option {
 	return func(o *Options) {
 		for k, v := range env {
 			o.Env[k] = v
 		}
+	}
+}
+
+// WithExtraArgs sets additional CLI flags as an escape hatch.
+func WithExtraArgs(args map[string]string) Option {
+	return func(o *Options) {
+		o.ExtraArgs = args
 	}
 }
 
@@ -515,6 +563,27 @@ func WithDisallowedTools(tools ...string) Option {
 func WithCLIPath(path string) Option {
 	return func(o *Options) {
 		o.CLIPath = path
+	}
+}
+
+// WithPathToClaudeCodeExecutable sets the Claude Code executable/script path (TS parity alias).
+func WithPathToClaudeCodeExecutable(path string) Option {
+	return func(o *Options) {
+		o.PathToClaudeCodeExecutable = path
+	}
+}
+
+// WithExecutable sets the runtime executable used for script-based Claude entrypoints.
+func WithExecutable(executable string) Option {
+	return func(o *Options) {
+		o.Executable = executable
+	}
+}
+
+// WithExecutableArgs sets args passed to the runtime executable.
+func WithExecutableArgs(args ...string) Option {
+	return func(o *Options) {
+		o.ExecutableArgs = args
 	}
 }
 
@@ -599,6 +668,13 @@ func WithSettingSources(sources ...SettingSource) Option {
 func WithSettings(settings string) Option {
 	return func(o *Options) {
 		o.Settings = settings
+	}
+}
+
+// WithUser sets a user identifier for the session.
+func WithUser(user string) Option {
+	return func(o *Options) {
+		o.User = user
 	}
 }
 

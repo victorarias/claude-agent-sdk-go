@@ -15,11 +15,38 @@ func TestWithModel(t *testing.T) {
 	}
 }
 
+func TestWithFallbackModel(t *testing.T) {
+	opts := DefaultOptions()
+	WithFallbackModel("claude-sonnet-4-5")(opts)
+	if opts.FallbackModel != "claude-sonnet-4-5" {
+		t.Errorf("expected fallback model 'claude-sonnet-4-5', got %q", opts.FallbackModel)
+	}
+}
+
 func TestWithCwd(t *testing.T) {
 	opts := DefaultOptions()
 	WithCwd("/tmp/test")(opts)
 	if opts.Cwd != "/tmp/test" {
 		t.Errorf("expected cwd '/tmp/test', got %q", opts.Cwd)
+	}
+}
+
+func TestWithAdditionalDirectories(t *testing.T) {
+	opts := DefaultOptions()
+	WithAdditionalDirectories("/tmp", "/var/tmp")(opts)
+	if len(opts.AddDirs) != 2 {
+		t.Fatalf("expected 2 add dirs, got %d", len(opts.AddDirs))
+	}
+	if opts.AddDirs[0] != "/tmp" || opts.AddDirs[1] != "/var/tmp" {
+		t.Fatalf("unexpected add dirs: %+v", opts.AddDirs)
+	}
+}
+
+func TestWithAddDirsAlias(t *testing.T) {
+	opts := DefaultOptions()
+	WithAddDirs("/workspace")(opts)
+	if len(opts.AddDirs) != 1 || opts.AddDirs[0] != "/workspace" {
+		t.Fatalf("unexpected add dirs: %+v", opts.AddDirs)
 	}
 }
 
@@ -31,6 +58,14 @@ func TestWithPermissionMode(t *testing.T) {
 	}
 }
 
+func TestWithPermissionPromptToolName(t *testing.T) {
+	opts := DefaultOptions()
+	WithPermissionPromptToolName("ask-permission")(opts)
+	if opts.PermissionPromptToolName != "ask-permission" {
+		t.Errorf("expected permission prompt tool name, got %q", opts.PermissionPromptToolName)
+	}
+}
+
 func TestWithEnv(t *testing.T) {
 	opts := DefaultOptions()
 	WithEnv(map[string]string{"FOO": "bar", "BAZ": "qux"})(opts)
@@ -39,6 +74,17 @@ func TestWithEnv(t *testing.T) {
 	}
 	if opts.Env["BAZ"] != "qux" {
 		t.Errorf("expected BAZ='qux', got %q", opts.Env["BAZ"])
+	}
+}
+
+func TestWithExtraArgs(t *testing.T) {
+	opts := DefaultOptions()
+	WithExtraArgs(map[string]string{"foo": "bar", "flag": ""})(opts)
+	if opts.ExtraArgs["foo"] != "bar" {
+		t.Errorf("expected extra arg foo=bar, got %q", opts.ExtraArgs["foo"])
+	}
+	if _, ok := opts.ExtraArgs["flag"]; !ok {
+		t.Error("expected flag extra arg")
 	}
 }
 
@@ -133,6 +179,33 @@ func TestWithCLIPath(t *testing.T) {
 	WithCLIPath("/usr/bin/claude")(opts)
 	if opts.CLIPath != "/usr/bin/claude" {
 		t.Errorf("expected '/usr/bin/claude', got %q", opts.CLIPath)
+	}
+}
+
+func TestWithPathToClaudeCodeExecutable(t *testing.T) {
+	opts := DefaultOptions()
+	WithPathToClaudeCodeExecutable("/tmp/cli.js")(opts)
+	if opts.PathToClaudeCodeExecutable != "/tmp/cli.js" {
+		t.Errorf("expected '/tmp/cli.js', got %q", opts.PathToClaudeCodeExecutable)
+	}
+}
+
+func TestWithExecutable(t *testing.T) {
+	opts := DefaultOptions()
+	WithExecutable("node")(opts)
+	if opts.Executable != "node" {
+		t.Errorf("expected 'node', got %q", opts.Executable)
+	}
+}
+
+func TestWithExecutableArgs(t *testing.T) {
+	opts := DefaultOptions()
+	WithExecutableArgs("--trace-warnings", "--no-warnings")(opts)
+	if len(opts.ExecutableArgs) != 2 {
+		t.Fatalf("expected 2 executable args, got %d", len(opts.ExecutableArgs))
+	}
+	if opts.ExecutableArgs[0] != "--trace-warnings" || opts.ExecutableArgs[1] != "--no-warnings" {
+		t.Fatalf("unexpected executable args: %+v", opts.ExecutableArgs)
 	}
 }
 
@@ -233,6 +306,14 @@ func TestWithSettings(t *testing.T) {
 	WithSettings("/path/to/settings.json")(opts)
 	if opts.Settings != "/path/to/settings.json" {
 		t.Errorf("expected settings path, got %v", opts.Settings)
+	}
+}
+
+func TestWithUser(t *testing.T) {
+	opts := DefaultOptions()
+	WithUser("ci-bot")(opts)
+	if opts.User != "ci-bot" {
+		t.Errorf("expected user 'ci-bot', got %q", opts.User)
 	}
 }
 

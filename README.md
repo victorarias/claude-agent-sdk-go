@@ -184,6 +184,32 @@ _ = commands
 _ = account
 ```
 
+## Unstable V2 Session API
+
+For TS-aligned unstable session workflows, the SDK also exposes:
+
+- `sdk.UnstableV2CreateSession`
+- `sdk.UnstableV2ResumeSession`
+- `sdk.UnstableV2Prompt`
+
+```go
+ctx := context.Background()
+session, err := sdk.UnstableV2CreateSession(ctx, types.WithModel("claude-sonnet-4-5"))
+if err != nil {
+    panic(err)
+}
+defer session.Close()
+
+if err := session.Send("Say hello in one short sentence."); err != nil {
+    panic(err)
+}
+for msg := range session.Stream() {
+    if _, ok := msg.(*types.ResultMessage); ok {
+        break
+    }
+}
+```
+
 ## Examples
 
 Comprehensive examples are available in the [`examples/`](./examples) directory:
@@ -195,6 +221,7 @@ Comprehensive examples are available in the [`examples/`](./examples) directory:
 | [hooks](./examples/hooks/) | Pre/post tool use hooks for logging and control |
 | [mcp-server](./examples/mcp-server/) | SDK-hosted MCP server with custom tools |
 | [runtime-controls](./examples/runtime-controls/) | Runtime model/permission/session/MCP control APIs |
+| [unstable-session](./examples/unstable-session/) | Unstable v2 create/resume/prompt session APIs |
 | [permissions](./examples/permissions/) | Custom tool permission handling |
 | [session](./examples/session/) | Session resume and conversation continuation |
 | [error-handling](./examples/error-handling/) | Error types and recovery patterns |

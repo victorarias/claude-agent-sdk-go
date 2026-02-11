@@ -141,7 +141,10 @@ type UserMessage struct {
 	Content         []ContentBlock `json:"content"`
 	Role            string         `json:"role,omitempty"`
 	UUID            string         `json:"uuid,omitempty"`
+	SessionID       string         `json:"session_id,omitempty"`
 	ParentToolUseID *string        `json:"parent_tool_use_id,omitempty"`
+	IsSynthetic     bool           `json:"isSynthetic,omitempty"`
+	IsReplay        bool           `json:"isReplay,omitempty"`
 	ToolUseResult   map[string]any `json:"tool_use_result,omitempty"`
 }
 
@@ -175,6 +178,8 @@ type AssistantMessage struct {
 	Content         []ContentBlock         `json:"content"`
 	Model           string                 `json:"model"`
 	StopReason      string                 `json:"stop_reason,omitempty"`
+	UUID            string                 `json:"uuid,omitempty"`
+	SessionID       string                 `json:"session_id,omitempty"`
 	ParentToolUseID *string                `json:"parent_tool_use_id,omitempty"`
 	Error           *AssistantMessageError `json:"error,omitempty"`
 }
@@ -231,6 +236,7 @@ func (m *AssistantMessage) HasToolCalls() bool {
 // SystemMessage represents a system message.
 type SystemMessage struct {
 	Subtype   string         `json:"subtype"`
+	UUID      string         `json:"uuid,omitempty"`
 	SessionID string         `json:"session_id,omitempty"`
 	Version   string         `json:"version,omitempty"`
 	Data      map[string]any `json:"data,omitempty"`
@@ -240,16 +246,40 @@ func (m *SystemMessage) MessageType() string { return "system" }
 
 // ResultMessage represents the final result of a query.
 type ResultMessage struct {
-	Subtype          string         `json:"subtype"`
-	DurationMS       int            `json:"duration_ms"`
-	DurationAPI      int            `json:"duration_api_ms"`
-	IsError          bool           `json:"is_error"`
-	NumTurns         int            `json:"num_turns"`
-	SessionID        string         `json:"session_id"`
-	TotalCostUSD     *float64       `json:"total_cost_usd,omitempty"`
-	Usage            map[string]any `json:"usage,omitempty"`
-	Result           *string        `json:"result,omitempty"`
-	StructuredOutput any            `json:"structured_output,omitempty"`
+	Subtype           string                `json:"subtype"`
+	UUID              string                `json:"uuid,omitempty"`
+	DurationMS        int                   `json:"duration_ms"`
+	DurationAPI       int                   `json:"duration_api_ms"`
+	IsError           bool                  `json:"is_error"`
+	NumTurns          int                   `json:"num_turns"`
+	SessionID         string                `json:"session_id"`
+	StopReason        *string               `json:"stop_reason,omitempty"`
+	TotalCostUSD      *float64              `json:"total_cost_usd,omitempty"`
+	Usage             map[string]any        `json:"usage,omitempty"`
+	ModelUsage        map[string]ModelUsage `json:"modelUsage,omitempty"`
+	PermissionDenials []PermissionDenial    `json:"permission_denials,omitempty"`
+	Errors            []string              `json:"errors,omitempty"`
+	Result            *string               `json:"result,omitempty"`
+	StructuredOutput  any                   `json:"structured_output,omitempty"`
+}
+
+// ModelUsage tracks per-model token and cost usage in result payloads.
+type ModelUsage struct {
+	InputTokens              int     `json:"inputTokens"`
+	OutputTokens             int     `json:"outputTokens"`
+	CacheReadInputTokens     int     `json:"cacheReadInputTokens"`
+	CacheCreationInputTokens int     `json:"cacheCreationInputTokens"`
+	WebSearchRequests        int     `json:"webSearchRequests"`
+	CostUSD                  float64 `json:"costUSD"`
+	ContextWindow            int     `json:"contextWindow"`
+	MaxOutputTokens          int     `json:"maxOutputTokens"`
+}
+
+// PermissionDenial describes a denied tool call in result payloads.
+type PermissionDenial struct {
+	ToolName  string         `json:"tool_name"`
+	ToolUseID string         `json:"tool_use_id"`
+	ToolInput map[string]any `json:"tool_input,omitempty"`
 }
 
 func (m *ResultMessage) MessageType() string { return "result" }
@@ -394,6 +424,33 @@ type HookResponseMessage struct {
 
 func (m *HookResponseMessage) MessageType() string { return "system" }
 
+// StatusMessage reports transient system status updates (for example, compacting).
+type StatusMessage struct {
+	Subtype        string         `json:"subtype"`
+	Status         any            `json:"status,omitempty"`
+	PermissionMode PermissionMode `json:"permissionMode,omitempty"`
+	UUID           string         `json:"uuid,omitempty"`
+	SessionID      string         `json:"session_id,omitempty"`
+}
+
+func (m *StatusMessage) MessageType() string { return "system" }
+
+// CompactMetadata provides metadata about compaction boundaries.
+type CompactMetadata struct {
+	Trigger   string `json:"trigger"`
+	PreTokens int    `json:"pre_tokens"`
+}
+
+// CompactBoundaryMessage marks a compaction boundary in the message stream.
+type CompactBoundaryMessage struct {
+	Subtype         string          `json:"subtype"`
+	CompactMetadata CompactMetadata `json:"compact_metadata"`
+	UUID            string          `json:"uuid,omitempty"`
+	SessionID       string          `json:"session_id,omitempty"`
+}
+
+func (m *CompactBoundaryMessage) MessageType() string { return "system" }
+
 // HookEvent represents the type of hook event.
 type HookEvent string
 
@@ -449,6 +506,45 @@ const (
 	// HookTaskCompleted is triggered when a task completes.
 	HookTaskCompleted HookEvent = "TaskCompleted"
 )
+
+// HookEvents lists all supported hook event names (TS parity helper).
+var HookEvents = []HookEvent{
+	HookPreToolUse,
+	HookPostToolUse,
+	HookPostToolUseFailure,
+	HookNotification,
+	HookUserPromptSubmit,
+	HookSessionStart,
+	HookSessionEnd,
+	HookStop,
+	HookSubagentStart,
+	HookSubagentStop,
+	HookPreCompact,
+	HookPermissionRequest,
+	HookSetup,
+	HookTeammateIdle,
+	HookTaskCompleted,
+}
+
+// ExitReason captures known session-end reasons.
+type ExitReason string
+
+const (
+	ExitReasonClear                     ExitReason = "clear"
+	ExitReasonLogout                    ExitReason = "logout"
+	ExitReasonPromptInputExit           ExitReason = "prompt_input_exit"
+	ExitReasonOther                     ExitReason = "other"
+	ExitReasonBypassPermissionsDisabled ExitReason = "bypass_permissions_disabled"
+)
+
+// ExitReasons lists all known session-end reasons (TS parity helper).
+var ExitReasons = []ExitReason{
+	ExitReasonClear,
+	ExitReasonLogout,
+	ExitReasonPromptInputExit,
+	ExitReasonOther,
+	ExitReasonBypassPermissionsDisabled,
+}
 
 // HookContext provides context for hook callbacks.
 type HookContext struct {
@@ -553,7 +649,7 @@ type SessionStartHookInput struct {
 // SessionEndHookInput is the input for SessionEnd hooks.
 type SessionEndHookInput struct {
 	BaseHookInput
-	Reason string `json:"reason"`
+	Reason ExitReason `json:"reason"`
 }
 
 // SetupHookInput is the input for Setup hooks.
@@ -1087,13 +1183,35 @@ type RewindFilesResult struct {
 	Deletions    int      `json:"deletions,omitempty"`
 }
 
+// MCPServerInfo describes connected server identity metadata.
+type MCPServerInfo struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
+// MCPServerToolAnnotations describes tool hints surfaced in MCP status.
+type MCPServerToolAnnotations struct {
+	ReadOnly    bool `json:"readOnly,omitempty"`
+	Destructive bool `json:"destructive,omitempty"`
+	OpenWorld   bool `json:"openWorld,omitempty"`
+}
+
+// MCPServerToolInfo describes a tool reported by MCP status.
+type MCPServerToolInfo struct {
+	Name        string                    `json:"name"`
+	Description string                    `json:"description,omitempty"`
+	Annotations *MCPServerToolAnnotations `json:"annotations,omitempty"`
+}
+
 // MCPServerStatus describes a server status returned by mcp_status.
 type MCPServerStatus struct {
-	Name   string         `json:"name"`
-	Status string         `json:"status"`
-	Scope  string         `json:"scope,omitempty"`
-	Error  string         `json:"error,omitempty"`
-	Config map[string]any `json:"config,omitempty"`
+	Name       string              `json:"name"`
+	Status     string              `json:"status"`
+	ServerInfo *MCPServerInfo      `json:"serverInfo,omitempty"`
+	Scope      string              `json:"scope,omitempty"`
+	Error      string              `json:"error,omitempty"`
+	Config     any                 `json:"config,omitempty"`
+	Tools      []MCPServerToolInfo `json:"tools,omitempty"`
 }
 
 // MCPSetServersResult describes dynamic MCP update results.

@@ -30,3 +30,6 @@ tools-config
 # Coverage output
 *.out
 coverage.html
+
+# Local planning scratch file
+TASKS.md

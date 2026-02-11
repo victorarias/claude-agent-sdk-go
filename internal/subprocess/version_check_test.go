@@ -56,7 +56,7 @@ func TestCheckCLIVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			version, err := checkCLIVersion(tt.cliPath)
+			version, err := checkCLIVersion(tt.cliPath, nil)
 			if tt.expectError && err == nil {
 				t.Errorf("expected error, got version: %s", version)
 			}
@@ -74,7 +74,7 @@ func TestCheckCLIVersionWithRealCLI(t *testing.T) {
 		t.Skip("claude CLI not installed, skipping version check test")
 	}
 
-	version, err := checkCLIVersion(cliPath)
+	version, err := checkCLIVersion(cliPath, nil)
 	if err != nil {
 		t.Fatalf("checkCLIVersion failed: %v", err)
 	}
