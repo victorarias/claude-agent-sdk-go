@@ -343,6 +343,17 @@ type ToolUseSummaryMessage struct {
 
 func (m *ToolUseSummaryMessage) MessageType() string { return "tool_use_summary" }
 
+// RateLimitEvent reports transient SDK throttling events.
+type RateLimitEvent struct {
+	UUID              string         `json:"uuid,omitempty"`
+	SessionID         string         `json:"session_id,omitempty"`
+	RetryAfterSeconds *float64       `json:"retry_after_seconds,omitempty"`
+	ResetsAt          string         `json:"resets_at,omitempty"`
+	Data              map[string]any `json:"data,omitempty"`
+}
+
+func (m *RateLimitEvent) MessageType() string { return "rate_limit_event" }
+
 // TaskNotificationMessage reports background task completion/failure.
 type TaskNotificationMessage struct {
 	Subtype    string `json:"subtype"`

@@ -79,6 +79,44 @@ func TestQuery_RawMessages(t *testing.T) {
 	}
 }
 
+func TestQuery_RateLimitEventDoesNotEmitParseError(t *testing.T) {
+	transport := NewMockTransport()
+	query := NewQuery(transport, true)
+
+	ctx := context.Background()
+	if err := query.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer query.Close()
+
+	transport.SendMessage(map[string]any{
+		"type":                "rate_limit_event",
+		"session_id":          "sess_1",
+		"retry_after_seconds": float64(2.5),
+	})
+
+	select {
+	case msg := <-query.Messages():
+		event, ok := msg.(*types.RateLimitEvent)
+		if !ok {
+			t.Fatalf("expected *types.RateLimitEvent, got %T", msg)
+		}
+		if event.RetryAfterSeconds == nil || *event.RetryAfterSeconds != 2.5 {
+			t.Fatalf("unexpected retry_after_seconds: %+v", event.RetryAfterSeconds)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for parsed rate_limit_event message")
+	}
+
+	select {
+	case err := <-query.Errors():
+		if err != nil {
+			t.Fatalf("unexpected parse error for rate_limit_event: %v", err)
+		}
+	case <-time.After(150 * time.Millisecond):
+	}
+}
+
 func TestQuery_ResultReceived(t *testing.T) {
 	transport := NewMockTransport()
 	query := NewQuery(transport, true)
