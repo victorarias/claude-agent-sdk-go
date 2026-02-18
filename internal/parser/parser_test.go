@@ -476,6 +476,39 @@ func TestParseMessage_ToolUseSummary(t *testing.T) {
 	}
 }
 
+func TestParseMessage_RateLimitEvent(t *testing.T) {
+	raw := map[string]any{
+		"type":                "rate_limit_event",
+		"uuid":                "rate_1",
+		"session_id":          "sess_1",
+		"retry_after_seconds": float64(1.75),
+		"resets_at":           "2026-02-18T21:15:00Z",
+		"scope":               "api",
+	}
+
+	msg, err := ParseMessage(raw)
+	if err != nil {
+		t.Fatalf("ParseMessage failed: %v", err)
+	}
+
+	event, ok := msg.(*types.RateLimitEvent)
+	if !ok {
+		t.Fatalf("expected *RateLimitEvent, got %T", msg)
+	}
+	if event.SessionID != "sess_1" {
+		t.Fatalf("expected session_id=sess_1, got %s", event.SessionID)
+	}
+	if event.RetryAfterSeconds == nil || *event.RetryAfterSeconds != 1.75 {
+		t.Fatalf("unexpected retry_after_seconds: %+v", event.RetryAfterSeconds)
+	}
+	if event.ResetsAt != "2026-02-18T21:15:00Z" {
+		t.Fatalf("unexpected resets_at: %s", event.ResetsAt)
+	}
+	if got := event.Data["scope"]; got != "api" {
+		t.Fatalf("unexpected raw payload scope: %v", got)
+	}
+}
+
 func TestParseMessage_SystemTaskNotification(t *testing.T) {
 	raw := map[string]any{
 		"type":        "system",

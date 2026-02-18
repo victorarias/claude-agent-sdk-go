@@ -39,6 +39,8 @@ func ParseMessage(raw map[string]any) (types.Message, error) {
 		return parseToolProgressMessage(raw)
 	case "tool_use_summary":
 		return parseToolUseSummaryMessage(raw)
+	case "rate_limit_event":
+		return parseRateLimitEvent(raw)
 	default:
 		return nil, &types.MessageParseError{
 			Message: fmt.Sprintf("unknown message type: %s", msgType),
@@ -160,6 +162,19 @@ func parseToolUseSummaryMessage(raw map[string]any) (*types.ToolUseSummaryMessag
 		PrecedingToolUseIDs: getStringSlice(raw, "preceding_tool_use_ids"),
 		UUID:                getString(raw, "uuid"),
 		SessionID:           getString(raw, "session_id"),
+	}
+	return msg, nil
+}
+
+func parseRateLimitEvent(raw map[string]any) (*types.RateLimitEvent, error) {
+	msg := &types.RateLimitEvent{
+		UUID:      getString(raw, "uuid"),
+		SessionID: getString(raw, "session_id"),
+		ResetsAt:  getString(raw, "resets_at"),
+		Data:      raw,
+	}
+	if retryAfter, ok := raw["retry_after_seconds"].(float64); ok {
+		msg.RetryAfterSeconds = &retryAfter
 	}
 	return msg, nil
 }
