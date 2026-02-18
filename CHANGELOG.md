@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/victorarias/claude-agent-sdk-go/compare/v0.1.1...v0.2.0) (2026-02-18)
+
+
+### Features
+
+* align Go SDK with latest Python SDK features ([#9](https://github.com/victorarias/claude-agent-sdk-go/issues/9)) ([0df6f90](https://github.com/victorarias/claude-agent-sdk-go/commit/0df6f90f0ef568a1f952dbfe24ec146d8cb1863c))
+* complete TS parity hardening + parser fuzz harness ([#11](https://github.com/victorarias/claude-agent-sdk-go/issues/11)) ([7cfb967](https://github.com/victorarias/claude-agent-sdk-go/commit/7cfb96740266fc7dc841bf16f2ec6943382ded94))
+
+
+### Bug Fixes
+
+* **parser:** parse structured result payload fields ([#12](https://github.com/victorarias/claude-agent-sdk-go/issues/12)) ([a3b128e](https://github.com/victorarias/claude-agent-sdk-go/commit/a3b128e9dad5c9f52d0197b874ea05b52c2e45e0))
+* **parser:** support rate_limit_event messages ([#13](https://github.com/victorarias/claude-agent-sdk-go/issues/13)) ([698f077](https://github.com/victorarias/claude-agent-sdk-go/commit/698f077a144c434264a7f9583d41c0a1ce3de8fc))
+
 ## [0.1.1](https://github.com/victorarias/claude-agent-sdk-go/compare/v0.1.0...v0.1.1) (2025-12-25)
 
 
